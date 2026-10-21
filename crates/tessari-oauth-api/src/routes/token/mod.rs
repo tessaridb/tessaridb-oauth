@@ -1,5 +1,6 @@
 //! `POST /{tenant}/oauth2/token` (RFC 6749 §3.2), redeeming an authorization code (§4.1.3), a refresh token (§6) or
-//! a confidential client's own credentials (§4.4).
+//! a confidential client's own credentials (§4.4); and the two other endpoints a client calls with its own
+//! authentication — revocation (RFC 7009) and pushed authorization requests (RFC 9126).
 //!
 //! The checks run in a fixed order. The client is authenticated before the code is read, so a code never names its
 //! presenter. The code is spent atomically before its bindings are checked, so it redeems once whatever the outcome,
@@ -14,6 +15,7 @@ mod answer;
 mod audit;
 mod client;
 mod proof;
+mod push;
 mod redeem;
 mod refresh;
 mod revoke;
@@ -59,13 +61,15 @@ const fn refusal(error: ErrorCode, reason: Reason) -> Refusal {
     Refusal { error, reason }
 }
 
-/// What a request to one of the two endpoints asks for.
+/// What a request to one of the three endpoints asks for.
 #[derive(Clone, Copy)]
 enum Operation {
     /// Tokens, at the token endpoint.
     Token,
     /// A refresh token revoked, at the revocation endpoint (RFC 7009).
     Revoke,
+    /// An authorization request kept for the browser to bring, at the pushed authorization request endpoint.
+    Push,
 }
 
 pub(super) async fn token(
@@ -84,6 +88,15 @@ pub(super) async fn revoke(
     form: Result<Form<Vec<(String, String)>>, FormRejection>,
 ) -> crate::Result<Response> {
     respond(&state, &tenant, &headers, form, Operation::Revoke).await
+}
+
+pub(super) async fn par(
+    State(state): State<PublicState>,
+    Path(tenant): Path<String>,
+    headers: HeaderMap,
+    form: Result<Form<Vec<(String, String)>>, FormRejection>,
+) -> crate::Result<Response> {
+    respond(&state, &tenant, &headers, form, Operation::Push).await
 }
 
 /// Read the form and answer `operation`: its result, a refusal with the specification's code alone, or the server's
@@ -115,22 +128,30 @@ async fn respond(
         (Ok(params), Operation::Token) => {
             exchange(state, &endpoint, headers, &params, client_id.as_ref())
                 .await
-                .map(|(issued, event)| (Json(issued).into_response(), event))
+                .map(|(issued, event)| (Json(issued).into_response(), Some(event)))
         }
         (Ok(params), Operation::Revoke) => {
             revoke::revoke(state, &endpoint, headers, &params, client_id.as_ref())
                 .await
-                .map(|event| (StatusCode::OK.into_response(), event))
+                .map(|event| (StatusCode::OK.into_response(), Some(event)))
+        }
+        // Nothing is issued by a push, so only its refusals are recorded.
+        (Ok(params), Operation::Push) => {
+            push::push(state, &endpoint, headers, &params, client_id.as_ref())
+                .await
+                .map(|pushed| (pushed, None))
         }
         (Err(refused), _) => Err(Failure::Refused(refused)),
     };
     match outcome {
         Ok((answered, event)) => {
-            state
-                .audit
-                .record(&endpoint.tenant, &event, endpoint.now)
-                .await
-                .map_err(Error::Store)?;
+            if let Some(event) = event {
+                state
+                    .audit
+                    .record(&endpoint.tenant, &event, endpoint.now)
+                    .await
+                    .map_err(Error::Store)?;
+            }
             Ok(no_store(answered))
         }
         Err(Failure::Server(error)) => Err(error),
@@ -138,6 +159,7 @@ async fn respond(
             let event = match operation {
                 Operation::Token => "token_refused",
                 Operation::Revoke => "revocation_refused",
+                Operation::Push => "push_refused",
             };
             tracing::warn!(
                 event,

@@ -10,6 +10,12 @@ pub const LOGIN_PATH: &str = "/login";
 /// §3.1.2.1), in bytes — the same handful of short parameters a query carries.
 pub const AUTHORIZE_BODY_MAX_BYTES: usize = 16 * 1024;
 
+/// The pushed authorization request endpoint path (RFC 9126 §2).
+pub const PAR_PATH: &str = "/oauth2/par";
+
+/// What a pushed request's id is written after to make its `request_uri` (RFC 9126 §2.2).
+pub const REQUEST_URI_PREFIX: &str = "urn:ietf:params:oauth:request_uri:";
+
 /// The token endpoint path (RFC 6749 §3.2).
 pub const TOKEN_PATH: &str = "/oauth2/token";
 

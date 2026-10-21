@@ -37,6 +37,13 @@ impl Params {
     pub fn get(&self, name: &str) -> Option<&str> {
         self.0.get(name).map(String::as_str)
     }
+
+    /// Every parameter with its value, each once.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.0
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str()))
+    }
 }
 
 #[cfg(test)]

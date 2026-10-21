@@ -1,5 +1,6 @@
 //! The public router: per tenant, the server metadata and the key set under the read limit, the authorization
-//! endpoint under its own, and the token and revocation endpoints under theirs, every form body capped.
+//! endpoint under its own, and the token, revocation and pushed-request endpoints under theirs, every form body
+//! capped.
 
 mod authorize;
 mod jwks;
@@ -42,6 +43,7 @@ pub fn public_router(state: PublicState) -> Router {
     let tokens = Router::new()
         .route("/{tenant}/oauth2/token", post(token::token))
         .route("/{tenant}/oauth2/revoke", post(token::revoke))
+        .route("/{tenant}/oauth2/par", post(token::par))
         .layer(DefaultBodyLimit::max(TOKEN_BODY_MAX_BYTES))
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
