@@ -15,6 +15,7 @@ pub mod keys;
 mod params;
 pub mod refresh;
 mod refusal;
+pub mod subject;
 pub mod token;
 
 pub use error::{Error, Result};
