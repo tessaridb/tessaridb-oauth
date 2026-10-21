@@ -5,7 +5,7 @@ An OAuth 2.1 authorization server and OpenID provider that keeps every piece of 
 portal and an embedded admin panel on its own listener.
 
 > Status: early development. The binary serves each tenant's server metadata (RFC 8414) and key set (RFC 7517)
-> over TLS, its authorization, token and revocation endpoints, and rotates the tenants' signing keys; the sign-in
+> over TLS, its authorization, pushed authorization request, token and revocation endpoints, and rotates the tenants' signing keys; the sign-in
 > page the authorization endpoint hands over to, and the account endpoints, are not served yet.
 
 ## What it is for
@@ -60,6 +60,12 @@ and sent nowhere, so a URI written into a forged request never receives an answe
 the registered URI with `error`, `state` and `iss` (RFC 9207). A request with `prompt=none` asks for no page and is
 refused with `login_required`. A valid request is kept for ten minutes and the browser is sent to `<issuer>/login`
 carrying only the kept request's id.
+
+A client may instead push those parameters to `POST <issuer>/oauth2/par` (RFC 9126), authenticating exactly as at the
+token endpoint; they are judged as the authorization endpoint judges them, every refusal answered to the client, and
+the answer names them by a `request_uri` for sixty seconds. The browser then brings only `client_id` and that
+`request_uri` to the authorization endpoint, where the pushed request is claimed once, by the client that pushed it,
+and nothing else in the URL is read. Pushing is advertised in the metadata and not required.
 
 The revocation endpoint `POST <issuer>/oauth2/revoke` (RFC 7009) authenticates the client exactly as the token
 endpoint does and revokes a refresh token together with its whole family. An unknown or already revoked token is

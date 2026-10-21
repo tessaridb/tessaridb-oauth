@@ -32,6 +32,9 @@ pub enum Reason {
     SilentWithoutSession,
     /// A pushed authorization request named a `request_uri` of its own (RFC 9126 §2.1).
     RequestUriInPush,
+    /// A `request_uri` names no pushed request this client may claim: malformed, unknown, lapsed, claimed already,
+    /// or another client's.
+    RequestUriUnknown,
     /// The client authenticated with a method other than the one pinned at registration.
     AuthMethodNotPinned,
     /// `grant_type` is not one this endpoint redeems.

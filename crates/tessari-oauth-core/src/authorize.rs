@@ -8,6 +8,7 @@
 
 use std::collections::BTreeSet;
 
+use tessari_oauth_constants::REQUEST_URI_PREFIX;
 use tessari_oauth_types::{Challenge, ClientId, ErrorCode, Resource, ScopeSet, TenantId};
 
 use crate::clients::{ClientDirectory, ClientRegistration};
@@ -123,6 +124,35 @@ where
     })
 }
 
+/// Step 3: the client and the pushed request a `request_uri` names (RFC 9126 §4), or `None` when the request
+/// carries none. The pushed request was judged in full when it was pushed and is the request; nothing else in these
+/// `pairs` is read. Every refusal renders at the server: no redirect URI has been proven yet.
+///
+/// # Errors
+///
+/// Returns the [`Refusal`] for a repeated parameter, a missing or malformed `client_id`, or a `request_uri` that is
+/// not one this server issues.
+pub fn pushed<I, K, V>(pairs: I) -> Result<Option<(ClientId, String)>, Refusal>
+where
+    I: IntoIterator<Item = (K, V)>,
+    K: Into<String>,
+    V: Into<String>,
+{
+    let params = Params::from_pairs(pairs).map_err(|_| render(Reason::DuplicateParameter))?;
+    let Some(request_uri) = params.get("request_uri") else {
+        return Ok(None);
+    };
+    let raw = params
+        .get("client_id")
+        .ok_or(render(Reason::MissingParameter))?;
+    let client_id = ClientId::parse(raw).map_err(|_| render(Reason::MalformedParameter))?;
+    let id = request_uri
+        .strip_prefix(REQUEST_URI_PREFIX)
+        .filter(|id| !id.is_empty())
+        .ok_or(render(Reason::RequestUriUnknown))?;
+    Ok(Some((client_id, id.to_owned())))
+}
+
 /// A refusal shown at the server, before the redirect URI is proven.
 const fn render(reason: Reason) -> Refusal {
     Refusal::RenderAtServer {
@@ -227,3 +257,7 @@ mod tests;
 #[cfg(test)]
 #[path = "authorize_prompt_tests.rs"]
 mod prompt_tests;
+
+#[cfg(test)]
+#[path = "authorize_pushed_tests.rs"]
+mod pushed_tests;

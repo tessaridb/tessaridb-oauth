@@ -3,7 +3,9 @@
 //!
 //! The request is judged in the core's fixed order. A refusal before the redirect URI is proven the client's own is
 //! shown on a page here and sent nowhere, so a URI an attacker wrote into the request never receives an answer from
-//! this domain; a later refusal goes back to that URI with `state` and the issuer (RFC 9207). A request that asks for
+//! this domain; a later refusal goes back to that URI with `state` and the issuer (RFC 9207). A `request_uri` brings a
+//! request its client pushed (RFC 9126): claimed once by that client, it is the request, and nothing else in the
+//! query is read; one that cannot be claimed is refused at the server. A request that asks for
 //! no page is refused with `login_required`, because no session can answer it yet. A valid request is kept as a
 //! pending authorization and the browser is sent to sign in carrying that record's id and nothing else. Every refusal
 //! is appended to the tenant's audit trail — identifiers and the reason, never the request's values — and is answered
@@ -61,34 +63,64 @@ async fn respond(
         .iter()
         .find(|(name, _)| name == "client_id")
         .and_then(|(_, raw)| ClientId::parse(raw).ok());
-    let found = match &client_id {
-        Some(client_id) => state
-            .clients
-            .find(&tenant, client_id)
-            .await
-            .map_err(Error::Store)?,
-        None => None,
-    };
-    let refused = match authorize::validate(&tenant, issuer, &Found(found), pairs) {
-        Ok(request) if !request.silent => {
-            let id = state
+    let named = pairs
+        .iter()
+        .map(|(name, value)| (name.as_str(), value.as_str()));
+    let (request, kept) = match authorize::pushed(named) {
+        // A pushed request was judged in full when it was pushed; claimed, it is the request (RFC 9126 §4).
+        Ok(Some((client, id))) => {
+            let claimed = state
                 .interactions
-                .open(&tenant, &request, now)
+                .claim(&tenant, &id, &client, now)
                 .await
                 .map_err(Error::Store)?;
-            return see_other(&format!("{issuer}{LOGIN_PATH}?interaction={id}"));
+            let Some(request) = claimed else {
+                let refused = Refusal::RenderAtServer {
+                    error: ErrorCode::InvalidRequest,
+                    reason: Reason::RequestUriUnknown,
+                };
+                return answer(state, &tenant, Some(&client), refused, now).await;
+            };
+            (request, Some(id))
         }
+        Ok(None) => {
+            let found = match &client_id {
+                Some(client_id) => state
+                    .clients
+                    .find(&tenant, client_id)
+                    .await
+                    .map_err(Error::Store)?,
+                None => None,
+            };
+            match authorize::validate(&tenant, issuer, &Found(found), pairs) {
+                Ok(request) => (request, None),
+                Err(refused) => {
+                    return answer(state, &tenant, client_id.as_ref(), refused, now).await;
+                }
+            }
+        }
+        Err(refused) => return answer(state, &tenant, client_id.as_ref(), refused, now).await,
+    };
+    if request.silent {
         // No session exists to answer from, and a silent request may never be shown a page.
-        Ok(request) => Refusal::RedirectToClient {
+        let refused = Refusal::RedirectToClient {
             redirect_uri: request.redirect_uri,
             error: ErrorCode::LoginRequired,
             state: request.state,
             iss: issuer.to_owned(),
             reason: Reason::SilentWithoutSession,
-        },
-        Err(refused) => refused,
+        };
+        return answer(state, &tenant, Some(&request.client_id), refused, now).await;
+    }
+    let id = match kept {
+        Some(id) => id,
+        None => state
+            .interactions
+            .open(&tenant, &request, now)
+            .await
+            .map_err(Error::Store)?,
     };
-    answer(state, &tenant, client_id.as_ref(), refused, now).await
+    see_other(&format!("{issuer}{LOGIN_PATH}?interaction={id}"))
 }
 
 /// Record `refused` for the client the request named, then answer it where it may go.

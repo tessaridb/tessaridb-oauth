@@ -5,7 +5,9 @@
 //! absent rather than promised.
 
 use serde::Serialize;
-use tessari_oauth_constants::{AUTHORIZATION_PATH, JWKS_PATH, REVOCATION_PATH, TOKEN_PATH};
+use tessari_oauth_constants::{
+    AUTHORIZATION_PATH, JWKS_PATH, PAR_PATH, REVOCATION_PATH, TOKEN_PATH,
+};
 use tessari_oauth_types::Algorithm;
 use url::Url;
 
@@ -36,6 +38,8 @@ pub struct Metadata {
     code_challenge_methods_supported: [&'static str; 1],
     dpop_signing_alg_values_supported: Vec<&'static str>,
     authorization_response_iss_parameter_supported: bool,
+    pushed_authorization_request_endpoint: String,
+    require_pushed_authorization_requests: bool,
 }
 
 /// The `issuer` exactly as given, when it is a valid issuer identifier.
@@ -86,6 +90,9 @@ pub fn metadata(issuer: &str) -> Result<Metadata, IssuerRefused> {
         dpop_signing_alg_values_supported: algorithm_names(&dpop::ALGORITHMS),
         // Every authorization response carries `iss` (RFC 9207).
         authorization_response_iss_parameter_supported: true,
+        // A client may push its request (RFC 9126); none is made to, so the browser's URL still works.
+        pushed_authorization_request_endpoint: format!("{issuer}{PAR_PATH}"),
+        require_pushed_authorization_requests: false,
     })
 }
 

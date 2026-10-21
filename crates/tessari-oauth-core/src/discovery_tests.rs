@@ -172,11 +172,20 @@ fn the_revocation_endpoint_is_advertised_with_the_token_endpoints_auth_methods()
 }
 
 #[test]
+fn pushed_authorization_requests_are_advertised_and_not_required() {
+    let document = document();
+    assert_eq!(
+        document["pushed_authorization_request_endpoint"],
+        "https://id.example.com/acme/oauth2/par"
+    );
+    assert_eq!(document["require_pushed_authorization_requests"], false);
+}
+
+#[test]
 fn nothing_the_server_does_not_enforce_yet_is_advertised() {
     let document = document();
     for field in [
         "userinfo_endpoint",
-        "pushed_authorization_request_endpoint",
         "id_token_signing_alg_values_supported",
         "subject_types_supported",
         "scopes_supported",
