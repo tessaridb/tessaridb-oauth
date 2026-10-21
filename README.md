@@ -4,8 +4,8 @@ An OAuth 2.1 authorization server and OpenID provider that keeps every piece of 
 [TessariDB](https://docs.tessaridb.com/). One binary carries the protocol endpoints, the users' account
 portal and an embedded admin panel on its own listener.
 
-> Status: early development. The protocol value types, the request validators, single-use code storage and
-> consent records on TessariDB exist; no endpoint is served yet.
+> Status: early development. The protocol value types, the request validators, single-use code storage,
+> consent records and rotating refresh-token families on TessariDB exist; no endpoint is served yet.
 
 ## What it is for
 
@@ -25,7 +25,9 @@ authorization-request and code-redemption validators in their fixed check order.
 by their SHA-256 digest only, and are spent with one conditional write, so of any number of simultaneous
 redemptions exactly one succeeds and the rest are reported as replays. Consent is a record per user and client
 holding the granted scopes, resources and consent policy version; a request outside it is answered with exactly
-what must be asked, simultaneous grants are all kept, and a revocation records who made it.
+what must be asked, simultaneous grants are all kept, and a revocation records who made it. Refresh tokens rotate on every use and are kept as digests only; a token
+presented again after it was rotated revokes its whole family, and a token lives at most 14 days unused and 30 days
+in all.
 
 ## Layout
 

@@ -6,6 +6,13 @@ pub const PKCE_VERIFIER_MIN_LEN: usize = 43;
 /// string to a digest.
 pub const PKCE_VERIFIER_MAX_LEN: usize = 128;
 
-/// Lifetime of an authorization code, in seconds (RFC 9700 §2.1.1 limits it; oauth binding 6). Nothing legitimate
+/// Lifetime of an authorization code, in seconds (RFC 9700 §2.1.1 limits it). Nothing legitimate
 /// needs longer: the client redeems the code in the request that receives it.
 pub const AUTHORIZATION_CODE_TTL_SECS: u64 = 60;
+
+/// Longest a refresh token stays usable without being used, in seconds: 14 days (RFC 9700 §4.14.2 asks for an
+/// idle and an absolute bound). Each rotation starts the idle clock again for its successor.
+pub const REFRESH_IDLE_TTL_SECS: u64 = 1_209_600;
+
+/// Longest a refresh-token family lives however often it is used, in seconds: 30 days. After it, the user signs in.
+pub const REFRESH_ABSOLUTE_TTL_SECS: u64 = 2_592_000;

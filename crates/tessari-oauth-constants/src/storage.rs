@@ -25,3 +25,7 @@ pub const STORE_SIGNIN_CONCURRENCY: usize = 4;
 /// Attempts at signing a new connection in when the node answers `throttled` (not now, as opposed to not this
 /// password), counting the first.
 pub const STORE_SIGNIN_ATTEMPTS: u32 = 6;
+
+/// Attempts at rotating one refresh token when the store answers `retry`, counting the first; as for a code
+/// spend, the losing rotation then sees the winner's and is answered as the reuse it is.
+pub const REFRESH_ROTATE_ATTEMPTS: u32 = 8;
