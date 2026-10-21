@@ -14,11 +14,12 @@ mod client;
 mod proof;
 mod redeem;
 mod refresh;
+mod revoke;
 
 use axum::Json;
 use axum::extract::rejection::FormRejection;
 use axum::extract::{Form, Path, State};
-use axum::http::{HeaderMap, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use tessari_oauth_core::clients::{ClientDirectory, ClientRegistration, GrantType};
 use tessari_oauth_core::token::{self, Endpoint, PresentedAuth, Refusal};
@@ -64,13 +65,43 @@ impl ClientDirectory for Found {
     }
 }
 
+/// What a request to one of the two endpoints asks for.
+#[derive(Clone, Copy)]
+enum Operation {
+    /// Tokens, at the token endpoint.
+    Token,
+    /// A refresh token revoked, at the revocation endpoint (RFC 7009).
+    Revoke,
+}
+
 pub(super) async fn token(
     State(state): State<PublicState>,
     Path(tenant): Path<String>,
     headers: HeaderMap,
     form: Result<Form<Vec<(String, String)>>, FormRejection>,
 ) -> crate::Result<Response> {
-    let (tenant, issuer) = state.tenant(&tenant)?;
+    respond(&state, &tenant, &headers, form, Operation::Token).await
+}
+
+pub(super) async fn revoke(
+    State(state): State<PublicState>,
+    Path(tenant): Path<String>,
+    headers: HeaderMap,
+    form: Result<Form<Vec<(String, String)>>, FormRejection>,
+) -> crate::Result<Response> {
+    respond(&state, &tenant, &headers, form, Operation::Revoke).await
+}
+
+/// Read the form and answer `operation`: its result, a refusal with the specification's code alone, or the server's
+/// failure.
+async fn respond(
+    state: &PublicState,
+    tenant: &str,
+    headers: &HeaderMap,
+    form: Result<Form<Vec<(String, String)>>, FormRejection>,
+    operation: Operation,
+) -> crate::Result<Response> {
+    let (tenant, issuer) = state.tenant(tenant)?;
     let endpoint = Endpoint {
         tenant,
         issuer: issuer.to_owned(),
@@ -86,23 +117,36 @@ pub(super) async fn token(
         .ok()
         .and_then(|params| params.get("client_id"))
         .and_then(|raw| ClientId::parse(raw).ok());
-    let outcome = match params {
-        Ok(params) => exchange(&state, &endpoint, &headers, &params, client_id.as_ref()).await,
-        Err(refused) => Err(Failure::Refused(refused)),
+    let outcome = match (params, operation) {
+        (Ok(params), Operation::Token) => {
+            exchange(state, &endpoint, headers, &params, client_id.as_ref())
+                .await
+                .map(|issued| Json(issued).into_response())
+        }
+        (Ok(params), Operation::Revoke) => {
+            revoke::revoke(state, &endpoint, headers, &params, client_id.as_ref())
+                .await
+                .map(|()| StatusCode::OK.into_response())
+        }
+        (Err(refused), _) => Err(Failure::Refused(refused)),
     };
     match outcome {
-        Ok(issued) => Ok(no_store(Json(issued).into_response())),
+        Ok(answered) => Ok(no_store(answered)),
         Err(Failure::Server(error)) => Err(error),
         Err(Failure::Refused(refused)) => {
+            let event = match operation {
+                Operation::Token => "token_refused",
+                Operation::Revoke => "revocation_refused",
+            };
             tracing::warn!(
-                event = "token_refused",
+                event,
                 tenant = endpoint.tenant.as_str(),
                 client = client_id.as_ref().map(ClientId::as_str),
                 reason = ?refused.reason,
                 error = refused.error.as_str(),
                 "a token request was refused"
             );
-            Ok(answer_refusal(refused, presents_basic(&headers)))
+            Ok(answer_refusal(refused, presents_basic(headers)))
         }
     }
 }
@@ -115,6 +159,29 @@ async fn exchange(
     params: &Params,
     client_id: Option<&ClientId>,
 ) -> Result<Issued, Failure> {
+    let client = authenticate(state, endpoint, headers, params, client_id).await?;
+    let proof = proof::read(headers, endpoint, &client)?;
+    match token::require_grant(params, &client)? {
+        GrantType::AuthorizationCode => {
+            redeem(state, endpoint, &client, params, proof.as_ref()).await
+        }
+        GrantType::RefreshToken => {
+            refresh::refresh(state, endpoint, &client, params, proof.as_ref()).await
+        }
+        GrantType::ClientCredentials => {
+            client::client_credentials(state, endpoint, &client, params, proof.as_ref()).await
+        }
+    }
+}
+
+/// The client the request authenticates as, by its pinned method; an assertion it presents is spent once.
+async fn authenticate(
+    state: &PublicState,
+    endpoint: &Endpoint,
+    headers: &HeaderMap,
+    params: &Params,
+    client_id: Option<&ClientId>,
+) -> Result<ClientRegistration, Failure> {
     let presented = presented(headers, params)?;
     let found = match client_id {
         Some(client_id) => state
@@ -135,19 +202,7 @@ async fn exchange(
             return Err(refusal(ErrorCode::InvalidClient, Reason::AssertionReplayed).into());
         }
     }
-    let client = authenticated.client;
-    let proof = proof::read(headers, endpoint, &client)?;
-    match token::require_grant(params, &client)? {
-        GrantType::AuthorizationCode => {
-            redeem(state, endpoint, &client, params, proof.as_ref()).await
-        }
-        GrantType::RefreshToken => {
-            refresh::refresh(state, endpoint, &client, params, proof.as_ref()).await
-        }
-        GrantType::ClientCredentials => {
-            client::client_credentials(state, endpoint, &client, params, proof.as_ref()).await
-        }
-    }
+    Ok(authenticated.client)
 }
 
 /// The one client authentication method the request presents (RFC 6749 §2.3: never more than one).

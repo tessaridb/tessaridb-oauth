@@ -17,7 +17,7 @@ use crate::token_fixture::{API, NOW, REDIRECT, Server, post, server, tenant, unc
 const FILES: &str = "https://files.example.com/";
 
 /// `machine`, a `private_key_jwt` client registered for client credentials at the API and the file store.
-async fn machine(server: &Server) -> SigningKey {
+pub(crate) async fn machine(server: &Server) -> SigningKey {
     let (key, _) = SigningKey::generate(Algorithm::Es256).expect("a key");
     let client = NewClient {
         client_id: ClientId::parse("machine").expect("a client id"),

@@ -5,7 +5,8 @@ An OAuth 2.1 authorization server and OpenID provider that keeps every piece of 
 portal and an embedded admin panel on its own listener.
 
 > Status: early development. The binary serves each tenant's server metadata (RFC 8414) and key set (RFC 7517)
-> over TLS and rotates the tenants' signing keys; the authorization, token and account endpoints are not served yet.
+> over TLS, its token and revocation endpoints, and rotates the tenants' signing keys; the authorization and account
+> endpoints are not served yet.
 
 ## What it is for
 
@@ -52,6 +53,12 @@ DPoP proof (RFC 9449) — one `DPoP` header, verified for this endpoint and spen
 receives a `DPoP` token naming the proof's key in `cnf.jkt`; a client registered with `dpop_bound_access_tokens`
 is refused without one, and a public client's refresh token keeps needing the key it was issued to. Without a
 proof the token is `Bearer`. Refusals carry the `error` code alone.
+
+The revocation endpoint `POST <issuer>/oauth2/revoke` (RFC 7009) authenticates the client exactly as the token
+endpoint does and revokes a refresh token together with its whole family. An unknown or already revoked token is
+answered `200` like a revoked one, another client's token is refused with `invalid_grant` and left usable, and a
+`token_type_hint` is only a hint. An access token is refused with `unsupported_token_type`: it is never recalled
+and stays valid for at most its five minutes. Discovery advertises the endpoint and its authentication methods.
 
 ## Layout
 

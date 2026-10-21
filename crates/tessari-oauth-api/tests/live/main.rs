@@ -15,3 +15,4 @@ mod token_dpop;
 mod token_fixture;
 mod token_refresh;
 mod token_refusals;
+mod token_revoke;

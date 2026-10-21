@@ -94,4 +94,6 @@ pub enum Reason {
     RefreshRevoked,
     /// The refresh token is bound to a DPoP key other than the proof's.
     RefreshOtherKey,
+    /// A revocation named an access token, which lives out its short lifetime and is never recalled.
+    AccessTokenNotRevocable,
 }

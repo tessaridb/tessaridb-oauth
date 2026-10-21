@@ -155,10 +155,26 @@ fn the_signing_algorithms_are_the_ones_the_jose_checks_accept() {
 }
 
 #[test]
+fn the_revocation_endpoint_is_advertised_with_the_token_endpoints_auth_methods() {
+    let document = document();
+    assert_eq!(
+        document["revocation_endpoint"],
+        "https://id.example.com/acme/oauth2/revoke"
+    );
+    assert_eq!(
+        names(&document, "revocation_endpoint_auth_methods_supported"),
+        names(&document, "token_endpoint_auth_methods_supported")
+    );
+    assert_eq!(
+        names(&document, "revocation_endpoint_auth_methods_supported"),
+        ["none", "private_key_jwt"]
+    );
+}
+
+#[test]
 fn nothing_the_server_does_not_enforce_yet_is_advertised() {
     let document = document();
     for field in [
-        "revocation_endpoint",
         "userinfo_endpoint",
         "pushed_authorization_request_endpoint",
         "id_token_signing_alg_values_supported",

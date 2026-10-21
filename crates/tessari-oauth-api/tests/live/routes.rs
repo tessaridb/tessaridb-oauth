@@ -66,14 +66,18 @@ async fn get(storage: &Storage, path: &str) -> Answer {
     answer(response).await
 }
 
-/// The parts of `response` a test reads; every body is JSON.
+/// The parts of `response` a test reads; every body is JSON, or empty and read as `null`.
 pub(crate) async fn answer(response: Response) -> Answer {
     let status = response.status();
     let headers = response.headers().clone();
     let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024)
         .await
         .expect("a body");
-    let body = serde_json::from_slice(&bytes).expect("a JSON body");
+    let body = if bytes.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_slice(&bytes).expect("a JSON body")
+    };
     Answer {
         status,
         headers,

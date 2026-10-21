@@ -5,6 +5,9 @@ pub const AUTHORIZATION_PATH: &str = "/oauth2/authorize";
 /// The token endpoint path (RFC 6749 §3.2).
 pub const TOKEN_PATH: &str = "/oauth2/token";
 
+/// The revocation endpoint path (RFC 7009 §2).
+pub const REVOCATION_PATH: &str = "/oauth2/revoke";
+
 /// The key set path (RFC 8414 `jwks_uri`).
 pub const JWKS_PATH: &str = "/oauth2/jwks";
 

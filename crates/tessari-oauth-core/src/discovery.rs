@@ -5,7 +5,7 @@
 //! absent rather than promised.
 
 use serde::Serialize;
-use tessari_oauth_constants::{AUTHORIZATION_PATH, JWKS_PATH, TOKEN_PATH};
+use tessari_oauth_constants::{AUTHORIZATION_PATH, JWKS_PATH, REVOCATION_PATH, TOKEN_PATH};
 use tessari_oauth_types::Algorithm;
 use url::Url;
 
@@ -31,6 +31,8 @@ pub struct Metadata {
     grant_types_supported: Vec<&'static str>,
     token_endpoint_auth_methods_supported: [&'static str; 2],
     token_endpoint_auth_signing_alg_values_supported: Vec<&'static str>,
+    revocation_endpoint: String,
+    revocation_endpoint_auth_methods_supported: [&'static str; 2],
     code_challenge_methods_supported: [&'static str; 1],
     dpop_signing_alg_values_supported: Vec<&'static str>,
     authorization_response_iss_parameter_supported: bool,
@@ -77,6 +79,9 @@ pub fn metadata(issuer: &str) -> Result<Metadata, IssuerRefused> {
         grant_types_supported: GrantType::ALL.iter().map(|grant| grant.name()).collect(),
         token_endpoint_auth_methods_supported: VERIFIED_AUTH_METHODS,
         token_endpoint_auth_signing_alg_values_supported: algorithm_names(&Algorithm::ALL),
+        // The revocation endpoint authenticates a client exactly as the token endpoint does.
+        revocation_endpoint: format!("{issuer}{REVOCATION_PATH}"),
+        revocation_endpoint_auth_methods_supported: VERIFIED_AUTH_METHODS,
         code_challenge_methods_supported: [CHALLENGE_METHOD_S256],
         dpop_signing_alg_values_supported: algorithm_names(&dpop::ALGORITHMS),
         // Every authorization response carries `iss` (RFC 9207).

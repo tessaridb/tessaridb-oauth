@@ -24,6 +24,8 @@ pub enum ErrorCode {
     InvalidDpopProof,
     /// The requested resource is not one the grant covers, or none was named where one must be (RFC 8707 §2).
     InvalidTarget,
+    /// The server does not revoke this type of token (RFC 7009 §2.2.1).
+    UnsupportedTokenType,
 }
 
 impl ErrorCode {
@@ -40,6 +42,7 @@ impl ErrorCode {
             Self::UnsupportedGrantType => "unsupported_grant_type",
             Self::InvalidDpopProof => "invalid_dpop_proof",
             Self::InvalidTarget => "invalid_target",
+            Self::UnsupportedTokenType => "unsupported_token_type",
         }
     }
 }
