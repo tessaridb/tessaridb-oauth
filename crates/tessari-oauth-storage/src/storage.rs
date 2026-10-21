@@ -5,10 +5,10 @@ use std::sync::Arc;
 use tessari_oauth_infrastructure::tessaridb::Database;
 
 use crate::Tenancy;
-use crate::assertions::{AssertionService, TessaridbAssertionRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
 use crate::consents::{ConsentService, TessaridbConsentRepository};
 use crate::refresh::{RefreshService, TessaridbRefreshRepository};
+use crate::replay::{ReplayService, TessaridbReplayRepository};
 use crate::tenants::{TenantService, TessaridbTenantRepository};
 
 /// The services the server reaches its records through.
@@ -22,8 +22,8 @@ pub struct Storage {
     pub consents: Arc<ConsentService>,
     /// Refresh-token families.
     pub refresh: Arc<RefreshService>,
-    /// Spent client assertions.
-    pub assertions: Arc<AssertionService>,
+    /// Spent client assertions and DPoP proofs.
+    pub replay: Arc<ReplayService>,
 }
 
 impl Storage {
@@ -34,13 +34,13 @@ impl Storage {
         let code_repository = Arc::new(TessaridbCodeRepository::new(database.clone()));
         let consent_repository = Arc::new(TessaridbConsentRepository::new(database.clone()));
         let refresh_repository = Arc::new(TessaridbRefreshRepository::new(database.clone()));
-        let assertion_repository = Arc::new(TessaridbAssertionRepository::new(database.clone()));
+        let replay_repository = Arc::new(TessaridbReplayRepository::new(database.clone()));
         Self {
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
             codes: Arc::new(CodeService::new(code_repository, tenancy.clone())),
             consents: Arc::new(ConsentService::new(consent_repository, tenancy.clone())),
             refresh: Arc::new(RefreshService::new(refresh_repository, tenancy.clone())),
-            assertions: Arc::new(AssertionService::new(assertion_repository, tenancy.clone())),
+            replay: Arc::new(ReplayService::new(replay_repository, tenancy.clone())),
         }
     }
 }

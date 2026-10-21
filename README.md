@@ -24,7 +24,10 @@ check, the redirect-URI type and its matching rule, the thumbprint, tenant, clie
 authorization-request, code-redemption and refresh-request validators in their fixed check order; a client
 redeems only the grant types it registered, and a refresh may narrow its scopes but never widen them. Confidential clients authenticate with `private_key_jwt`: an Ed25519 or ES256 assertion
 signed by a key the client registered, addressed to the tenant's issuer alone, and valid for at most five minutes. Each assertion is accepted once: its `jti` is recorded in a
-TessariDB space until it could no longer be accepted, and a second presentation is refused as a replay. Authorization codes are stored
+TessariDB space until it could no longer be accepted, and a second presentation is refused as a replay. DPoP proofs
+(RFC 9449) are checked the same way: typed `dpop+jwt`, signed by the public key they carry under the server's
+algorithms, bound to this method and URI, at most a minute old, and accepted once per key; the token they accompany
+is bound to that key's RFC 7638 thumbprint. Authorization codes are stored
 by their SHA-256 digest only, and are spent with one conditional write, so of any number of simultaneous
 redemptions exactly one succeeds and the rest are reported as replays. Consent is a record per user and client
 holding the granted scopes, resources and consent policy version; a request outside it is answered with exactly
