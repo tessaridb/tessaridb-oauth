@@ -1,0 +1,8 @@
+//! The public routes end to end over a real TessariDB node, called through the router as the listener calls it.
+//!
+//! Needs `TESSARIDB_OAUTH_TEST_STORE`, `TESSARIDB_OAUTH_TEST_USER` and `TESSARIDB_OAUTH_TEST_PASSWORD`; without them
+//! the store-backed tests are `ignored`, and `cargo test -p tessari-oauth-api --test live -- --ignored` runs them.
+
+#![cfg(test)]
+
+mod routes;

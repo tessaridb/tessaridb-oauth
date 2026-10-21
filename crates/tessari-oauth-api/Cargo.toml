@@ -9,14 +9,21 @@ publish.workspace = true
 # Integration tests are declared one binary per crate when they exist; never one per file under `tests/`.
 autotests = false
 
+[[test]]
+name = "live"
+path = "tests/live/main.rs"
+
 [lib]
 doctest = false
 
 [dependencies]
 tessari-oauth-constants.workspace = true
+tessari-oauth-core.workspace = true
+tessari-oauth-storage.workspace = true
 tessari-oauth-types.workspace = true
 thiserror.workspace = true
 axum.workspace = true
+serde.workspace = true
 tower.workspace = true
 hyper-util.workspace = true
 http-body.workspace = true
@@ -27,7 +34,9 @@ tracing.workspace = true
 
 [dev-dependencies]
 tessari-oauth-infrastructure.workspace = true
+tessari-oauth-test-support.workspace = true
 rcgen.workspace = true
+serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util"] }
 
 [lints]
