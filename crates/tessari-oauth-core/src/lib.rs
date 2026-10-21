@@ -4,6 +4,7 @@
 pub mod authorize;
 pub mod clients;
 pub mod codes;
+pub mod consents;
 mod error;
 mod params;
 mod refusal;

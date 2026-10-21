@@ -3,10 +3,19 @@
 //! A connection is a session: it holds the identity it signed in with and whatever `USE` it was last given. The
 //! identity is worth keeping — a password costs an Argon2id verification, so it is spent once per connection —
 //! and the `USE` is not, so every unit of work carries its own. A connection that failed is dropped rather than
-//! handed to the next caller in an unknown state.
+//! handed to the next caller in an unknown state, and so is a new connection whose sign-in may not have happened:
+//! reused, it would send work with no credentials and no session behind it.
+//!
+//! The node verifies only so many passwords at once and answers `throttled` beyond that, so new connections sign
+//! in a few at a time and a throttled sign-in is tried again, bounded.
 
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
 
+use tessari_oauth_constants::{
+    STORE_RETRY_FIRST_PAUSE_MS, STORE_RETRY_MAX_PAUSE_MS, STORE_SIGNIN_ATTEMPTS,
+    STORE_SIGNIN_CONCURRENCY,
+};
 use tessaridb_client::{Answer, Client, RefusalClass, Value};
 use tokio::sync::Semaphore;
 
@@ -23,6 +32,7 @@ struct Inner {
     config: StoreConfig,
     idle: Mutex<Vec<Client>>,
     slots: Semaphore,
+    signins: Semaphore,
 }
 
 impl Database {
@@ -34,6 +44,7 @@ impl Database {
                 config,
                 idle: Mutex::new(Vec::new()),
                 slots: Semaphore::new(connections),
+                signins: Semaphore::new(STORE_SIGNIN_CONCURRENCY),
             }),
         }
     }
@@ -87,20 +98,67 @@ impl Database {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .pop();
-        let (mut client, signing_in) = match reused {
-            Some(client) => (client, false),
-            None => (self.connect().await?, true),
-        };
+        if let Some(client) = reused {
+            return self
+                .send(client, false, &script, parameters, preamble)
+                .await;
+        }
+        let mut pause = Duration::from_millis(STORE_RETRY_FIRST_PAUSE_MS);
+        let longest = Duration::from_millis(STORE_RETRY_MAX_PAUSE_MS);
+        let mut made = 1;
+        loop {
+            let signing = self
+                .inner
+                .signins
+                .acquire()
+                .await
+                .map_err(|_| Error::Unavailable {
+                    message: "the connection pool is closed".to_owned(),
+                })?;
+            let client = self.connect().await?;
+            let outcome = self
+                .send(client, true, &script, parameters.clone(), preamble)
+                .await;
+            drop(signing);
+            let throttled = matches!(
+                &outcome,
+                Err(Error::Refused {
+                    class: Some(RefusalClass::Throttled),
+                    ..
+                })
+            );
+            if !throttled || made >= STORE_SIGNIN_ATTEMPTS {
+                return outcome;
+            }
+            tokio::time::sleep(pause).await;
+            pause = pause.saturating_mul(2).min(longest);
+            made = made.saturating_add(1);
+        }
+    }
+
+    /// Send one request on `client`, signing in first when `signing_in`, and keep the connection only when its
+    /// session is certainly intact.
+    async fn send(
+        &self,
+        mut client: Client,
+        signing_in: bool,
+        script: &str,
+        parameters: Vec<(String, Value)>,
+        preamble: usize,
+    ) -> Result<Vec<Answer>> {
         let config = &self.inner.config;
         let credentials = signing_in.then_some((config.user.as_str(), config.password.as_str()));
-        match client.run_with(&script, credentials, parameters).await {
+        match client.run_with(script, credentials, parameters).await {
             Ok(answers) => {
                 self.release(client);
                 Ok(answers.into_iter().skip(preamble).collect())
             }
             Err(tessaridb_client::Error::Refused { message, class }) => {
-                // A refused statement leaves the session intact, unless the refusal was the sign-in itself.
-                if class != Some(RefusalClass::Unauthenticated) {
+                // A refused statement leaves the session intact — unless the refusal was about the session itself,
+                // or was a sign-in the node did not take, which leaves a connection that never signed in.
+                let session_lost = class == Some(RefusalClass::Unauthenticated)
+                    || (signing_in && class == Some(RefusalClass::Throttled));
+                if !session_lost {
                     self.release(client);
                 }
                 Err(Error::Refused { message, class })

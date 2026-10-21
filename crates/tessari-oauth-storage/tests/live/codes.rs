@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tessari_oauth_core::codes::IssuedCode;
 use tessari_oauth_storage::codes::Consumed;
 use tessari_oauth_types::{
-    AuthorizationCode, Challenge, ClientId, ErrorCategory, ScopeSet, TenantId, Timestamp,
+    AuthorizationCode, Challenge, ClientId, ErrorCategory, ScopeSet, TenantId, Timestamp, UserId,
 };
 use tokio::sync::Barrier;
 
@@ -25,6 +25,7 @@ fn issued() -> IssuedCode {
     IssuedCode {
         tenant: tenant(),
         client_id: ClientId::parse("portal").expect("a client id"),
+        user: UserId::parse("user-7").expect("a user id"),
         redirect_uri: "https://portal.example.com/callback".to_owned(),
         challenge: Challenge::of(VERIFIER).expect("a challenge"),
         scopes: ScopeSet::parse("openid profile").expect("scopes"),

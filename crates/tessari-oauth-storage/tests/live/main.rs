@@ -7,6 +7,7 @@
 #![cfg(test)]
 
 mod codes;
+mod consents;
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};

@@ -44,6 +44,19 @@ impl ScopeSet {
         self.0.is_subset(&ceiling.0)
     }
 
+    /// The scopes in this set that `granted` lacks, or `None` when it holds them all.
+    #[must_use]
+    pub fn missing_from(&self, granted: &Self) -> Option<Self> {
+        let missing: BTreeSet<String> = self.0.difference(&granted.0).cloned().collect();
+        (!missing.is_empty()).then_some(Self(missing))
+    }
+
+    /// Every scope in this set or in `other`.
+    #[must_use]
+    pub fn union(&self, other: &Self) -> Self {
+        Self(self.0.union(&other.0).cloned().collect())
+    }
+
     /// The scopes in sorted order.
     pub fn iter(&self) -> impl Iterator<Item = &str> {
         self.0.iter().map(String::as_str)

@@ -4,8 +4,8 @@ An OAuth 2.1 authorization server and OpenID provider that keeps every piece of 
 [TessariDB](https://docs.tessaridb.com/). One binary carries the protocol endpoints, the users' account
 portal and an embedded admin panel on its own listener.
 
-> Status: early development. The protocol value types, the request validators and single-use code storage on
-> TessariDB exist; no endpoint is served yet.
+> Status: early development. The protocol value types, the request validators, single-use code storage and
+> consent records on TessariDB exist; no endpoint is served yet.
 
 ## What it is for
 
@@ -23,7 +23,9 @@ password grants will not be offered. Implemented so far, as pure functions witho
 check, the redirect-URI type and its matching rule, the thumbprint, tenant, client and scope value types, and the
 authorization-request and code-redemption validators in their fixed check order. Authorization codes are stored
 by their SHA-256 digest only, and are spent with one conditional write, so of any number of simultaneous
-redemptions exactly one succeeds and the rest are reported as replays.
+redemptions exactly one succeeds and the rest are reported as replays. Consent is a record per user and client
+holding the granted scopes, resources and consent policy version; a request outside it is answered with exactly
+what must be asked, simultaneous grants are all kept, and a revocation records who made it.
 
 ## Layout
 

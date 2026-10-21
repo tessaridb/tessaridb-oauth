@@ -4,7 +4,24 @@
 /// surfaces as a failure instead of a loop.
 pub const CODE_SPEND_ATTEMPTS: u32 = 8;
 
-/// Pause before the second spend attempt, in milliseconds; each later pause doubles. Eight attempts wait at most
-/// 2 + 4 + … + 128 = 254 ms in all, well inside a token request's budget, and the first pause is about one device
-/// sync.
-pub const CODE_SPEND_FIRST_PAUSE_MS: u64 = 2;
+/// Attempts at writing one consent record, counting the first. A grant is read, merged and written back under a
+/// revision check; each refused attempt means another writer of the same record succeeded, so the bound is the
+/// number of simultaneous grants for one user and client that are still served rather than failed.
+pub const CONSENT_WRITE_ATTEMPTS: u32 = 32;
+
+/// Pause before a store write is tried again, in milliseconds; each later pause doubles up to
+/// [`STORE_RETRY_MAX_PAUSE_MS`]. The first pause is about one device sync, which is what a `retry` is waiting on.
+pub const STORE_RETRY_FIRST_PAUSE_MS: u64 = 2;
+
+/// Longest pause between two attempts at one store write, in milliseconds. Eight code-spend attempts wait at most
+/// 2 + 4 + … + 64 + 64 = 190 ms in all, inside a token request's budget.
+pub const STORE_RETRY_MAX_PAUSE_MS: u64 = 64;
+
+/// Sign-ins one connection pool runs at once. A node verifies at most 24 passwords at a time per process and answers
+/// `throttled` beyond that, so a pool opening many connections together signs them in a few at a time rather than
+/// spending the node's whole allowance — and leaves room for the other replicas sharing it.
+pub const STORE_SIGNIN_CONCURRENCY: usize = 4;
+
+/// Attempts at signing a new connection in when the node answers `throttled` (not now, as opposed to not this
+/// password), counting the first.
+pub const STORE_SIGNIN_ATTEMPTS: u32 = 6;

@@ -9,6 +9,8 @@ pub struct CodeEntity {
     pub tenant: String,
     /// The client the code was issued to.
     pub client_id: String,
+    /// The user who authorised the code.
+    pub user_id: String,
     /// The redirect URI exactly as the authorization request named it.
     pub redirect_uri: String,
     /// The PKCE S256 challenge.
@@ -26,6 +28,7 @@ impl FromRecord for CodeEntity {
         Ok(Self {
             tenant: row.take("tenant")?,
             client_id: row.take("client_id")?,
+            user_id: row.take("user_id")?,
             redirect_uri: row.take("redirect_uri")?,
             challenge: row.take("challenge")?,
             scopes: row.take("scopes")?,

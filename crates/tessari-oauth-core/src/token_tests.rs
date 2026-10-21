@@ -1,5 +1,5 @@
 use tessari_oauth_constants::AUTHORIZATION_CODE_TTL_SECS;
-use tessari_oauth_types::{Challenge, ClientId, ErrorCode, ScopeSet, Timestamp};
+use tessari_oauth_types::{Challenge, ClientId, ErrorCode, ScopeSet, Timestamp, UserId};
 
 use super::{
     PresentedAuth, Refusal, authenticate_client, read, redeem_code,
@@ -15,6 +15,7 @@ fn issued() -> IssuedCode {
     IssuedCode {
         tenant: acme(),
         client_id: ClientId::parse("app").expect("fixture"),
+        user: UserId::parse("user-1").expect("fixture"),
         redirect_uri: REDIRECT.to_owned(),
         challenge: Challenge::parse(CHALLENGE).expect("fixture"),
         scopes: ScopeSet::parse("openid").expect("fixture"),

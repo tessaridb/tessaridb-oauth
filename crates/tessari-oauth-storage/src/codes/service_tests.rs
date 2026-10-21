@@ -17,6 +17,7 @@ fn spent_row() -> CodeEntity {
     CodeEntity {
         tenant: "acme-eu".to_owned(),
         client_id: "portal".to_owned(),
+        user_id: "user-7".to_owned(),
         redirect_uri: "https://portal.example.com/callback".to_owned(),
         challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM".to_owned(),
         scopes: vec!["openid".to_owned()],

@@ -11,17 +11,18 @@
 //! a bounded number of times, never by reading.
 
 use std::sync::Arc;
-use std::time::Duration;
 
-use tessari_oauth_constants::{CODE_SPEND_ATTEMPTS, CODE_SPEND_FIRST_PAUSE_MS};
+use tessari_oauth_constants::CODE_SPEND_ATTEMPTS;
 use tessari_oauth_core::codes::IssuedCode;
-use tessari_oauth_types::{AuthorizationCode, Challenge, ClientId, ScopeSet, TenantId, Timestamp};
+use tessari_oauth_types::{
+    AuthorizationCode, Challenge, ClientId, ScopeSet, TenantId, Timestamp, UserId,
+};
 
 use tessari_oauth_infrastructure::tessaridb::Place;
 
 use super::CodeEntity;
 use super::repository::CodeRepository;
-use crate::{Error, Result, Tenancy};
+use crate::{Error, Result, Tenancy, retry};
 
 /// What a consume found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +53,7 @@ fn to_entity(code: &IssuedCode) -> Result<CodeEntity> {
     Ok(CodeEntity {
         tenant: code.tenant.as_str().to_owned(),
         client_id: code.client_id.as_str().to_owned(),
+        user_id: code.user.as_str().to_owned(),
         redirect_uri: code.redirect_uri.clone(),
         challenge: code.challenge.as_str().to_owned(),
         scopes: code.scopes.iter().map(str::to_owned).collect(),
@@ -66,6 +68,7 @@ fn to_model(row: CodeEntity) -> Result<IssuedCode> {
     Ok(IssuedCode {
         tenant: TenantId::parse(row.tenant).map_err(|_| unreadable("tenant"))?,
         client_id: ClientId::parse(row.client_id).map_err(|_| unreadable("client_id"))?,
+        user: UserId::parse(row.user_id).map_err(|_| unreadable("user"))?,
         redirect_uri: row.redirect_uri,
         challenge: Challenge::parse(row.challenge).map_err(|_| unreadable("challenge"))?,
         scopes: ScopeSet::parse(&row.scopes.join(" ")).map_err(|_| unreadable("scopes"))?,
@@ -128,18 +131,10 @@ impl CodeService {
 
     /// The conditional spend, asked again while the store answers `retry` and attempts remain.
     async fn spend(&self, place: &Place, digest: &str, at: i64) -> Result<Option<CodeEntity>> {
-        let mut pause = Duration::from_millis(CODE_SPEND_FIRST_PAUSE_MS);
-        let mut attempt = 1;
-        loop {
-            let outcome = self.repository.mark_redeemed(place, digest, at).await;
-            let retry = matches!(&outcome, Err(Error::Store(store)) if store.is_retry());
-            if !retry || attempt >= CODE_SPEND_ATTEMPTS {
-                return outcome;
-            }
-            tokio::time::sleep(pause).await;
-            pause = pause.saturating_mul(2);
-            attempt = attempt.saturating_add(1);
-        }
+        retry::bounded(CODE_SPEND_ATTEMPTS, retry::on_store_retry, || {
+            self.repository.mark_redeemed(place, digest, at)
+        })
+        .await
     }
 }
 
