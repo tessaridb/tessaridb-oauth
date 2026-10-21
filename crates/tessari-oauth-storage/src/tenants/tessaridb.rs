@@ -14,6 +14,8 @@ use crate::Result;
 /// `refresh_families` and `refresh_tokens` hold each family and each of its tokens under a digest; a token is read by
 /// id, and the families an account event revokes are found by user or by client. `signing_keys` holds each key sealed with its public half and dates; it is listed whole, oldest first.
 /// `replays` is a space of spent client assertions and DPoP proofs whose keys expire with what they record.
+/// `audit` is a topic of one message per issuance, refusal, replay, reuse and revocation, which the store keeps in commit
+/// order and never lets anyone rewrite or delete; a message is kept for 400 days.
 /// `clients` holds each client's registration under its id; every read is by id. `secrets` holds the tenant's sealed
 /// secrets under the id naming their purpose — the pairwise salt.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
@@ -37,6 +39,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      kid string REQUIRED, tenant string REQUIRED, algorithm string REQUIRED, sealed string REQUIRED, \
      public_jwk string REQUIRED, created_at int REQUIRED, compromised bool REQUIRED, retired_at int); \
      DEFINE SPACE IF NOT EXISTS replays; \
+     DEFINE TOPIC IF NOT EXISTS audit RETAIN 400d; \
      DEFINE TABLE IF NOT EXISTS clients (\
      client_id string REQUIRED, tenant string REQUIRED, redirect_uris array REQUIRED, scope_ceiling array REQUIRED, \
      resources array REQUIRED, auth_method string REQUIRED, \

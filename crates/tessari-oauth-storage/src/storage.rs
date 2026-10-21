@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tessari_oauth_infrastructure::tessaridb::Database;
 
 use crate::Tenancy;
+use crate::audit::{AuditService, TessaridbAuditRepository};
 use crate::clients::{ClientService, TessaridbClientRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
 use crate::consents::{ConsentService, TessaridbConsentRepository};
@@ -36,6 +37,8 @@ pub struct Storage {
     pub subjects: Arc<SubjectService>,
     /// Request counters.
     pub throttle: Arc<ThrottleService>,
+    /// The audit trail.
+    pub audit: Arc<AuditService>,
 }
 
 impl Storage {
@@ -51,6 +54,7 @@ impl Storage {
         let key_repository = Arc::new(TessaridbKeyRepository::new(database.clone()));
         let secret_repository = Arc::new(TessaridbSecretRepository::new(database.clone()));
         let throttle_repository = Arc::new(TessaridbThrottleRepository::new(database.clone()));
+        let audit_repository = Arc::new(TessaridbAuditRepository::new(database.clone()));
         Self {
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
             clients: Arc::new(ClientService::new(client_repository, tenancy.clone())),
@@ -61,6 +65,7 @@ impl Storage {
             keys: Arc::new(KeyService::new(key_repository, tenancy.clone())),
             subjects: Arc::new(SubjectService::new(secret_repository, tenancy.clone())),
             throttle: Arc::new(ThrottleService::new(throttle_repository, tenancy.clone())),
+            audit: Arc::new(AuditService::new(audit_repository, tenancy.clone())),
         }
     }
 }
