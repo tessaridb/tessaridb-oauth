@@ -4,6 +4,7 @@ mod answers;
 pub mod codes;
 pub mod consents;
 mod error;
+pub mod keys;
 pub mod refresh;
 pub mod replay;
 mod retry;
