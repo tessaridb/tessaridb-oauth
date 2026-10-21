@@ -11,3 +11,11 @@ fn a_token_id_is_sixteen_random_bytes_and_never_repeats() {
     let distinct: std::collections::BTreeSet<&String> = ids.iter().collect();
     assert_eq!(distinct.len(), ids.len());
 }
+
+#[test]
+fn a_random_secret_is_thirty_two_bytes_and_never_repeats() {
+    let first = super::random_secret().expect("a secret");
+    let second = super::random_secret().expect("a secret");
+    assert_eq!(first.len(), 32);
+    assert_ne!(*first, *second);
+}

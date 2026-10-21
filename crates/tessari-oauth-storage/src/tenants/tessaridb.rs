@@ -14,7 +14,8 @@ use crate::Result;
 /// `refresh_families` and `refresh_tokens` hold each family and each of its tokens under a digest; every read is by
 /// id. `signing_keys` holds each key sealed with its public half and dates; it is listed whole, oldest first.
 /// `replays` is a space of spent client assertions and DPoP proofs whose keys expire with what they record.
-/// `clients` holds each client's registration under its id; every read is by id.
+/// `clients` holds each client's registration under its id; every read is by id. `secrets` holds the tenant's sealed
+/// secrets under the id naming their purpose — the pairwise salt.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -36,7 +37,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE SPACE IF NOT EXISTS replays; \
      DEFINE TABLE IF NOT EXISTS clients (\
      client_id string REQUIRED, tenant string REQUIRED, redirect_uris array REQUIRED, scope_ceiling array REQUIRED, auth_method string REQUIRED, \
-     assertion_alg string, grant_types array REQUIRED, jwks array REQUIRED, registered_at int REQUIRED);";
+     assertion_alg string, grant_types array REQUIRED, jwks array REQUIRED, registered_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS secrets (sealed string REQUIRED, created_at int REQUIRED);";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

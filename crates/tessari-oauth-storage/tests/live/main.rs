@@ -16,6 +16,7 @@ mod keys;
 mod refresh;
 mod replay;
 mod signer;
+mod subjects;
 mod throttle;
 mod tls;
 

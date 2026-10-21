@@ -11,4 +11,4 @@ mod token_id;
 
 pub use kek::Kek;
 pub use signing::SigningKey;
-pub use token_id::token_id;
+pub use token_id::{random_secret, token_id};

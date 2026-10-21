@@ -11,6 +11,7 @@ use crate::consents::{ConsentService, TessaridbConsentRepository};
 use crate::keys::{KeyService, TessaridbKeyRepository};
 use crate::refresh::{RefreshService, TessaridbRefreshRepository};
 use crate::replay::{ReplayService, TessaridbReplayRepository};
+use crate::subjects::{SubjectService, TessaridbSecretRepository};
 use crate::tenants::{TenantService, TessaridbTenantRepository};
 use crate::throttle::{TessaridbThrottleRepository, ThrottleService};
 
@@ -31,6 +32,8 @@ pub struct Storage {
     pub replay: Arc<ReplayService>,
     /// Signing keys.
     pub keys: Arc<KeyService>,
+    /// Pairwise subjects and the salt they are made under.
+    pub subjects: Arc<SubjectService>,
     /// Request counters.
     pub throttle: Arc<ThrottleService>,
 }
@@ -46,6 +49,7 @@ impl Storage {
         let refresh_repository = Arc::new(TessaridbRefreshRepository::new(database.clone()));
         let replay_repository = Arc::new(TessaridbReplayRepository::new(database.clone()));
         let key_repository = Arc::new(TessaridbKeyRepository::new(database.clone()));
+        let secret_repository = Arc::new(TessaridbSecretRepository::new(database.clone()));
         let throttle_repository = Arc::new(TessaridbThrottleRepository::new(database.clone()));
         Self {
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
@@ -55,6 +59,7 @@ impl Storage {
             refresh: Arc::new(RefreshService::new(refresh_repository, tenancy.clone())),
             replay: Arc::new(ReplayService::new(replay_repository, tenancy.clone())),
             keys: Arc::new(KeyService::new(key_repository, tenancy.clone())),
+            subjects: Arc::new(SubjectService::new(secret_repository, tenancy.clone())),
             throttle: Arc::new(ThrottleService::new(throttle_repository, tenancy.clone())),
         }
     }

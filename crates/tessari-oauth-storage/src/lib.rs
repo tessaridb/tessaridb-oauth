@@ -10,6 +10,7 @@ pub mod refresh;
 pub mod replay;
 mod retry;
 mod storage;
+pub mod subjects;
 mod tenancy;
 pub mod tenants;
 pub mod throttle;
