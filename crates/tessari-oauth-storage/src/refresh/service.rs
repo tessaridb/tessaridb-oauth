@@ -21,6 +21,7 @@ use tessari_oauth_types::{
 
 use super::repository::RefreshRepository;
 use super::{FamilyEntity, RefreshGrant, Revocation, Rotation, RotationRefusal, TokenEntity};
+use crate::audit::AuditService;
 use crate::{Error, Result, Tenancy, retry};
 
 /// Why a family was revoked when the reuse of one of its tokens ended it.
@@ -37,6 +38,8 @@ const REVOKED: &str = "revoked_by_client";
 pub struct RefreshService {
     pub(super) repository: Arc<dyn RefreshRepository>,
     pub(super) tenancy: Tenancy,
+    /// Where a cascade records what it revoked.
+    pub(super) audit: Arc<AuditService>,
 }
 
 fn unreadable(reason: &str) -> Error {
@@ -92,10 +95,15 @@ fn family(grant: &RefreshGrant, at: i64, revoked: Option<&str>) -> Result<Family
 }
 
 impl RefreshService {
-    pub(crate) fn new(repository: Arc<dyn RefreshRepository>, tenancy: Tenancy) -> Self {
+    pub(crate) fn new(
+        repository: Arc<dyn RefreshRepository>,
+        tenancy: Tenancy,
+        audit: Arc<AuditService>,
+    ) -> Self {
         Self {
             repository,
             tenancy,
+            audit,
         }
     }
 

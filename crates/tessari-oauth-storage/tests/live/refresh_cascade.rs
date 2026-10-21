@@ -4,6 +4,7 @@
 use std::collections::BTreeSet;
 
 use tessari_oauth_storage::Storage;
+use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::refresh::{Holder, RefreshGrant, Rotation, RotationRefusal};
 use tessari_oauth_types::{
     ClientId, RefreshToken, Resource, ScopeSet, TenantId, Timestamp, UserId,
@@ -67,6 +68,18 @@ async fn families() -> Storage {
     storage
 }
 
+/// The last message of the trail.
+async fn last_message(storage: &Storage) -> AuditEvent {
+    storage
+        .audit
+        .read_after(&tenant(), 0, 100)
+        .await
+        .expect("the trail reads")
+        .pop()
+        .expect("a message")
+        .event
+}
+
 /// Whether the family started from `name`'s token at `at_client` still rotates.
 async fn rotates(storage: &Storage, name: &str, at_client: &str) -> bool {
     let rotation = storage
@@ -98,6 +111,15 @@ async fn a_users_standing_families_are_revoked_at_every_client() {
         .await
         .expect("revoked");
     assert_eq!(revoked, 2, "f1 and f2; f4 was revoked already");
+    assert_eq!(
+        last_message(&storage).await,
+        AuditEvent {
+            user: Some(holder.clone()),
+            reason: Some("password_changed".to_owned()),
+            families: Some(2),
+            ..AuditEvent::of(AuditKind::Cascade)
+        }
+    );
     assert!(!rotates(&storage, "f1", "portal").await, "f1");
     assert!(!rotates(&storage, "f2", "studio").await, "f2");
     assert!(
@@ -128,6 +150,15 @@ async fn a_clients_standing_families_are_revoked_for_every_user() {
         .await
         .expect("revoked");
     assert_eq!(revoked, 2, "f1 and f3; f4 was revoked already");
+    assert_eq!(
+        last_message(&storage).await,
+        AuditEvent {
+            client_id: Some(portal.clone()),
+            reason: Some("client_disabled".to_owned()),
+            families: Some(2),
+            ..AuditEvent::of(AuditKind::Cascade)
+        }
+    );
     assert!(!rotates(&storage, "f1", "portal").await, "f1");
     assert!(!rotates(&storage, "f3", "portal").await, "f3");
     assert!(
@@ -155,6 +186,16 @@ async fn one_users_families_at_one_client_are_revoked_and_no_others() {
         .await
         .expect("revoked");
     assert_eq!(revoked, 1, "f1; f4 was revoked already");
+    assert_eq!(
+        last_message(&storage).await,
+        AuditEvent {
+            client_id: Some(portal.clone()),
+            user: Some(holder.clone()),
+            reason: Some("consent_withdrawn".to_owned()),
+            families: Some(1),
+            ..AuditEvent::of(AuditKind::Cascade)
+        }
+    );
     assert!(!rotates(&storage, "f1", "portal").await, "f1");
     assert!(
         rotates(&storage, "f2", "studio").await,

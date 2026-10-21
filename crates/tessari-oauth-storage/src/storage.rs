@@ -55,17 +55,22 @@ impl Storage {
         let secret_repository = Arc::new(TessaridbSecretRepository::new(database.clone()));
         let throttle_repository = Arc::new(TessaridbThrottleRepository::new(database.clone()));
         let audit_repository = Arc::new(TessaridbAuditRepository::new(database.clone()));
+        let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
         Self {
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
             clients: Arc::new(ClientService::new(client_repository, tenancy.clone())),
             codes: Arc::new(CodeService::new(code_repository, tenancy.clone())),
             consents: Arc::new(ConsentService::new(consent_repository, tenancy.clone())),
-            refresh: Arc::new(RefreshService::new(refresh_repository, tenancy.clone())),
+            refresh: Arc::new(RefreshService::new(
+                refresh_repository,
+                tenancy.clone(),
+                Arc::clone(&audit),
+            )),
             replay: Arc::new(ReplayService::new(replay_repository, tenancy.clone())),
             keys: Arc::new(KeyService::new(key_repository, tenancy.clone())),
             subjects: Arc::new(SubjectService::new(secret_repository, tenancy.clone())),
             throttle: Arc::new(ThrottleService::new(throttle_repository, tenancy.clone())),
-            audit: Arc::new(AuditService::new(audit_repository, tenancy.clone())),
+            audit,
         }
     }
 }
