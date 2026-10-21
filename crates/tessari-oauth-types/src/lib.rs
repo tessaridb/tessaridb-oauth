@@ -2,6 +2,7 @@
 //! two of them is a compile error: PKCE challenges, key thumbprints, redirect URIs, tenant and client ids, and
 //! the error taxonomy every crate maps its failures into.
 
+mod authorization_code;
 mod base64url;
 mod category;
 mod client_id;
@@ -14,6 +15,7 @@ mod tenant_id;
 mod thumbprint;
 mod timestamp;
 
+pub use authorization_code::AuthorizationCode;
 pub use category::ErrorCategory;
 pub use client_id::ClientId;
 pub use error::{Error, Result};

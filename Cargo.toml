@@ -27,6 +27,11 @@ subtle = "2"
 # Redirect URIs are parsed by the WHATWG URL parser, and a registered value must already be in the form it
 # serialises to, so the server never normalises an incoming value into a match.
 url = "2"
+# The database client is the family's own SDK; it does not publish to a registry, so it arrives pinned by tag.
+tessaridb-client = { git = "https://github.com/tessaridb/tessaridb-sdk-rust.git", tag = "v0.12.0" }
+tokio = { version = "1", default-features = false, features = ["net", "sync", "time"] }
+async-trait = "0.1"
+tracing = "0.1"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

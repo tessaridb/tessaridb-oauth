@@ -2,5 +2,6 @@
 //! against server-side request forgery.
 
 mod error;
+pub mod tessaridb;
 
 pub use error::{Error, Result};

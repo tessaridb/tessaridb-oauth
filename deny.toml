@@ -33,3 +33,6 @@ private = { ignore = true }
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+# The database client does not publish to a registry, so it arrives by git. The allowance names the one repository
+# rather than the organisation: an org-wide allowance would cover every repository added under that name later.
+allow-git = ["https://github.com/tessaridb/tessaridb-sdk-rust.git"]

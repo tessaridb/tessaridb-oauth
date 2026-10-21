@@ -4,7 +4,8 @@ An OAuth 2.1 authorization server and OpenID provider that keeps every piece of 
 [TessariDB](https://docs.tessaridb.com/). One binary carries the protocol endpoints, the users' account
 portal and an embedded admin panel on its own listener.
 
-> Status: early development. The workspace and the first protocol value types exist; no endpoint is served yet.
+> Status: early development. The protocol value types, the request validators and single-use code storage on
+> TessariDB exist; no endpoint is served yet.
 
 ## What it is for
 
@@ -20,7 +21,9 @@ URIs matched exactly with only the native-app loopback port exception (RFC 8252 
 sender-constrained tokens, with keys named by their JWK thumbprint (RFC 7638). Implicit, hybrid token-returning and
 password grants will not be offered. Implemented so far, as pure functions without a server: the PKCE `S256`
 check, the redirect-URI type and its matching rule, the thumbprint, tenant, client and scope value types, and the
-authorization-request and code-redemption validators in their fixed check order.
+authorization-request and code-redemption validators in their fixed check order. Authorization codes are stored
+by their SHA-256 digest only, and are spent with one conditional write, so of any number of simultaneous
+redemptions exactly one succeeds and the rest are reported as replays.
 
 ## Layout
 
@@ -47,6 +50,17 @@ cargo lint       # clippy over all targets with warnings denied
 cargo fmt --all --check
 cargo deny check # licences, advisories, sources
 ```
+
+The storage tests that need a database are marked `ignored` and run against a TessariDB node you name:
+
+```sh
+docker run -d --rm --name oauth-live -p 127.0.0.1:39601:9080 \
+  -e TESSARIDB_INITIAL_USER=oauth -e TESSARIDB_INITIAL_PASSWORD="$PASSWORD" tessaridb/tessaridb:0.36.2
+TESSARIDB_OAUTH_TEST_STORE=127.0.0.1:39601 TESSARIDB_OAUTH_TEST_USER=oauth \
+  TESSARIDB_OAUTH_TEST_PASSWORD="$PASSWORD" cargo test -p tessari-oauth-storage --test live -- --ignored
+```
+
+Each test works in a namespace of its own, so the suite can run repeatedly against one node.
 
 ## Licence
 
