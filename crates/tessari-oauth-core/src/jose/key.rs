@@ -1,7 +1,8 @@
-//! Signing algorithms this server accepts, and the public keys clients register for them (RFC 7517, RFC 8037).
+//! The public keys clients register, each bound to one of the algorithms this server accepts (RFC 7517, RFC 8037).
 
 use ring::signature::{self, UnparsedPublicKey};
 use serde::Deserialize;
+pub use tessari_oauth_types::Algorithm;
 use tessari_oauth_types::{KeyThumbprint, base64url};
 
 use super::JoseError;
@@ -11,26 +12,6 @@ const KEY_COMPONENT_LEN: usize = 32;
 
 /// The SEC 1 tag of an uncompressed elliptic-curve point.
 const UNCOMPRESSED_POINT: u8 = 0x04;
-
-/// A signature algorithm this server accepts. Only elliptic curves: small signatures and no padding history.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Algorithm {
-    /// Ed25519 (RFC 8037).
-    EdDsa,
-    /// ECDSA over P-256 with SHA-256 (RFC 7518 §3.4).
-    Es256,
-}
-
-impl Algorithm {
-    /// The algorithm's name in the JOSE registry, as an `alg` header writes it.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::EdDsa => "EdDSA",
-            Self::Es256 => "ES256",
-        }
-    }
-}
 
 /// A registered public key, bound to the one algorithm it verifies.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,29 +54,20 @@ impl VerifyingKey {
         if !public_signing {
             return Err(JoseError::KeyRefused);
         }
-        // The thumbprint's canonical form (RFC 7638 §3.2): the required members in lexicographic order. The
-        // coordinates are written as read; strict decoding gives each byte string exactly one spelling.
-        let (bytes, canonical) = match (algorithm, jwk.kty.as_str(), jwk.crv.as_deref()) {
+        let (bytes, thumbprint) = match (algorithm, jwk.kty.as_str(), jwk.crv.as_deref()) {
             (Algorithm::EdDsa, "OKP", Some("Ed25519")) => {
                 let x = component(jwk.x.as_deref())?;
-                let canonical = format!(
-                    r#"{{"crv":"Ed25519","kty":"OKP","x":"{}"}}"#,
-                    base64url::encode(&x)
-                );
-                (x, canonical)
+                let thumbprint = KeyThumbprint::of_ed25519(&x);
+                (x, thumbprint)
             }
             (Algorithm::Es256, "EC", Some("P-256")) => {
                 let x = component(jwk.x.as_deref())?;
                 let y = component(jwk.y.as_deref())?;
-                let canonical = format!(
-                    r#"{{"crv":"P-256","kty":"EC","x":"{}","y":"{}"}}"#,
-                    base64url::encode(&x),
-                    base64url::encode(&y)
-                );
+                let thumbprint = KeyThumbprint::of_p256(&x, &y);
                 let mut point = vec![UNCOMPRESSED_POINT];
                 point.extend(x);
                 point.extend(y);
-                (point, canonical)
+                (point, thumbprint)
             }
             _ => return Err(JoseError::KeyRefused),
         };
@@ -103,7 +75,7 @@ impl VerifyingKey {
             kid: jwk.kid,
             algorithm,
             bytes,
-            thumbprint: KeyThumbprint::of_canonical_jwk(&canonical),
+            thumbprint,
         })
     }
 

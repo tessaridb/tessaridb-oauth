@@ -32,6 +32,12 @@ pub enum Error {
         /// What it must be instead.
         reason: &'static str,
     },
+    /// Key custody could not seal, open, generate or use a key; the reason names the step, never the material.
+    #[error("key custody: {reason}")]
+    Custody {
+        /// Which step failed.
+        reason: &'static str,
+    },
     /// A namespace or database name that is not a plain name.
     #[error("not a plain name: {name:?}")]
     InvalidName {
@@ -75,9 +81,10 @@ impl Error {
                 class: Some(RefusalClass::Throttled | RefusalClass::Unavailable),
                 ..
             } => ErrorCategory::Unavailable,
-            Self::Refused { .. } | Self::InvalidName { .. } | Self::InvalidConfig { .. } => {
-                ErrorCategory::Internal
-            }
+            Self::Refused { .. }
+            | Self::InvalidName { .. }
+            | Self::InvalidConfig { .. }
+            | Self::Custody { .. } => ErrorCategory::Internal,
         }
     }
 }

@@ -78,12 +78,6 @@ fn a_key_that_is_not_a_public_signing_key_of_the_configured_algorithm_is_refused
 }
 
 #[test]
-fn the_algorithms_are_named_as_the_jose_registry_names_them() {
-    assert_eq!(Algorithm::EdDsa.name(), "EdDSA");
-    assert_eq!(Algorithm::Es256.name(), "ES256");
-}
-
-#[test]
 fn thumbprints_match_the_rfc_examples() {
     let ed = VerifyingKey::from_jwk(
         &format!(r#"{{"kty":"OKP","crv":"Ed25519","x":"{ED25519_X}","kid":"ignored"}}"#),

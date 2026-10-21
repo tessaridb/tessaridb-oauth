@@ -511,12 +511,16 @@ dependencies = [
 name = "tessari-oauth-infrastructure"
 version = "0.1.0"
 dependencies = [
+ "ring",
+ "serde",
+ "serde_json",
  "tessari-oauth-constants",
  "tessari-oauth-types",
  "tessaridb-client",
  "thiserror",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
