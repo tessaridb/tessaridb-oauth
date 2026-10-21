@@ -11,6 +11,7 @@ fn each_code_is_spelled_as_the_specification_spells_it() {
         (ErrorCode::InvalidScope, "invalid_scope"),
         (ErrorCode::InvalidClient, "invalid_client"),
         (ErrorCode::InvalidGrant, "invalid_grant"),
+        (ErrorCode::UnauthorizedClient, "unauthorized_client"),
         (ErrorCode::UnsupportedGrantType, "unsupported_grant_type"),
     ] {
         assert_eq!(code.as_str(), wire);

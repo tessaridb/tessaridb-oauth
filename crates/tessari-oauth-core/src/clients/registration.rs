@@ -14,6 +14,15 @@ pub enum AuthMethod {
     ClientSecretPost,
 }
 
+/// A grant the token endpoint redeems. A client redeems only the ones it registered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GrantType {
+    /// `authorization_code` (RFC 6749 §4.1.3).
+    AuthorizationCode,
+    /// `refresh_token` (RFC 6749 §6).
+    RefreshToken,
+}
+
 /// What a client is allowed to do, registered in one tenant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientRegistration {
@@ -27,6 +36,8 @@ pub struct ClientRegistration {
     pub scope_ceiling: ScopeSet,
     /// The one way this client authenticates at the token endpoint.
     pub auth_method: AuthMethod,
+    /// The grants this client may redeem at the token endpoint.
+    pub grant_types: Vec<GrantType>,
 }
 
 /// Finds a tenant's client registrations; the storage layer implements it.

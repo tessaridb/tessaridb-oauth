@@ -16,6 +16,8 @@ pub enum ErrorCode {
     InvalidClient,
     /// The authorization grant is invalid, expired, revoked or was issued to another client or URI.
     InvalidGrant,
+    /// The authenticated client is not registered for this grant type.
+    UnauthorizedClient,
     /// The authorization server does not support this `grant_type`.
     UnsupportedGrantType,
 }
@@ -30,6 +32,7 @@ impl ErrorCode {
             Self::InvalidScope => "invalid_scope",
             Self::InvalidClient => "invalid_client",
             Self::InvalidGrant => "invalid_grant",
+            Self::UnauthorizedClient => "unauthorized_client",
             Self::UnsupportedGrantType => "unsupported_grant_type",
         }
     }

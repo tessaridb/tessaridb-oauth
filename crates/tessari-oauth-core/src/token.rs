@@ -1,17 +1,21 @@
-//! `/token` validation for the authorization-code grant, in the fixed order.
+//! `/token` validation, in the fixed order.
 //!
 //! The client is authenticated BEFORE the grant is read: a server that decodes a code to learn which client it
-//! belongs to lets the code authenticate its presenter. Then the grant type, then — after the storage layer has
-//! atomically consumed the code — every binding the code was issued with, each refused on its own.
+//! belongs to lets the code authenticate its presenter. Then the grant type, which the client must have registered,
+//! then — after the storage layer has atomically consumed the code — every binding the code was issued with, each
+//! refused on its own. The refresh grant's own checks are in [`crate::refresh`].
 
 use tessari_oauth_types::{ClientId, ErrorCode, ScopeSet, TenantId, Timestamp};
 
-use crate::clients::{AuthMethod, ClientDirectory, ClientRegistration};
+use crate::clients::{AuthMethod, ClientDirectory, ClientRegistration, GrantType};
 use crate::codes::IssuedCode;
 use crate::{Params, Reason};
 
-/// The grant this module redeems.
+/// The `grant_type` of the authorization-code grant.
 const GRANT_AUTHORIZATION_CODE: &str = "authorization_code";
+
+/// The `grant_type` of the refresh grant.
+const GRANT_REFRESH_TOKEN: &str = "refresh_token";
 
 /// A token-endpoint refusal: the `error` value for the caller and the reason for the audit log.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,20 +102,31 @@ fn reject_method_not_pinned(pinned: AuthMethod, presented: PresentedAuth) -> Res
     }
 }
 
-/// Refuse any `grant_type` but the authorization code.
+/// The grant `params` asks for, when this endpoint redeems it and `client` registered it.
 ///
 /// # Errors
 ///
-/// `invalid_request` when absent; `unsupported_grant_type` otherwise.
-pub fn require_authorization_code_grant(params: &Params) -> Result<(), Refusal> {
-    match params.get("grant_type") {
-        None => Err(refuse(ErrorCode::InvalidRequest, Reason::MissingParameter)),
-        Some(GRANT_AUTHORIZATION_CODE) => Ok(()),
-        Some(_) => Err(refuse(
-            ErrorCode::UnsupportedGrantType,
-            Reason::UnsupportedGrantType,
-        )),
+/// `invalid_request` when absent; `unsupported_grant_type` for a grant this endpoint does not redeem;
+/// `unauthorized_client` for one the client did not register.
+pub fn require_grant(params: &Params, client: &ClientRegistration) -> Result<GrantType, Refusal> {
+    let grant = match params.get("grant_type") {
+        None => return Err(refuse(ErrorCode::InvalidRequest, Reason::MissingParameter)),
+        Some(GRANT_AUTHORIZATION_CODE) => GrantType::AuthorizationCode,
+        Some(GRANT_REFRESH_TOKEN) => GrantType::RefreshToken,
+        Some(_) => {
+            return Err(refuse(
+                ErrorCode::UnsupportedGrantType,
+                Reason::UnsupportedGrantType,
+            ));
+        }
+    };
+    if !client.grant_types.contains(&grant) {
+        return Err(refuse(
+            ErrorCode::UnauthorizedClient,
+            Reason::GrantNotRegistered,
+        ));
     }
+    Ok(grant)
 }
 
 /// Check every binding of a consumed code against the authenticated client and the request.

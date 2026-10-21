@@ -30,6 +30,10 @@ pub enum Reason {
     AuthMethodNotPinned,
     /// `grant_type` is not one this endpoint redeems.
     UnsupportedGrantType,
+    /// The client is not registered for this `grant_type`.
+    GrantNotRegistered,
+    /// A refresh asked for a scope the original grant does not hold.
+    ScopeBeyondGrant,
     /// The code was issued to another client.
     CodeClientMismatch,
     /// The code was issued in another tenant.

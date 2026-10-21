@@ -7,6 +7,7 @@ pub mod codes;
 pub mod consents;
 mod error;
 mod params;
+pub mod refresh;
 mod refusal;
 pub mod token;
 

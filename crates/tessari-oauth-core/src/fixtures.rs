@@ -2,7 +2,7 @@
 
 use tessari_oauth_types::{ClientId, RedirectUri, ScopeSet, TenantId};
 
-use crate::clients::{AuthMethod, ClientDirectory, ClientRegistration};
+use crate::clients::{AuthMethod, ClientDirectory, ClientRegistration, GrantType};
 
 /// The tenant the requests are for.
 pub(crate) fn acme() -> TenantId {
@@ -35,6 +35,7 @@ pub(crate) fn client(tenant: TenantId, id: &str, redirects: &[&str]) -> ClientRe
             .collect(),
         scope_ceiling: ScopeSet::parse("openid profile notes:read").expect("fixture ceiling"),
         auth_method: AuthMethod::None,
+        grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
     }
 }
 

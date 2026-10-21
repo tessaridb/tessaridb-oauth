@@ -1,11 +1,9 @@
 use tessari_oauth_constants::AUTHORIZATION_CODE_TTL_SECS;
 use tessari_oauth_types::{Challenge, ClientId, ErrorCode, ScopeSet, Timestamp, UserId};
 
-use super::{
-    PresentedAuth, Refusal, authenticate_client, read, redeem_code,
-    require_authorization_code_grant,
-};
+use super::{PresentedAuth, Refusal, authenticate_client, read, redeem_code, require_grant};
 use crate::Reason;
+use crate::clients::GrantType;
 use crate::codes::IssuedCode;
 use crate::fixtures::{CHALLENGE, REDIRECT, VERIFIER, acme, client, directory, globex};
 
@@ -185,16 +183,34 @@ fn t7_an_unknown_or_foreign_client_is_refused_as_invalid_client() {
 }
 
 #[test]
-fn t8_any_grant_type_but_the_authorization_code_is_refused() {
+fn t8_only_the_code_and_refresh_grants_exist_and_only_for_a_client_registered_for_them() {
+    let app = client(acme(), "app", &[REDIRECT]);
+    for (grant, expected) in [
+        ("authorization_code", GrantType::AuthorizationCode),
+        ("refresh_token", GrantType::RefreshToken),
+    ] {
+        let params = read(with("grant_type", grant)).expect("no repeats");
+        assert_eq!(require_grant(&params, &app), Ok(expected), "{grant}");
+    }
+    let mut code_only = app.clone();
+    code_only.grant_types = vec![GrantType::AuthorizationCode];
+    let params = read(with("grant_type", "refresh_token")).expect("no repeats");
+    assert_eq!(
+        require_grant(&params, &code_only),
+        Err(Refusal {
+            error: ErrorCode::UnauthorizedClient,
+            reason: Reason::GrantNotRegistered
+        })
+    );
     for grant in [
         "password",
         "implicit",
-        "refresh_token",
         "client_credentials",
+        "REFRESH_TOKEN",
     ] {
         let params = read(with("grant_type", grant)).expect("no repeats");
         assert_eq!(
-            require_authorization_code_grant(&params),
+            require_grant(&params, &app),
             Err(Refusal {
                 error: ErrorCode::UnsupportedGrantType,
                 reason: Reason::UnsupportedGrantType
@@ -204,7 +220,7 @@ fn t8_any_grant_type_but_the_authorization_code_is_refused() {
     }
     let params = read(without("grant_type")).expect("no repeats");
     assert_eq!(
-        require_authorization_code_grant(&params),
+        require_grant(&params, &app),
         Err(Refusal {
             error: ErrorCode::InvalidRequest,
             reason: Reason::MissingParameter

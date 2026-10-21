@@ -21,7 +21,8 @@ URIs matched exactly with only the native-app loopback port exception (RFC 8252 
 sender-constrained tokens, with keys named by their JWK thumbprint (RFC 7638). Implicit, hybrid token-returning and
 password grants will not be offered. Implemented so far, as pure functions without a server: the PKCE `S256`
 check, the redirect-URI type and its matching rule, the thumbprint, tenant, client and scope value types, and the
-authorization-request and code-redemption validators in their fixed check order. Authorization codes are stored
+authorization-request, code-redemption and refresh-request validators in their fixed check order; a client
+redeems only the grant types it registered, and a refresh may narrow its scopes but never widen them. Authorization codes are stored
 by their SHA-256 digest only, and are spent with one conditional write, so of any number of simultaneous
 redemptions exactly one succeeds and the rest are reported as replays. Consent is a record per user and client
 holding the granted scopes, resources and consent policy version; a request outside it is answered with exactly

@@ -2,4 +2,4 @@
 
 mod registration;
 
-pub use registration::{AuthMethod, ClientDirectory, ClientRegistration};
+pub use registration::{AuthMethod, ClientDirectory, ClientRegistration, GrantType};
