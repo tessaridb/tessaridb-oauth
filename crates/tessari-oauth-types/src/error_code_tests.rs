@@ -16,6 +16,7 @@ fn each_code_is_spelled_as_the_specification_spells_it() {
         (ErrorCode::InvalidDpopProof, "invalid_dpop_proof"),
         (ErrorCode::InvalidTarget, "invalid_target"),
         (ErrorCode::UnsupportedTokenType, "unsupported_token_type"),
+        (ErrorCode::LoginRequired, "login_required"),
     ] {
         assert_eq!(code.as_str(), wire);
     }

@@ -18,6 +18,14 @@ const FIXED: [(HeaderName, &str); 4] = [
     ),
 ];
 
+/// Mark `response` as never to be stored by any cache (RFC 6749 §5.1).
+pub(crate) fn no_store(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    response
+}
+
 /// Set the fixed headers on `response`, replacing any a handler set.
 pub(crate) fn protect(mut response: Response) -> Response {
     let headers = response.headers_mut();

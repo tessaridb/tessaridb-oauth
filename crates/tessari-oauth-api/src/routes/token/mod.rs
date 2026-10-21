@@ -23,16 +23,18 @@ use axum::extract::rejection::FormRejection;
 use axum::extract::{Form, Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use tessari_oauth_core::clients::{ClientDirectory, ClientRegistration, GrantType};
+use tessari_oauth_core::clients::{ClientRegistration, GrantType};
 use tessari_oauth_core::token::{self, Endpoint, PresentedAuth, Refusal};
 use tessari_oauth_core::{Params, Reason};
 use tessari_oauth_storage::audit::AuditEvent;
 use tessari_oauth_storage::replay::Spent;
-use tessari_oauth_types::{ClientId, ErrorCode, TenantId};
+use tessari_oauth_types::{ClientId, ErrorCode};
 
+use super::Found;
 use crate::Error;
+use crate::headers::no_store;
 use crate::state::PublicState;
-use answer::{Issued, answer_refusal, no_store};
+use answer::{Issued, answer_refusal};
 use redeem::redeem;
 
 /// Why a request was not answered with tokens: refused by a check, or not served because the server failed.
@@ -55,17 +57,6 @@ impl From<Error> for Failure {
 
 const fn refusal(error: ErrorCode, reason: Reason) -> Refusal {
     Refusal { error, reason }
-}
-
-/// The one registration looked up for this request, as the directory the core authenticates against.
-struct Found(Option<ClientRegistration>);
-
-impl ClientDirectory for Found {
-    fn find(&self, tenant: &TenantId, client_id: &ClientId) -> Option<ClientRegistration> {
-        self.0
-            .clone()
-            .filter(|found| found.tenant == *tenant && found.client_id == *client_id)
-    }
 }
 
 /// What a request to one of the two endpoints asks for.

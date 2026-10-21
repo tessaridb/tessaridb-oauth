@@ -25,6 +25,9 @@ const READ_GROUP: &str = "read";
 /// The route group of the token requests.
 const TOKEN_GROUP: &str = "token";
 
+/// The route group of the authorization requests.
+const AUTHORIZE_GROUP: &str = "authorize";
+
 /// The counted name of a request with no peer address.
 const NO_ADDRESS: &str = "no-address";
 
@@ -67,6 +70,16 @@ pub(crate) async fn tokens(
 ) -> Result<Response> {
     let limit = state.token_limit;
     count(&state, TOKEN_GROUP, limit, request, next).await
+}
+
+/// Count the request under the authorization limit, and refuse it past the limit or when the store cannot count.
+pub(crate) async fn authorizations(
+    State(state): State<PublicState>,
+    request: Request,
+    next: Next,
+) -> Result<Response> {
+    let limit = state.authorize_limit;
+    count(&state, AUTHORIZE_GROUP, limit, request, next).await
 }
 
 /// Count the request in `group` under `limit`, then serve or refuse it.

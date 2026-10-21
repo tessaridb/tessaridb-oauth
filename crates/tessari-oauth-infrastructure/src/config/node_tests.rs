@@ -66,6 +66,13 @@ fn a_complete_environment_is_read_with_the_documented_defaults() {
         ),
         (60, 60)
     );
+    assert_eq!(
+        (
+            config.authorize_limit.requests.get(),
+            config.authorize_limit.window_secs.get()
+        ),
+        (120, 60)
+    );
 }
 
 #[test]
@@ -95,6 +102,8 @@ fn a_value_that_does_not_fit_is_refused_naming_its_variable_and_value() {
         ("TESSARIDB_OAUTH_READ_WINDOW_SECS", "-1"),
         ("TESSARIDB_OAUTH_TOKEN_LIMIT", "0"),
         ("TESSARIDB_OAUTH_TOKEN_WINDOW_SECS", "many"),
+        ("TESSARIDB_OAUTH_AUTHORIZE_LIMIT", "0"),
+        ("TESSARIDB_OAUTH_AUTHORIZE_WINDOW_SECS", "-1"),
         ("TESSARIDB_OAUTH_TENANTS", "acme,,globex"),
         ("TESSARIDB_OAUTH_TENANTS", "acme,acme"),
         ("TESSARIDB_OAUTH_TENANTS", "Not A Tenant"),

@@ -5,8 +5,8 @@ An OAuth 2.1 authorization server and OpenID provider that keeps every piece of 
 portal and an embedded admin panel on its own listener.
 
 > Status: early development. The binary serves each tenant's server metadata (RFC 8414) and key set (RFC 7517)
-> over TLS, its token and revocation endpoints, and rotates the tenants' signing keys; the authorization and account
-> endpoints are not served yet.
+> over TLS, its authorization, token and revocation endpoints, and rotates the tenants' signing keys; the sign-in
+> page the authorization endpoint hands over to, and the account endpoints, are not served yet.
 
 ## What it is for
 
@@ -54,13 +54,21 @@ receives a `DPoP` token naming the proof's key in `cnf.jkt`; a client registered
 is refused without one, and a public client's refresh token keeps needing the key it was issued to. Without a
 proof the token is `Bearer`. Refusals carry the `error` code alone.
 
+The authorization endpoint `GET|POST <issuer>/oauth2/authorize` (RFC 6749 §4.1.1) judges a request in a fixed
+order. Until the client is known and the redirect URI is one it registered, a refusal is shown on a page at the server
+and sent nowhere, so a URI written into a forged request never receives an answer; every later refusal goes back to
+the registered URI with `error`, `state` and `iss` (RFC 9207). A request with `prompt=none` asks for no page and is
+refused with `login_required`. A valid request is kept for ten minutes and the browser is sent to `<issuer>/login`
+carrying only the kept request's id.
+
 The revocation endpoint `POST <issuer>/oauth2/revoke` (RFC 7009) authenticates the client exactly as the token
 endpoint does and revokes a refresh token together with its whole family. An unknown or already revoked token is
 answered `200` like a revoked one, another client's token is refused with `invalid_grant` and left usable, and a
 `token_type_hint` is only a hint. An access token is refused with `unsupported_token_type`: it is never recalled
 and stays valid for at most its five minutes. Discovery advertises the endpoint and its authentication methods.
 
-Every outcome at both endpoints is appended to an audit topic in the tenant's TessariDB database, which the store
+Every outcome at the token and revocation endpoints, and every refusal at the authorization endpoint, is appended
+to an audit topic in the tenant's TessariDB database, which the store
 itself refuses to rewrite or delete from, and kept for 400 days: what was issued — client, user, subject, scopes,
 audience, the access token's `jti`, the authentication method and the bound key — what was refused and why, a
 replayed code, a reused refresh token and a revocation. A message never carries a token, code, verifier, assertion
@@ -99,6 +107,7 @@ first, for development only.
 | `TENANTS` | the tenants this server is the issuer for, comma-separated | required |
 | `READ_LIMIT`, `READ_WINDOW_SECS` | metadata and key-set requests one client address may make per window | `300`, `60` |
 | `TOKEN_LIMIT`, `TOKEN_WINDOW_SECS` | token requests one client address may make per window | `60`, `60` |
+| `AUTHORIZE_LIMIT`, `AUTHORIZE_WINDOW_SECS` | authorization requests one client address may make per window | `120`, `60` |
 
 ```sh
 cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary
@@ -106,8 +115,8 @@ curl --cacert cert.pem https://localhost:8443/acme/.well-known/oauth-authorizati
 ```
 
 At start the server provisions each tenant's database, makes a signing key for any tenant without one and then
-checks every five minutes for keys due to rotate. Each read and each token request is counted per client address in
-TessariDB, under separate limits; past the limit
+checks every five minutes for keys due to rotate. Each read, authorization request and token request is counted per
+client address in TessariDB, under separate limits; past the limit
 the answer is `429` with `Retry-After`, every counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`,
 and when the store cannot count the request is refused with `503` rather than served. Logs are JSON on standard
 output, filtered by `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the

@@ -82,6 +82,8 @@ pub struct NodeConfig {
     pub read_limit: ReadLimit,
     /// The limit on the token endpoint, counted apart from reads.
     pub token_limit: ReadLimit,
+    /// The limit on the authorization endpoint, counted apart from reads and tokens.
+    pub authorize_limit: ReadLimit,
 }
 
 /// The environment as a lookup answers it.
@@ -215,6 +217,18 @@ impl NodeConfig {
                 "a whole number of seconds above zero",
             )?,
         };
+        let authorize_limit = ReadLimit {
+            requests: variables.parsed(
+                "TESSARIDB_OAUTH_AUTHORIZE_LIMIT",
+                NonZeroU64::MIN.saturating_add(119),
+                "a whole number of requests above zero",
+            )?,
+            window_secs: variables.parsed(
+                "TESSARIDB_OAUTH_AUTHORIZE_WINDOW_SECS",
+                NonZeroU64::MIN.saturating_add(59),
+                "a whole number of seconds above zero",
+            )?,
+        };
         Ok(Self {
             public,
             store,
@@ -223,6 +237,7 @@ impl NodeConfig {
             tenants: tenants(variables.required("TESSARIDB_OAUTH_TENANTS")?)?,
             read_limit,
             token_limit,
+            authorize_limit,
         })
     }
 }

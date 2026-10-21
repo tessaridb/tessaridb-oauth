@@ -123,6 +123,7 @@ async fn run(
         kek,
         throttle: Arc::clone(&storage.throttle),
         audit: Arc::clone(&storage.audit),
+        interactions: Arc::clone(&storage.interactions),
         read_limit: Limit {
             requests: config.read_limit.requests,
             window_secs: config.read_limit.window_secs,
@@ -130,6 +131,10 @@ async fn run(
         token_limit: Limit {
             requests: config.token_limit.requests,
             window_secs: config.token_limit.window_secs,
+        },
+        authorize_limit: Limit {
+            requests: config.authorize_limit.requests,
+            window_secs: config.authorize_limit.window_secs,
         },
         issuers: Arc::new(issuers),
         clock,

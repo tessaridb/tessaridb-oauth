@@ -8,6 +8,8 @@ use tessari_oauth_constants::ACCESS_TOKEN_TTL_SECS;
 use tessari_oauth_core::token::Refusal;
 use tessari_oauth_types::{ErrorCode, KeyThumbprint, RefreshToken, ScopeSet};
 
+use crate::headers::no_store;
+
 /// A successful token response (RFC 6749 §5.1).
 #[derive(Serialize)]
 pub(super) struct Issued {
@@ -66,12 +68,4 @@ pub(super) fn answer_refusal(refused: Refusal, basic: bool) -> Response {
         );
     }
     no_store(response)
-}
-
-/// Mark `response` as never to be stored by any cache (RFC 6749 §5.1).
-pub(super) fn no_store(mut response: Response) -> Response {
-    let headers = response.headers_mut();
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
-    response
 }

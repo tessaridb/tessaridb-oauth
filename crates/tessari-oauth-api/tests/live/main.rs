@@ -5,6 +5,7 @@
 
 #![cfg(test)]
 
+mod authorize;
 mod routes;
 mod throttle;
 mod token;

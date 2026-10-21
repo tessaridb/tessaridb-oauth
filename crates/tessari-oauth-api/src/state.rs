@@ -1,5 +1,6 @@
 //! What the public routes read: the tenants this server is the issuer for, their key records, clients, codes, refresh
-//! families, spent assertions and pairwise salts, the key-encryption key, the request counters and the clock.
+//! families, spent assertions, pairwise salts and pending authorizations, the key-encryption key, the request counters
+//! and the clock.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -8,6 +9,7 @@ use tessari_oauth_infrastructure::custody::Kek;
 use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
+use tessari_oauth_storage::interactions::InteractionService;
 use tessari_oauth_storage::keys::KeyService;
 use tessari_oauth_storage::refresh::RefreshService;
 use tessari_oauth_storage::replay::ReplayService;
@@ -38,10 +40,14 @@ pub struct PublicState {
     pub throttle: Arc<ThrottleService>,
     /// The audit trail every token and revocation outcome is appended to.
     pub audit: Arc<AuditService>,
+    /// Authorization requests kept while their user signs in.
+    pub interactions: Arc<InteractionService>,
     /// How many metadata and key-set reads one client address may make per window.
     pub read_limit: Limit,
     /// How many token requests one client address may make per window.
     pub token_limit: Limit,
+    /// How many authorization requests one client address may make per window.
+    pub authorize_limit: Limit,
     /// Each served tenant's issuer identifier, fixed at start-up from the configuration.
     pub issuers: Arc<HashMap<TenantId, String>>,
     /// The clock the key rule is judged at.

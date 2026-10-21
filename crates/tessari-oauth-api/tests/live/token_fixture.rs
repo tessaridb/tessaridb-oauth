@@ -123,8 +123,10 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         kek: Arc::clone(&server.kek),
         throttle: Arc::clone(&storage.throttle),
         audit: Arc::clone(&storage.audit),
+        interactions: Arc::clone(&storage.interactions),
         read_limit: plenty(),
         token_limit,
+        authorize_limit: plenty(),
         issuers: Arc::new(HashMap::from(
             ["acme", "initech"].map(|name| (tenant(name), issuer(name))),
         )),

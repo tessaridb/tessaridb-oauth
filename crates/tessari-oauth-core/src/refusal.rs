@@ -28,6 +28,8 @@ pub enum Reason {
     ScopeBeyondCeiling,
     /// `prompt` named `none` together with another value.
     PromptNoneCombined,
+    /// `prompt=none` asked for no page, and there is no session to answer it from.
+    SilentWithoutSession,
     /// The client authenticated with a method other than the one pinned at registration.
     AuthMethodNotPinned,
     /// `grant_type` is not one this endpoint redeems.

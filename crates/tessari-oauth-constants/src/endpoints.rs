@@ -2,6 +2,14 @@
 /// issuer and the metadata can only ever name the routes the server mounts.
 pub const AUTHORIZATION_PATH: &str = "/oauth2/authorize";
 
+/// The sign-in page an authorization request is handed to, appended to the issuer with the pending authorization's
+/// id as `interaction`.
+pub const LOGIN_PATH: &str = "/login";
+
+/// The largest authorization-request body read when the request is POSTed as a form (OpenID Connect Core
+/// §3.1.2.1), in bytes — the same handful of short parameters a query carries.
+pub const AUTHORIZE_BODY_MAX_BYTES: usize = 16 * 1024;
+
 /// The token endpoint path (RFC 6749 §3.2).
 pub const TOKEN_PATH: &str = "/oauth2/token";
 

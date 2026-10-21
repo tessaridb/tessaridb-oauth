@@ -26,6 +26,8 @@ pub enum ErrorCode {
     InvalidTarget,
     /// The server does not revoke this type of token (RFC 7009 §2.2.1).
     UnsupportedTokenType,
+    /// The request may show no page and no session can answer it (OpenID Connect Core §3.1.2.6).
+    LoginRequired,
 }
 
 impl ErrorCode {
@@ -43,6 +45,7 @@ impl ErrorCode {
             Self::InvalidDpopProof => "invalid_dpop_proof",
             Self::InvalidTarget => "invalid_target",
             Self::UnsupportedTokenType => "unsupported_token_type",
+            Self::LoginRequired => "login_required",
         }
     }
 }
