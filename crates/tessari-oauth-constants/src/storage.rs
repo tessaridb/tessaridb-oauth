@@ -33,3 +33,8 @@ pub const STORE_SIGNIN_ATTEMPTS: u32 = 6;
 /// Attempts at rotating one refresh token when the store answers `retry`, counting the first; as for a code
 /// spend, the losing rotation then sees the winner's and is answered as the reuse it is.
 pub const REFRESH_ROTATE_ATTEMPTS: u32 = 8;
+
+/// Attempts at writing a secret that is made once, such as a tenant's pairwise salt, when the store answers `retry`,
+/// counting the first. A `retry` means a competing first write is still landing; once it has, the refusal says the
+/// secret exists and it is read back.
+pub const SECRET_CREATE_ATTEMPTS: u32 = 8;

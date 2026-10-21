@@ -137,13 +137,25 @@ pub(crate) async fn issue(
     secret: &str,
     expires_at: u64,
 ) {
+    issue_scoped(server, tenant_name, client, secret, expires_at, "api:read").await;
+}
+
+/// [`issue`] granting `scopes`.
+pub(crate) async fn issue_scoped(
+    server: &Server,
+    tenant_name: &str,
+    client: &str,
+    secret: &str,
+    expires_at: u64,
+    scopes: &str,
+) {
     let issued = IssuedCode {
         tenant: tenant(tenant_name),
         client_id: ClientId::parse(client).expect("a client id"),
         user: UserId::parse(USER).expect("a user id"),
         redirect_uri: REDIRECT.to_owned(),
         challenge: Challenge::of(VERIFIER).expect("a challenge"),
-        scopes: ScopeSet::parse("api:read").expect("scopes"),
+        scopes: ScopeSet::parse(scopes).expect("scopes"),
         resources: BTreeSet::from([Resource::parse(API).expect("a resource")]),
         expires_at: Timestamp::from_unix_secs(expires_at),
     };

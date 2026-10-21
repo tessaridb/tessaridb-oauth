@@ -1,4 +1,4 @@
-//! `POST /{tenant}/oauth2/token` (RFC 6749 §3.2), redeeming an authorization code (§4.1.3).
+//! `POST /{tenant}/oauth2/token` (RFC 6749 §3.2), redeeming an authorization code (§4.1.3) or a refresh token (§6).
 //!
 //! The checks run in a fixed order. The client is authenticated before the code is read, so a code never names its
 //! presenter. The code is spent atomically before its bindings are checked, so it redeems once whatever the outcome,
@@ -9,6 +9,7 @@
 
 mod answer;
 mod redeem;
+mod refresh;
 
 use axum::Json;
 use axum::extract::rejection::FormRejection;
@@ -133,12 +134,7 @@ async fn exchange(
     let client = authenticated.client;
     match token::require_grant(params, &client)? {
         GrantType::AuthorizationCode => redeem(state, endpoint, &client, params).await,
-        // Not redeemed here yet: refused whole rather than half served.
-        GrantType::RefreshToken => Err(refusal(
-            ErrorCode::UnsupportedGrantType,
-            Reason::UnsupportedGrantType,
-        )
-        .into()),
+        GrantType::RefreshToken => refresh::refresh(state, endpoint, &client, params).await,
     }
 }
 

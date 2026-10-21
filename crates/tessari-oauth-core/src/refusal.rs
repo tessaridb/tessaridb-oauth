@@ -76,4 +76,14 @@ pub enum Reason {
     CodeReplayed,
     /// The refresh family a code would start had already been revoked for a replay of that code.
     CodeFamilyRevoked,
+    /// No such refresh token in this tenant.
+    RefreshUnknown,
+    /// The refresh token was issued to another client.
+    RefreshOtherClient,
+    /// The refresh token had already been rotated: its family is now revoked.
+    RefreshReused,
+    /// The refresh token went unused past its idle bound, or its family is past its absolute one.
+    RefreshExpired,
+    /// The refresh token's family was revoked.
+    RefreshRevoked,
 }

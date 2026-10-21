@@ -4,18 +4,36 @@ use axum::Json;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use tessari_oauth_constants::ACCESS_TOKEN_TTL_SECS;
 use tessari_oauth_core::token::Refusal;
-use tessari_oauth_types::ErrorCode;
+use tessari_oauth_types::{ErrorCode, RefreshToken, ScopeSet};
 
 /// A successful token response (RFC 6749 §5.1).
 #[derive(Serialize)]
 pub(super) struct Issued {
-    pub(super) access_token: String,
-    pub(super) token_type: &'static str,
-    pub(super) expires_in: u64,
+    access_token: String,
+    token_type: &'static str,
+    expires_in: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) refresh_token: Option<String>,
-    pub(super) scope: String,
+    refresh_token: Option<String>,
+    scope: String,
+}
+
+impl Issued {
+    /// A bearer answer: `access_token` for `scopes`, with `refresh_token` when one was issued.
+    pub(super) fn bearer(
+        access_token: String,
+        refresh_token: Option<&RefreshToken>,
+        scopes: &ScopeSet,
+    ) -> Self {
+        Self {
+            access_token,
+            token_type: "Bearer",
+            expires_in: ACCESS_TOKEN_TTL_SECS,
+            refresh_token: refresh_token.map(|token| token.expose().to_owned()),
+            scope: scopes.iter().collect::<Vec<_>>().join(" "),
+        }
+    }
 }
 
 /// An error response (RFC 6749 §5.2): the code and nothing the request supplied.

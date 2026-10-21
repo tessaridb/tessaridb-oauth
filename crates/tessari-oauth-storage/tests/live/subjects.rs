@@ -51,32 +51,47 @@ async fn a_subject_is_stable_for_its_client_and_differs_across_clients_and_tenan
     assert!(!first.contains("user-7"), "opaque");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
 async fn simultaneous_first_requests_agree_on_one_salt() {
     let storage = fresh(&tenant("acme"), 8).await;
     let kek = Arc::new(fresh_kek().expect("a key-encryption key"));
-    let barrier = Arc::new(Barrier::new(8));
-    let mut tasks = tokio::task::JoinSet::new();
-    for _ in 0..8 {
-        let (storage, kek, barrier) = (storage.clone(), Arc::clone(&kek), Arc::clone(&barrier));
-        tasks.spawn(async move {
-            barrier.wait().await;
-            storage
-                .subjects
-                .pairwise(&tenant("acme"), &kek, &client("svc-1"), &user(), NOW)
-                .await
-        });
+    // Each round is a tenant with no salt yet, so every round races the first write again.
+    for round in 0..10 {
+        let name = format!("race-{round}");
+        storage
+            .tenants
+            .provision(&tenant(&name))
+            .await
+            .expect("provisioned");
+        let barrier = Arc::new(Barrier::new(8));
+        let mut tasks = tokio::task::JoinSet::new();
+        for _ in 0..8 {
+            let (storage, kek, barrier, name) = (
+                storage.clone(),
+                Arc::clone(&kek),
+                Arc::clone(&barrier),
+                name.clone(),
+            );
+            tasks.spawn(async move {
+                barrier.wait().await;
+                storage
+                    .subjects
+                    .pairwise(&tenant(&name), &kek, &client("svc-1"), &user(), NOW)
+                    .await
+            });
+        }
+        let mut subjects = Vec::new();
+        while let Some(joined) = tasks.join_next().await {
+            let subject = joined.expect("joined");
+            subjects.push(subject.unwrap_or_else(|error| panic!("round {round}: {error:?}")));
+        }
+        assert_eq!(subjects.len(), 8);
+        assert!(
+            subjects.iter().all(|subject| *subject == subjects[0]),
+            "round {round}: {subjects:?}"
+        );
     }
-    let mut subjects = Vec::new();
-    while let Some(joined) = tasks.join_next().await {
-        subjects.push(joined.expect("joined").expect("a subject"));
-    }
-    assert_eq!(subjects.len(), 8);
-    assert!(
-        subjects.iter().all(|subject| *subject == subjects[0]),
-        "{subjects:?}"
-    );
 }
 
 #[tokio::test]

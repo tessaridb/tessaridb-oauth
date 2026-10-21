@@ -41,8 +41,11 @@ the client by its pinned method before it reads the code. The code is spent firs
 so a code redeems once whatever the outcome; a code presented again is refused and revokes the refresh family it
 started. The access token is an RFC 9068 JWT addressed to one resource, carrying only `iss`, `aud`, `sub`,
 `client_id`, `scope`, `iat`, `exp` and `jti`, valid for five minutes — the time a revoked grant can still be used —
-with `sub` a pairwise identifier per client. A client registered for refresh tokens also receives one. Refusals
-carry the `error` code alone; tokens are `Bearer` for now, and the refresh grant is not yet redeemed.
+with `sub` a pairwise identifier per client. A client registered for refresh tokens also receives one, and redeems
+it at the same endpoint (RFC 6749 §6): the request is judged on the family's grant before the token is rotated, so
+a refused refresh leaves the token usable; the access token may be narrowed to fewer scopes or one of the grant's
+resources but never widened, and a token presented after it was rotated revokes its family. Refusals carry the
+`error` code alone; tokens are `Bearer` for now.
 
 ## Layout
 

@@ -148,18 +148,40 @@ impl RefreshService {
             return self.end_family(&place, family_id, at, REPLAY).await;
         }
         let tombstone = family(grant, at, Some(REPLAY))?;
-        match self
-            .repository
-            .create_family(&place, family_id, &tombstone)
-            .await
-        {
+        // A `retry` means a competing write of this family is still landing and may not be readable yet; only once
+        // it has landed does a refusal mean the family exists.
+        let created = retry::bounded(REFRESH_ROTATE_ATTEMPTS, retry::on_store_retry, || {
+            self.repository.create_family(&place, family_id, &tombstone)
+        })
+        .await;
+        match created {
             Ok(()) => Ok(()),
-            // The redemption that won started the family meanwhile: revoke what it started.
+            // The redemption that won started the family meanwhile, or another replay recorded it: revoke it.
             Err(Error::Store(store)) if store.category() == ErrorCategory::Conflict => {
                 self.end_family(&place, family_id, at, REPLAY).await
             }
             Err(failure) => Err(failure),
         }
+    }
+
+    /// The grant the family of `presented` carries in `tenant`, read without changing anything; `None` for a token
+    /// this tenant never issued. Rotation never changes a family's grant, so what is judged on it before a rotation
+    /// still holds after one.
+    ///
+    /// # Errors
+    ///
+    /// When the store is unavailable, refuses, or holds a row this crate cannot read.
+    pub async fn grant(
+        &self,
+        tenant: &TenantId,
+        presented: &RefreshToken,
+    ) -> Result<Option<RefreshGrant>> {
+        let place = self.tenancy.place(tenant)?;
+        self.repository
+            .find_token(&place, &presented.digest())
+            .await?
+            .map(|token| to_grant(&token))
+            .transpose()
     }
 
     /// Present `presented` from `client` at `now`, rotating it to `next` when it may rotate.

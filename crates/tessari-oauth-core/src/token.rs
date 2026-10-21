@@ -5,6 +5,8 @@
 //! then — after the storage layer has atomically consumed the code — every binding the code was issued with, each
 //! refused on its own. The refresh grant's own checks are in [`crate::refresh`].
 
+use std::collections::BTreeSet;
+
 use tessari_oauth_types::{ClientId, ErrorCode, Resource, ScopeSet, TenantId, Timestamp, UserId};
 
 use crate::assertion::{self, AssertionUse};
@@ -211,20 +213,24 @@ pub fn redeem_code(
         client_id: code.client_id.clone(),
         scopes: code.scopes.clone(),
         user: code.user.clone(),
-        audience: audience(params, code)?,
+        audience: audience(params, &code.resources)?,
     })
 }
 
-/// The one resource a token from `code` is addressed to: the `resource` the request names, which must be one the code
-/// was granted for, or the code's only resource when none is named (RFC 8707 §2.2).
-fn audience(params: &Params, code: &IssuedCode) -> Result<Resource, Refusal> {
+/// The one resource a token is addressed to, out of the `resources` its grant was given at: the `resource` the request
+/// names, which must be one of them, or the only one when none is named (RFC 8707 §2.2).
+///
+/// # Errors
+///
+/// `invalid_target` for a named resource the grant does not hold, or none named where the grant holds several.
+pub fn audience(params: &Params, resources: &BTreeSet<Resource>) -> Result<Resource, Refusal> {
     let invalid_target = |reason| refuse(ErrorCode::InvalidTarget, reason);
     match params.get("resource") {
         Some(named) => Resource::parse(named)
             .ok()
-            .filter(|resource| code.resources.contains(resource))
+            .filter(|resource| resources.contains(resource))
             .ok_or(invalid_target(Reason::TargetNotGranted)),
-        None => match (code.resources.first(), code.resources.len()) {
+        None => match (resources.first(), resources.len()) {
             (Some(only), 1) => Ok(only.clone()),
             _ => Err(invalid_target(Reason::TargetUnnamed)),
         },

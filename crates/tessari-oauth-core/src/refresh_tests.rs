@@ -76,3 +76,24 @@ fn a_malformed_scope_is_refused() {
         );
     }
 }
+
+#[test]
+fn a_refresh_names_one_audience_among_the_familys_resources() {
+    let resources = std::collections::BTreeSet::from([
+        tessari_oauth_types::Resource::parse("https://api.example.com/").expect("fixture"),
+        tessari_oauth_types::Resource::parse("https://files.example.com/").expect("fixture"),
+    ]);
+    let named = request(&[("resource", "https://files.example.com/")]);
+    assert_eq!(
+        crate::token::audience(&named, &resources).map(|resource| resource.as_str().to_owned()),
+        Ok("https://files.example.com/".to_owned())
+    );
+    let unnamed = request(&[]);
+    assert_eq!(
+        crate::token::audience(&unnamed, &resources),
+        Err(Refusal {
+            error: ErrorCode::InvalidTarget,
+            reason: Reason::TargetUnnamed,
+        })
+    );
+}

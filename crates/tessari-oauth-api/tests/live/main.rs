@@ -10,4 +10,5 @@ mod throttle;
 mod token;
 mod token_clients;
 mod token_fixture;
+mod token_refresh;
 mod token_refusals;

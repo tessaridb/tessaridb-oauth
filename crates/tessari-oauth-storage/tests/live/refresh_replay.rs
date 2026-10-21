@@ -98,3 +98,60 @@ async fn a_replay_before_the_family_starts_leaves_no_family_to_start() {
         .await
         .expect("a second replay changes nothing");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn simultaneous_replays_and_a_start_all_answer_and_leave_the_family_revoked() {
+    let storage = std::sync::Arc::new(fresh(&tenant(), 9).await);
+    for round in 0..20 {
+        let family = format!("code-race-{round}");
+        let mut racers = tokio::task::JoinSet::new();
+        for replay in 0..8 {
+            let (storage, family) = (std::sync::Arc::clone(&storage), family.clone());
+            racers.spawn(async move {
+                let replayed = storage
+                    .refresh
+                    .revoke_for_replay(&grant(), &family, at(START + replay))
+                    .await;
+                (false, replayed)
+            });
+        }
+        let (starter, family_id) = (std::sync::Arc::clone(&storage), family.clone());
+        racers.spawn(async move {
+            let started = starter
+                .refresh
+                .start(&token(&family_id), &grant(), &family_id, at(START))
+                .await;
+            (true, started)
+        });
+        for (is_start, outcome) in racers.join_all().await {
+            match outcome {
+                Ok(()) => {}
+                // Only the start may lose, and only to a family a replay already recorded.
+                Err(error) if is_start && error.category() == ErrorCategory::Conflict => {}
+                Err(error) => panic!(
+                    "round {round}: {} failed: {error:?}",
+                    if is_start { "start" } else { "replay" }
+                ),
+            }
+        }
+        let rotation = storage
+            .refresh
+            .rotate(
+                &tenant(),
+                &token(&family),
+                &token("next"),
+                &portal(),
+                at(START + 9),
+            )
+            .await
+            .expect("answered");
+        assert!(
+            matches!(
+                rotation,
+                Rotation::Refused(RotationRefusal::FamilyRevoked | RotationRefusal::Unknown)
+            ),
+            "round {round}: {rotation:?}"
+        );
+    }
+}

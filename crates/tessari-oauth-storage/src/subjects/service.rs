@@ -8,13 +8,14 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use tessari_oauth_constants::SECRET_CREATE_ATTEMPTS;
 use tessari_oauth_core::subject;
 use tessari_oauth_infrastructure::custody::{Kek, random_secret};
 use tessari_oauth_types::{ClientId, ErrorCategory, TenantId, Timestamp, UserId, base64url};
 
 use super::SecretEntity;
 use super::repository::SecretRepository;
-use crate::{Error, Result, Tenancy};
+use crate::{Error, Result, Tenancy, retry};
 
 /// The record id and sealing binding of the pairwise salt.
 const PAIRWISE_SALT: &str = "pairwise";
@@ -74,7 +75,12 @@ impl SubjectService {
             created_at: i64::try_from(now.unix_secs())
                 .map_err(|_| unreadable("time beyond i64"))?,
         };
-        match self.repository.create(&place, PAIRWISE_SALT, &made).await {
+        // A `retry` means a competing first write is still landing; only once it has does a refusal mean it exists.
+        let created = retry::bounded(SECRET_CREATE_ATTEMPTS, retry::on_store_retry, || {
+            self.repository.create(&place, PAIRWISE_SALT, &made)
+        })
+        .await;
+        match created {
             // Opened from what was written, so the salt in use is the one the store holds.
             Ok(()) => open(kek, tenant, &made),
             // Another request made the salt first; its salt is the tenant's.

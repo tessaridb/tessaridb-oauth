@@ -138,7 +138,11 @@ async fn of_eight_parallel_redemptions_at_most_one_is_answered_with_tokens() {
         })
         .count();
     assert!(won.len() <= 1, "{} answered with tokens", won.len());
-    assert_eq!(won.len() + refused, 8);
+    let seen: Vec<String> = answers
+        .iter()
+        .map(|answer| format!("{} {}", answer.status, answer.body))
+        .collect();
+    assert_eq!(won.len() + refused, 8, "{seen:?}");
     // The others were replays, so whatever the winner was given is already revoked.
     if let Some(winner) = won.first() {
         let refresh_token = winner.body["refresh_token"]

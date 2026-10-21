@@ -1,6 +1,5 @@
 //! Redeeming a spent code: its bindings checked, its refresh family started, its access token signed.
 
-use tessari_oauth_constants::ACCESS_TOKEN_TTL_SECS;
 use tessari_oauth_core::access_token::{self, Grant, TYPE};
 use tessari_oauth_core::clients::{ClientRegistration, GrantType};
 use tessari_oauth_core::codes::IssuedCode;
@@ -77,13 +76,12 @@ pub(super) async fn redeem(
     } else {
         None
     };
-    Ok(Issued {
-        access_token: sign(&signer, endpoint, &redemption, &subject)?,
-        token_type: "Bearer",
-        expires_in: ACCESS_TOKEN_TTL_SECS,
-        refresh_token: refresh_token.map(|token| token.expose().to_owned()),
-        scope: redemption.scopes.iter().collect::<Vec<_>>().join(" "),
-    })
+    let access_token = sign(&signer, endpoint, &redemption, &subject)?;
+    Ok(Issued::bearer(
+        access_token,
+        refresh_token.as_ref(),
+        &redemption.scopes,
+    ))
 }
 
 /// The authority a code's refresh family carries: everything the code granted.
@@ -104,8 +102,7 @@ async fn start_family(
     issued: &IssuedCode,
     code: &AuthorizationCode,
 ) -> Result<RefreshToken, Failure> {
-    let secret = random_secret().map_err(|_| Error::Internal)?;
-    let first = RefreshToken::from_secret(base64url::encode(&secret));
+    let first = fresh_refresh_token()?;
     match state
         .refresh
         .start(&first, &family_grant(issued), &code.digest(), endpoint.now)
@@ -120,8 +117,14 @@ async fn start_family(
     }
 }
 
+/// A new refresh token: 256 bits from the system's cryptographic random source, base64url.
+pub(super) fn fresh_refresh_token() -> Result<RefreshToken, Failure> {
+    let secret = random_secret().map_err(|_| Error::Internal)?;
+    Ok(RefreshToken::from_secret(base64url::encode(&secret)))
+}
+
 /// The access token for `redemption`, issued to `subject` and signed by `signer`, the tenant's current key.
-fn sign(
+pub(super) fn sign(
     signer: &SigningKey,
     endpoint: &Endpoint,
     redemption: &Redemption,

@@ -198,8 +198,8 @@ async fn a_request_with_the_wrong_client_or_shape_is_refused() {
     refused(
         &post(&server, "acme", &refresh).await,
         StatusCode::BAD_REQUEST,
-        "unsupported_grant_type",
-        "refresh grant",
+        "invalid_grant",
+        "refresh token nobody issued",
     );
 
     let unregistered = [
