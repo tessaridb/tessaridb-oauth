@@ -127,6 +127,7 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         read_limit: plenty(),
         token_limit,
         authorize_limit: plenty(),
+        signing_algorithm: Algorithm::Es256,
         issuers: Arc::new(HashMap::from(
             ["acme", "initech"].map(|name| (tenant(name), issuer(name))),
         )),

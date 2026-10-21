@@ -182,10 +182,17 @@ fn pushed_authorization_requests_are_advertised_and_not_required() {
 }
 
 #[test]
+fn userinfo_is_advertised_under_the_issuer() {
+    assert_eq!(
+        document()["userinfo_endpoint"],
+        "https://id.example.com/acme/oauth2/userinfo"
+    );
+}
+
+#[test]
 fn nothing_the_server_does_not_enforce_yet_is_advertised() {
     let document = document();
     for field in [
-        "userinfo_endpoint",
         "id_token_signing_alg_values_supported",
         "subject_types_supported",
         "scopes_supported",

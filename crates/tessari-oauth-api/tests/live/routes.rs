@@ -42,6 +42,7 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         read_limit,
         token_limit: unlimited(),
         authorize_limit: unlimited(),
+        signing_algorithm: Algorithm::Es256,
         issuers: Arc::new(HashMap::from([(acme(), ISSUER.to_owned())])),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
     }

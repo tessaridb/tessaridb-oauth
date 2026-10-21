@@ -22,6 +22,10 @@ pub const TOKEN_PATH: &str = "/oauth2/token";
 /// The revocation endpoint path (RFC 7009 §2).
 pub const REVOCATION_PATH: &str = "/oauth2/revoke";
 
+/// The UserInfo endpoint path (OpenID Connect Core §5.3); appended to the issuer it is also the audience a token for
+/// it names, since it is a resource of the server's own.
+pub const USERINFO_PATH: &str = "/oauth2/userinfo";
+
 /// The key set path (RFC 8414 `jwks_uri`).
 pub const JWKS_PATH: &str = "/oauth2/jwks";
 

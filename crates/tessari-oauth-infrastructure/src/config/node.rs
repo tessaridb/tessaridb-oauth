@@ -78,7 +78,7 @@ pub struct NodeConfig {
     pub region: String,
     /// The tenants this server is the issuer for.
     pub tenants: Vec<TenantId>,
-    /// The read limit on the public routes.
+    /// The read limit on the public routes: metadata, key set and UserInfo.
     pub read_limit: ReadLimit,
     /// The limit on the token endpoint, counted apart from reads.
     pub token_limit: ReadLimit,

@@ -15,7 +15,7 @@ use tessari_oauth_storage::refresh::RefreshService;
 use tessari_oauth_storage::replay::ReplayService;
 use tessari_oauth_storage::subjects::SubjectService;
 use tessari_oauth_storage::throttle::{Limit, ThrottleService};
-use tessari_oauth_types::{Clock, TenantId};
+use tessari_oauth_types::{Algorithm, Clock, TenantId};
 
 use crate::{Error, Result};
 
@@ -42,12 +42,14 @@ pub struct PublicState {
     pub audit: Arc<AuditService>,
     /// Authorization requests kept while their user signs in.
     pub interactions: Arc<InteractionService>,
-    /// How many metadata and key-set reads one client address may make per window.
+    /// How many metadata, key-set and UserInfo reads one client address may make per window.
     pub read_limit: Limit,
     /// How many token requests one client address may make per window.
     pub token_limit: Limit,
     /// How many authorization requests one client address may make per window.
     pub authorize_limit: Limit,
+    /// The algorithm the tenants' keys sign with — the server's choice, and the only one a token is verified under.
+    pub signing_algorithm: Algorithm,
     /// Each served tenant's issuer identifier, fixed at start-up from the configuration.
     pub issuers: Arc<HashMap<TenantId, String>>,
     /// The clock the key rule is judged at.

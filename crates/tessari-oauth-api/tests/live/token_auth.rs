@@ -3,6 +3,7 @@
 
 use axum::body::Body;
 use axum::http::Request;
+use ring::digest::{SHA256, digest};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use tessari_oauth_api::public_router;
 use tessari_oauth_infrastructure::custody::SigningKey;
@@ -34,11 +35,25 @@ impl Holder {
 
     /// A proof for `htm` `htu` identified by `jti`, made now.
     pub(crate) fn proof(&self, jti: &str, htm: &str, htu: &str) -> String {
+        self.signed(&format!(
+            r#"{{"jti":"{jti}","htm":"{htm}","htu":"{htu}","iat":{NOW}}}"#
+        ))
+    }
+
+    /// A proof for `htm` `htu` identified by `jti`, made now, over `access_token` as a resource requires it.
+    pub(crate) fn over(&self, jti: &str, htm: &str, htu: &str, access_token: &str) -> String {
+        let ath = base64url::encode(digest(&SHA256, access_token.as_bytes()).as_ref());
+        self.signed(&format!(
+            r#"{{"jti":"{jti}","htm":"{htm}","htu":"{htu}","iat":{NOW},"ath":"{ath}"}}"#
+        ))
+    }
+
+    /// `claims` signed as a proof carrying this key.
+    fn signed(&self, claims: &str) -> String {
         let header = format!(
             r#"{{"typ":"dpop+jwt","alg":"EdDSA","jwk":{{"kty":"OKP","crv":"Ed25519","x":"{}"}}}}"#,
             base64url::encode(self.pair.public_key().as_ref())
         );
-        let claims = format!(r#"{{"jti":"{jti}","htm":"{htm}","htu":"{htu}","iat":{NOW}}}"#);
         let input = format!(
             "{}.{}",
             base64url::encode(header.as_bytes()),

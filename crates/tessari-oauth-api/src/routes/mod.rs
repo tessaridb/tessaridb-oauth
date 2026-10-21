@@ -1,4 +1,4 @@
-//! The public router: per tenant, the server metadata and the key set under the read limit, the authorization
+//! The public router: per tenant, the server metadata, the key set and UserInfo under the read limit, the authorization
 //! endpoint under its own, and the token, revocation and pushed-request endpoints under theirs, every form body
 //! capped.
 
@@ -6,6 +6,7 @@ mod authorize;
 mod jwks;
 mod metadata;
 mod token;
+mod userinfo;
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -26,6 +27,10 @@ pub fn public_router(state: PublicState) -> Router {
             get(metadata::metadata),
         )
         .route("/{tenant}/oauth2/jwks", get(jwks::jwks))
+        .route(
+            "/{tenant}/oauth2/userinfo",
+            get(userinfo::userinfo).post(userinfo::userinfo),
+        )
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
             crate::throttle::reads,

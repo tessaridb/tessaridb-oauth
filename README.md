@@ -5,7 +5,7 @@ An OAuth 2.1 authorization server and OpenID provider that keeps every piece of 
 portal and an embedded admin panel on its own listener.
 
 > Status: early development. The binary serves each tenant's server metadata (RFC 8414) and key set (RFC 7517)
-> over TLS, its authorization, pushed authorization request, token and revocation endpoints, and rotates the tenants' signing keys; the sign-in
+> over TLS, its authorization, pushed authorization request, token, revocation and UserInfo endpoints, and rotates the tenants' signing keys; the sign-in
 > page the authorization endpoint hands over to, and the account endpoints, are not served yet.
 
 ## What it is for
@@ -73,7 +73,16 @@ answered `200` like a revoked one, another client's token is refused with `inval
 `token_type_hint` is only a hint. An access token is refused with `unsupported_token_type`: it is never recalled
 and stays valid for at most its five minutes. Discovery advertises the endpoint and its authentication methods.
 
-Every outcome at the token and revocation endpoints, and every refusal at the authorization endpoint, is appended
+UserInfo, `GET` or `POST <issuer>/oauth2/userinfo` (OpenID Connect Core §5.3), answers an access token addressed to
+that URL — a client that calls it registers the URL as one of its resources and names it as `resource` — and carrying
+`openid`, with the token's subject (`{"sub": …}`) and nothing more yet: profile and contact claims are released per
+scope once the user directory exists. The token is read from the `Authorization` header alone, as `Bearer`, or as
+`DPoP` with a proof over that token (`ath`, RFC 9449 §7.1) that is spent once; a bound token is refused as a bearer
+token. Every bad token gets the same `401` with `error="invalid_token"` in `WWW-Authenticate`, a token without
+`openid` a `403` with `error="insufficient_scope"`, and none of the answers is cached. A token from the client
+credentials grant never carries `openid`, so it never reaches UserInfo. Discovery advertises the endpoint.
+
+Every outcome at the token and revocation endpoints, and every refusal at the authorization and UserInfo endpoints, is appended
 to an audit topic in the tenant's TessariDB database, which the store
 itself refuses to rewrite or delete from, and kept for 400 days: what was issued — client, user, subject, scopes,
 audience, the access token's `jti`, the authentication method and the bound key — what was refused and why, a
@@ -111,7 +120,7 @@ first, for development only.
 | `STORE_CONNECTIONS` | connections to the store at most | `16` |
 | `REGION` | the region whose tenants this server holds (namespace `oauth_<REGION>`) | required |
 | `TENANTS` | the tenants this server is the issuer for, comma-separated | required |
-| `READ_LIMIT`, `READ_WINDOW_SECS` | metadata and key-set requests one client address may make per window | `300`, `60` |
+| `READ_LIMIT`, `READ_WINDOW_SECS` | metadata, key-set and UserInfo requests one client address may make per window | `300`, `60` |
 | `TOKEN_LIMIT`, `TOKEN_WINDOW_SECS` | token requests one client address may make per window | `60`, `60` |
 | `AUTHORIZE_LIMIT`, `AUTHORIZE_WINDOW_SECS` | authorization requests one client address may make per window | `120`, `60` |
 

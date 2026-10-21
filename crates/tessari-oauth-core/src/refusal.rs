@@ -65,6 +65,8 @@ pub enum Reason {
     DpopMissing,
     /// A DPoP proof had been presented before.
     DpopReplayed,
+    /// A request to a resource carried no access token under a scheme it accepts.
+    AccessTokenMissing,
     /// An access token is not a JWS signed under the configured algorithm by one of the tenant's published keys.
     AccessTokenUnverified,
     /// An access token's `typ` is not `at+jwt`, or its claims are not an access token's.

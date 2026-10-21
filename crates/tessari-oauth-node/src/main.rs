@@ -28,6 +28,9 @@ use tokio::sync::watch;
 
 type Failure = Box<dyn Error + Send + Sync>;
 
+/// The algorithm new signing keys are made for, and the only one an access token is verified under.
+const SIGNING_ALGORITHM: Algorithm = Algorithm::Es256;
+
 fn main() -> ExitCode {
     let Ok(_flush_on_exit) = tessari_oauth_observability::init_tracing() else {
         return ExitCode::FAILURE;
@@ -107,7 +110,7 @@ async fn run(
         keys: Arc::clone(&storage.keys),
         kek: Arc::clone(&kek),
         tenants: config.tenants.clone(),
-        algorithm: Algorithm::Es256,
+        algorithm: SIGNING_ALGORITHM,
         clock: Arc::clone(&clock),
         interval: Duration::from_secs(KEY_ROTATION_CHECK_SECS),
         timeout: Duration::from_secs(KEY_ROTATION_RUN_TIMEOUT_SECS),
@@ -123,6 +126,7 @@ async fn run(
         kek,
         throttle: Arc::clone(&storage.throttle),
         audit: Arc::clone(&storage.audit),
+        signing_algorithm: SIGNING_ALGORITHM,
         interactions: Arc::clone(&storage.interactions),
         read_limit: Limit {
             requests: config.read_limit.requests,
