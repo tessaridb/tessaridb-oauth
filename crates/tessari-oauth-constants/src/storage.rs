@@ -4,6 +4,10 @@
 /// surfaces as a failure instead of a loop.
 pub const CODE_SPEND_ATTEMPTS: u32 = 8;
 
+/// Attempts at spending one client assertion. The spend is a conditional `SET` that the store already re-runs for up
+/// to a second when it loses a race; an attempt here answers the `retry` that survives that. A bound at all, as above.
+pub const ASSERTION_SPEND_ATTEMPTS: u32 = 8;
+
 /// Attempts at writing one consent record, counting the first. A grant is read, merged and written back under a
 /// revision check; each refused attempt means another writer of the same record succeeded, so the bound is the
 /// number of simultaneous grants for one user and client that are still served rather than failed.

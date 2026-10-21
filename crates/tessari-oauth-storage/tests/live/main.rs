@@ -9,6 +9,7 @@
 
 #![cfg(test)]
 
+mod assertions;
 mod codes;
 mod consents;
 mod refresh;
