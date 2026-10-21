@@ -24,6 +24,14 @@ pub enum Error {
         /// What the node says to do about it; `None` from a node too old to send one.
         class: Option<RefusalClass>,
     },
+    /// A store configuration this crate will not run with.
+    #[error("{field}: {reason}")]
+    InvalidConfig {
+        /// The setting at fault.
+        field: &'static str,
+        /// What it must be instead.
+        reason: &'static str,
+    },
     /// A namespace or database name that is not a plain name.
     #[error("not a plain name: {name:?}")]
     InvalidName {
@@ -67,7 +75,9 @@ impl Error {
                 class: Some(RefusalClass::Throttled | RefusalClass::Unavailable),
                 ..
             } => ErrorCategory::Unavailable,
-            Self::Refused { .. } | Self::InvalidName { .. } => ErrorCategory::Internal,
+            Self::Refused { .. } | Self::InvalidName { .. } | Self::InvalidConfig { .. } => {
+                ErrorCategory::Internal
+            }
         }
     }
 }

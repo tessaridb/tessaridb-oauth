@@ -21,7 +21,7 @@ fn tenant() -> TenantId {
     TenantId::parse("acme-eu").expect("a tenant id")
 }
 
-fn issued() -> IssuedCode {
+pub(crate) fn issued() -> IssuedCode {
     IssuedCode {
         tenant: tenant(),
         client_id: ClientId::parse("portal").expect("a client id"),

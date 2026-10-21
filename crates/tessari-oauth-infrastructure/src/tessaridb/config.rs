@@ -11,6 +11,9 @@ pub struct StoreConfig {
     pub user: String,
     /// The account's password; spent once per connection and never printed.
     pub password: String,
+    /// The certificate (PEM) the node's chain must lead to. Without one the store is reached in the clear, which
+    /// is accepted only to a loopback IP literal.
+    pub authority: Option<Vec<u8>>,
 }
 
 impl fmt::Debug for StoreConfig {
@@ -20,6 +23,7 @@ impl fmt::Debug for StoreConfig {
             .field("address", &self.address)
             .field("user", &self.user)
             .field("password", &"<redacted>")
+            .field("authority", &self.authority.as_ref().map(|_| "<set>"))
             .finish()
     }
 }

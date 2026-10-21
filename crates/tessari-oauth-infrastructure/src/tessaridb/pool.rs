@@ -9,6 +9,7 @@
 //! The node verifies only so many passwords at once and answers `throttled` beyond that, so new connections sign
 //! in a few at a time and a throttled sign-in is tried again, bounded.
 
+use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
@@ -16,11 +17,32 @@ use tessari_oauth_constants::{
     STORE_RETRY_FIRST_PAUSE_MS, STORE_RETRY_MAX_PAUSE_MS, STORE_SIGNIN_ATTEMPTS,
     STORE_SIGNIN_CONCURRENCY,
 };
-use tessaridb_client::{Answer, Client, RefusalClass, Value};
+use tessaridb_client::{Answer, Client, RefusalClass, Secured, Tls, Value};
 use tokio::sync::Semaphore;
 
 use super::{Place, StoreConfig};
 use crate::{Error, Result};
+
+/// One signed-in session, over TLS or — to a loopback address only — in the clear.
+enum Connection {
+    Plain(Client),
+    /// Boxed: a TLS session carries its whole record layer, many times the size of a plain one.
+    Secured(Box<Client<Secured>>),
+}
+
+impl Connection {
+    async fn run_with(
+        &mut self,
+        script: &str,
+        credentials: Option<(&str, &str)>,
+        parameters: Vec<(String, Value)>,
+    ) -> std::result::Result<Vec<Answer>, tessaridb_client::Error> {
+        match self {
+            Self::Plain(client) => client.run_with(script, credentials, parameters).await,
+            Self::Secured(client) => client.run_with(script, credentials, parameters).await,
+        }
+    }
+}
 
 /// A handle on the store; cheap to clone, shared by every caller.
 #[derive(Clone)]
@@ -30,23 +52,42 @@ pub struct Database {
 
 struct Inner {
     config: StoreConfig,
-    idle: Mutex<Vec<Client>>,
+    tls: Option<Tls>,
+    idle: Mutex<Vec<Connection>>,
     slots: Semaphore,
     signins: Semaphore,
 }
 
 impl Database {
     /// A pool of at most `connections` connections to the store `config` names. Nothing connects until used.
-    #[must_use]
-    pub fn new(config: StoreConfig, connections: usize) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidConfig`] when the configuration would send the password in the clear across a network, or
+    /// names an authority that is not a certificate.
+    pub fn new(config: StoreConfig, connections: usize) -> Result<Self> {
+        let tls = match &config.authority {
+            Some(pem) => Some(Tls::trusting_pem(pem).map_err(|_| Error::InvalidConfig {
+                field: "store_authority",
+                reason: "the authority must be one or more PEM certificates",
+            })?),
+            None if is_loopback_literal(&config.address) => None,
+            None => {
+                return Err(Error::InvalidConfig {
+                    field: "store_authority",
+                    reason: "without an authority the store is reached only at 127.0.0.1 or [::1]",
+                });
+            }
+        };
+        Ok(Self {
             inner: Arc::new(Inner {
                 config,
+                tls,
                 idle: Mutex::new(Vec::new()),
                 slots: Semaphore::new(connections),
                 signins: Semaphore::new(STORE_SIGNIN_CONCURRENCY),
             }),
-        }
+        })
     }
 
     /// Run `script` at `place` with its values bound, answering one [`Answer`] per statement of `script`.
@@ -140,7 +181,7 @@ impl Database {
     /// session is certainly intact.
     async fn send(
         &self,
-        mut client: Client,
+        mut client: Connection,
         signing_in: bool,
         script: &str,
         parameters: Vec<(String, Value)>,
@@ -169,19 +210,24 @@ impl Database {
         }
     }
 
-    async fn connect(&self) -> Result<Client> {
+    async fn connect(&self) -> Result<Connection> {
         let address = &self.inner.config.address;
-        let client =
-            Client::connect(address.as_str())
+        let connected = match &self.inner.tls {
+            Some(tls) => Client::connect_tls(address, tls)
                 .await
-                .map_err(|failure| Error::Unavailable {
-                    message: failure.to_string(),
-                })?;
+                .map(|client| Connection::Secured(Box::new(client))),
+            None => Client::connect(address.as_str())
+                .await
+                .map(Connection::Plain),
+        };
+        let client = connected.map_err(|failure| Error::Unavailable {
+            message: failure.to_string(),
+        })?;
         tracing::debug!(%address, "store connection opened");
         Ok(client)
     }
 
-    fn release(&self, client: Client) {
+    fn release(&self, client: Connection) {
         self.inner
             .idle
             .lock()
@@ -189,3 +235,15 @@ impl Database {
             .push(client);
     }
 }
+
+/// Whether `address` is a loopback IP literal with a port — the only place the clear is accepted, because nothing
+/// sent there leaves the machine. A name is not accepted even when it is `localhost`: a name can resolve elsewhere.
+fn is_loopback_literal(address: &str) -> bool {
+    address
+        .parse::<SocketAddr>()
+        .is_ok_and(|socket| socket.ip().is_loopback())
+}
+
+#[cfg(test)]
+#[path = "pool_tests.rs"]
+mod tests;
