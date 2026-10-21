@@ -34,6 +34,14 @@ pub enum Reason {
     GrantNotRegistered,
     /// A refresh asked for a scope the original grant does not hold.
     ScopeBeyondGrant,
+    /// A client assertion is not a JWS signed by one of the client's keys under its registered algorithm.
+    AssertionSignature,
+    /// A client assertion's type, issuer, subject or `jti` is not what client authentication requires.
+    AssertionClaims,
+    /// A client assertion is not addressed to this tenant's issuer alone.
+    AssertionAudience,
+    /// A client assertion is expired, not yet valid, or valid for longer than allowed.
+    AssertionTime,
     /// The code was issued to another client.
     CodeClientMismatch,
     /// The code was issued in another tenant.

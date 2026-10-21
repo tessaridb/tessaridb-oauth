@@ -1,13 +1,23 @@
 use tessari_oauth_constants::AUTHORIZATION_CODE_TTL_SECS;
 use tessari_oauth_types::{Challenge, ClientId, ErrorCode, ScopeSet, Timestamp, UserId};
 
-use super::{PresentedAuth, Refusal, authenticate_client, read, redeem_code, require_grant};
+use super::{
+    Endpoint, PresentedAuth, Refusal, authenticate_client, read, redeem_code, require_grant,
+};
 use crate::Reason;
 use crate::clients::GrantType;
 use crate::codes::IssuedCode;
 use crate::fixtures::{CHALLENGE, REDIRECT, VERIFIER, acme, client, directory, globex};
 
 const ISSUED_AT: u64 = 1_800_000_000;
+
+fn endpoint() -> Endpoint {
+    Endpoint {
+        tenant: acme(),
+        issuer: crate::fixtures::ACME_ISSUER.to_owned(),
+        now: Timestamp::from_unix_secs(ISSUED_AT),
+    }
+}
 
 fn issued() -> IssuedCode {
     IssuedCode {
@@ -144,9 +154,10 @@ fn t7_a_public_client_presenting_a_secret_is_refused_as_not_pinned() {
     for presented in [
         PresentedAuth::ClientSecretBasic,
         PresentedAuth::ClientSecretPost,
+        PresentedAuth::PrivateKeyJwt,
     ] {
         assert_eq!(
-            authenticate_client(&acme(), &directory(), presented, &params),
+            authenticate_client(&endpoint(), &directory(), presented, &params),
             Err(Refusal {
                 error: ErrorCode::InvalidClient,
                 reason: Reason::AuthMethodNotPinned
@@ -154,9 +165,9 @@ fn t7_a_public_client_presenting_a_secret_is_refused_as_not_pinned() {
             "{presented:?}"
         );
     }
-    let found = authenticate_client(&acme(), &directory(), PresentedAuth::None, &params)
+    let found = authenticate_client(&endpoint(), &directory(), PresentedAuth::None, &params)
         .expect("pinned none");
-    assert_eq!(found.client_id.as_str(), "app");
+    assert_eq!(found.client.client_id.as_str(), "app");
 }
 
 #[test]
@@ -164,7 +175,7 @@ fn t7_an_unknown_or_foreign_client_is_refused_as_invalid_client() {
     for id in ["nobody", "other"] {
         let params = read(with("client_id", id)).expect("no repeats");
         assert_eq!(
-            authenticate_client(&acme(), &directory(), PresentedAuth::None, &params),
+            authenticate_client(&endpoint(), &directory(), PresentedAuth::None, &params),
             Err(Refusal {
                 error: ErrorCode::InvalidClient,
                 reason: Reason::UnknownClient
@@ -174,7 +185,7 @@ fn t7_an_unknown_or_foreign_client_is_refused_as_invalid_client() {
     }
     let params = read(without("client_id")).expect("no repeats");
     assert_eq!(
-        authenticate_client(&acme(), &directory(), PresentedAuth::None, &params),
+        authenticate_client(&endpoint(), &directory(), PresentedAuth::None, &params),
         Err(Refusal {
             error: ErrorCode::InvalidClient,
             reason: Reason::MissingParameter
@@ -246,7 +257,7 @@ fn t6_a_directory_returning_another_tenants_client_is_still_refused() {
     let params = read(with("client_id", "other")).expect("no repeats");
     assert_eq!(
         authenticate_client(
-            &acme(),
+            &endpoint(),
             &crate::fixtures::CarelessDirectory,
             PresentedAuth::None,
             &params

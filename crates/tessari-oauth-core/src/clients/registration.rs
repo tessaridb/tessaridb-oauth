@@ -2,6 +2,8 @@
 
 use tessari_oauth_types::{ClientId, RedirectUri, ScopeSet, TenantId};
 
+use crate::jose::{Algorithm, VerifyingKey};
+
 /// How a client authenticates at the token endpoint. Exactly one is pinned per client; a request using another
 /// method is refused even when that other method would be acceptable, so a client cannot be downgraded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,6 +14,8 @@ pub enum AuthMethod {
     ClientSecretBasic,
     /// A client secret in the request body (`client_secret_post`).
     ClientSecretPost,
+    /// An assertion signed with one of the client's registered keys under this algorithm (`private_key_jwt`).
+    PrivateKeyJwt(Algorithm),
 }
 
 /// A grant the token endpoint redeems. A client redeems only the ones it registered.
@@ -38,6 +42,8 @@ pub struct ClientRegistration {
     pub auth_method: AuthMethod,
     /// The grants this client may redeem at the token endpoint.
     pub grant_types: Vec<GrantType>,
+    /// The public keys the client signs its assertions with; empty unless it authenticates by `private_key_jwt`.
+    pub keys: Vec<VerifyingKey>,
 }
 
 /// Finds a tenant's client registrations; the storage layer implements it.

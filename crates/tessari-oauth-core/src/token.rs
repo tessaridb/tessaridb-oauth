@@ -7,6 +7,7 @@
 
 use tessari_oauth_types::{ClientId, ErrorCode, ScopeSet, TenantId, Timestamp};
 
+use crate::assertion::{self, AssertionUse};
 use crate::clients::{AuthMethod, ClientDirectory, ClientRegistration, GrantType};
 use crate::codes::IssuedCode;
 use crate::{Params, Reason};
@@ -35,7 +36,32 @@ pub enum PresentedAuth {
     ClientSecretBasic,
     /// `client_secret` in the body.
     ClientSecretPost,
+    /// `client_assertion` in the body.
+    PrivateKeyJwt,
 }
+
+/// The token endpoint a request arrived at: its tenant, that tenant's issuer, and the time it is judged at.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Endpoint {
+    /// The tenant the endpoint serves.
+    pub tenant: TenantId,
+    /// The tenant's issuer identifier, the only audience a client assertion may name.
+    pub issuer: String,
+    /// The request's time.
+    pub now: Timestamp,
+}
+
+/// An authenticated client, and the assertion it spent when it authenticated with one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Authenticated {
+    /// The client's registration.
+    pub client: ClientRegistration,
+    /// The assertion to record as spent; `None` for a public client.
+    pub assertion: Option<AssertionUse>,
+}
+
+/// The `client_assertion_type` of a JWT client assertion (RFC 7523 §2.2).
+const JWT_BEARER_ASSERTION: &str = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
 /// A redeemed code's grant, ready to be minted into tokens.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,17 +92,19 @@ const fn refuse(error: ErrorCode, reason: Reason) -> Refusal {
     Refusal { error, reason }
 }
 
-/// Authenticate the client of `params` in `tenant` by the method pinned at its registration.
+/// Authenticate the client of `params` at `endpoint` by the method pinned at its registration.
 ///
 /// # Errors
 ///
-/// `invalid_client` for an absent, malformed or unknown `client_id`, or a method other than the pinned one.
+/// `invalid_client` for an absent, malformed or unknown `client_id`, a method other than the pinned one, or an
+/// assertion that does not hold (see [`crate::assertion::verify`]).
 pub fn authenticate_client(
-    tenant: &TenantId,
+    endpoint: &Endpoint,
     directory: &impl ClientDirectory,
     presented: PresentedAuth,
     params: &Params,
-) -> Result<ClientRegistration, Refusal> {
+) -> Result<Authenticated, Refusal> {
+    let tenant = &endpoint.tenant;
     let raw = params
         .get("client_id")
         .ok_or(refuse(ErrorCode::InvalidClient, Reason::MissingParameter))?;
@@ -86,20 +114,38 @@ pub fn authenticate_client(
         .find(tenant, &client_id)
         .filter(|registration| registration.tenant == *tenant)
         .ok_or(refuse(ErrorCode::InvalidClient, Reason::UnknownClient))?;
-    reject_method_not_pinned(client.auth_method, presented)?;
-    Ok(client)
+    let assertion = match (client.auth_method, presented) {
+        (AuthMethod::None, PresentedAuth::None) => None,
+        (AuthMethod::PrivateKeyJwt(_), PresentedAuth::PrivateKeyJwt) => {
+            Some(presented_assertion(endpoint, &client, params)?)
+        }
+        // Secret methods are pinnable but not verifiable yet, so a client pinned to one is refused, not trusted.
+        _ => {
+            return Err(refuse(
+                ErrorCode::InvalidClient,
+                Reason::AuthMethodNotPinned,
+            ));
+        }
+    };
+    Ok(Authenticated { client, assertion })
 }
 
-/// The presented method is exactly the pinned one. Secret methods are pinnable but not verifiable yet, so only a
-/// public client (`none`) authenticates today; a confidential registration is refused rather than trusted.
-fn reject_method_not_pinned(pinned: AuthMethod, presented: PresentedAuth) -> Result<(), Refusal> {
-    match (pinned, presented) {
-        (AuthMethod::None, PresentedAuth::None) => Ok(()),
-        _ => Err(refuse(
-            ErrorCode::InvalidClient,
-            Reason::AuthMethodNotPinned,
-        )),
+/// The JWT assertion `params` carries, verified as `client`'s.
+fn presented_assertion(
+    endpoint: &Endpoint,
+    client: &ClientRegistration,
+    params: &Params,
+) -> Result<AssertionUse, Refusal> {
+    let missing = refuse(ErrorCode::InvalidClient, Reason::MissingParameter);
+    match params.get("client_assertion_type") {
+        None => return Err(missing),
+        Some(JWT_BEARER_ASSERTION) => {}
+        Some(_) => {
+            return Err(refuse(ErrorCode::InvalidClient, Reason::MalformedParameter));
+        }
     }
+    let assertion = params.get("client_assertion").ok_or(missing)?;
+    assertion::verify(assertion, client, &endpoint.issuer, endpoint.now)
 }
 
 /// The grant `params` asks for, when this endpoint redeems it and `client` registered it.

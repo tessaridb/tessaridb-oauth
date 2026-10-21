@@ -36,6 +36,7 @@ pub(crate) fn client(tenant: TenantId, id: &str, redirects: &[&str]) -> ClientRe
         scope_ceiling: ScopeSet::parse("openid profile notes:read").expect("fixture ceiling"),
         auth_method: AuthMethod::None,
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
+        keys: Vec::new(),
     }
 }
 

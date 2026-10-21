@@ -22,7 +22,8 @@ sender-constrained tokens, with keys named by their JWK thumbprint (RFC 7638). I
 password grants will not be offered. Implemented so far, as pure functions without a server: the PKCE `S256`
 check, the redirect-URI type and its matching rule, the thumbprint, tenant, client and scope value types, and the
 authorization-request, code-redemption and refresh-request validators in their fixed check order; a client
-redeems only the grant types it registered, and a refresh may narrow its scopes but never widen them. Authorization codes are stored
+redeems only the grant types it registered, and a refresh may narrow its scopes but never widen them. Confidential clients authenticate with `private_key_jwt`: an Ed25519 or ES256 assertion
+signed by a key the client registered, addressed to the tenant's issuer alone, and valid for at most five minutes. Authorization codes are stored
 by their SHA-256 digest only, and are spent with one conditional write, so of any number of simultaneous
 redemptions exactly one succeeds and the rest are reported as replays. Consent is a record per user and client
 holding the granted scopes, resources and consent policy version; a request outside it is answered with exactly

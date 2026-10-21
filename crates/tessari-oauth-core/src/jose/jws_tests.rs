@@ -36,16 +36,17 @@ fn the_rfc_ed25519_and_es256_examples_verify_and_return_their_payloads() {
             ED25519_JWS,
             Algorithm::EdDsa,
             &[key(ED25519_JWK, Algorithm::EdDsa)]
-        ),
-        Ok(b"Example of Ed25519 signing".to_vec())
+        )
+        .map(|verified| (verified.typ, verified.payload)),
+        Ok((None, b"Example of Ed25519 signing".to_vec()))
     );
-    let payload = verify(
+    let verified = verify(
         ES256_JWS,
         Algorithm::Es256,
         &[key(ES256_JWK, Algorithm::Es256)],
     )
     .expect("RFC 7515 A.3 verifies");
-    assert!(payload.starts_with(br#"{"iss":"joe""#));
+    assert!(verified.payload.starts_with(br#"{"iss":"joe""#));
 }
 
 #[test]

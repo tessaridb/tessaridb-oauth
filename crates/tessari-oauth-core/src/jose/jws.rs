@@ -12,10 +12,20 @@ use super::{Algorithm, JoseError, VerifyingKey};
 struct Header {
     alg: String,
     kid: Option<String>,
+    typ: Option<String>,
     crit: Option<serde::de::IgnoredAny>,
 }
 
-/// Verify `compact` under `algorithm` with one of `keys`, and return its payload.
+/// A JWS whose signature verified: its declared type, for the caller to judge, and its payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Verified {
+    /// The `typ` header, when present.
+    pub typ: Option<String>,
+    /// The decoded payload.
+    pub payload: Vec<u8>,
+}
+
+/// Verify `compact` under `algorithm` with one of `keys`, and return its type and payload.
 ///
 /// # Errors
 ///
@@ -27,7 +37,7 @@ pub fn verify(
     compact: &str,
     algorithm: Algorithm,
     keys: &[VerifyingKey],
-) -> Result<Vec<u8>, JoseError> {
+) -> Result<Verified, JoseError> {
     let mut segments = compact.split('.');
     let (Some(header), Some(payload), Some(signature), None) = (
         segments.next(),
@@ -57,7 +67,10 @@ pub fn verify(
     if !key.verifies(signing_input.as_bytes(), &signature) {
         return Err(JoseError::BadSignature);
     }
-    Ok(payload_bytes)
+    Ok(Verified {
+        typ: header.typ,
+        payload: payload_bytes,
+    })
 }
 
 /// The one registered key of `algorithm` that `kid` names, or the only one when there is no `kid`.
