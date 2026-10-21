@@ -1,6 +1,8 @@
 //! The registration envelope of one client — the blast radius of that client, as data (oauth client policy).
 
-use tessari_oauth_types::{ClientId, RedirectUri, ScopeSet, TenantId};
+use std::collections::BTreeSet;
+
+use tessari_oauth_types::{ClientId, RedirectUri, Resource, ScopeSet, TenantId};
 
 use crate::jose::{Algorithm, VerifyingKey};
 
@@ -65,6 +67,8 @@ pub struct ClientRegistration {
     pub redirect_uris: Vec<RedirectUri>,
     /// The most a request from this client may ever ask for.
     pub scope_ceiling: ScopeSet,
+    /// The resources its tokens may be addressed to.
+    pub resources: BTreeSet<Resource>,
     /// The one way this client authenticates at the token endpoint.
     pub auth_method: AuthMethod,
     /// The grants this client may redeem at the token endpoint.

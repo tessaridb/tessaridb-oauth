@@ -1,10 +1,12 @@
 //! A tenant's client registrations: registered once, found by id in their own tenant only, and a key that is not a
 //! public signing key refused before anything is written.
 
+use std::collections::BTreeSet;
+
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
 use tessari_oauth_storage::clients::NewClient;
 use tessari_oauth_types::{
-    Algorithm, ClientId, ErrorCategory, RedirectUri, ScopeSet, TenantId, Timestamp,
+    Algorithm, ClientId, ErrorCategory, RedirectUri, Resource, ScopeSet, TenantId, Timestamp,
 };
 
 use crate::fresh;
@@ -24,6 +26,7 @@ fn service_client(id: &str, jwks: Vec<String>) -> NewClient {
             RedirectUri::parse("https://app.example.com/cb").expect("a redirect URI"),
         ],
         scope_ceiling: ScopeSet::parse("orders:read orders:write").expect("scopes"),
+        resources: BTreeSet::new(),
         auth_method: AuthMethod::PrivateKeyJwt(Algorithm::EdDsa),
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         jwks,
@@ -175,4 +178,27 @@ async fn a_client_registered_dpop_bound_is_found_bound_and_one_registered_plain_
         );
         assert_eq!(found, registered);
     }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_clients_resources_are_found_as_registered() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    let mut client = service_client("svc-res", vec![ED25519_JWK.to_owned()]);
+    client.resources = BTreeSet::from([
+        Resource::parse("https://api.example.com/").expect("a resource"),
+        Resource::parse("https://files.example.com/").expect("a resource"),
+    ]);
+    storage
+        .clients
+        .register(&tenant("acme"), &client, NOW)
+        .await
+        .expect("registered");
+    let found = storage
+        .clients
+        .find(&tenant("acme"), &client.client_id)
+        .await
+        .expect("answered")
+        .expect("found");
+    assert_eq!(found.resources, client.resources);
 }

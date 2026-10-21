@@ -1,6 +1,7 @@
 //! The token endpoint for a confidential client and under its own request limit: a client assertion authenticates
 //! once and never again, and token requests are counted apart from the metadata reads.
 
+use std::collections::BTreeSet;
 use std::num::NonZeroU64;
 
 use axum::body::Body;
@@ -39,6 +40,7 @@ async fn a_client_assertion_authenticates_once() {
         client_id: ClientId::parse("backend").expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
         scope_ceiling: ScopeSet::parse("api:read").expect("scopes"),
+        resources: BTreeSet::new(),
         auth_method: AuthMethod::PrivateKeyJwt(Algorithm::Es256),
         grant_types: vec![GrantType::AuthorizationCode],
         jwks: vec![key.public_jwk().expect("a JWK")],

@@ -4,11 +4,14 @@
 //! keys present exactly when the client authenticates with them — so what `find` reads back is what was accepted.
 //! A stored row that no longer reads as a registration is an error, never a client, so the request fails closed.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use tessari_oauth_core::clients::{AuthMethod, ClientRegistration, GrantType};
 use tessari_oauth_core::jose::VerifyingKey;
-use tessari_oauth_types::{Algorithm, ClientId, RedirectUri, ScopeSet, TenantId, Timestamp};
+use tessari_oauth_types::{
+    Algorithm, ClientId, RedirectUri, Resource, ScopeSet, TenantId, Timestamp,
+};
 
 use super::repository::ClientRepository;
 use super::{ClientEntity, NewClient};
@@ -90,6 +93,12 @@ fn registration(tenant: &TenantId, entity: ClientEntity) -> Result<ClientRegistr
         redirect_uris,
         scope_ceiling: ScopeSet::parse(&entity.scope_ceiling.join(" "))
             .map_err(|fault| unreadable(fault.to_string()))?,
+        resources: entity
+            .resources
+            .into_iter()
+            .map(Resource::parse)
+            .collect::<std::result::Result<BTreeSet<_>, _>>()
+            .map_err(|fault| unreadable(fault.to_string()))?,
         auth_method,
         grant_types,
         keys: keys(auth_method, &entity.jwks)
@@ -133,6 +142,11 @@ impl ClientService {
                 .map(|uri| uri.as_str().to_owned())
                 .collect(),
             scope_ceiling: client.scope_ceiling.iter().map(str::to_owned).collect(),
+            resources: client
+                .resources
+                .iter()
+                .map(|resource| resource.as_str().to_owned())
+                .collect(),
             auth_method: auth_method.to_owned(),
             assertion_alg: assertion_alg.map(str::to_owned),
             grant_types: client

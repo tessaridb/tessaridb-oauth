@@ -1,7 +1,9 @@
 //! A client registration as it is handed in: its keys as the JWKs it registered, so they can be kept as given.
 
+use std::collections::BTreeSet;
+
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
-use tessari_oauth_types::{ClientId, RedirectUri, ScopeSet};
+use tessari_oauth_types::{ClientId, RedirectUri, Resource, ScopeSet};
 
 /// A client to register.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,6 +14,8 @@ pub struct NewClient {
     pub redirect_uris: Vec<RedirectUri>,
     /// The most a request from it may ever ask for.
     pub scope_ceiling: ScopeSet,
+    /// The resources its tokens may be addressed to.
+    pub resources: BTreeSet<Resource>,
     /// The one way it authenticates at the token endpoint.
     pub auth_method: AuthMethod,
     /// The grants it may redeem.

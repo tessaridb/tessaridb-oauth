@@ -82,6 +82,7 @@ pub(crate) async fn server(connections: usize) -> Server {
                 client_id: ClientId::parse(client).expect("a client id"),
                 redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
                 scope_ceiling: ScopeSet::parse("api:read api:write").expect("scopes"),
+                resources: BTreeSet::from([Resource::parse(API).expect("a resource")]),
                 auth_method: AuthMethod::None,
                 grant_types: grants,
                 jwks: Vec::new(),

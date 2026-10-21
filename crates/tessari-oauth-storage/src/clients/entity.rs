@@ -14,6 +14,8 @@ pub struct ClientEntity {
     pub redirect_uris: Vec<String>,
     /// The most it may ever ask for.
     pub scope_ceiling: Vec<String>,
+    /// The resources its tokens may be addressed to.
+    pub resources: Vec<String>,
     /// Its token-endpoint authentication method, by registry name.
     pub auth_method: String,
     /// The assertion algorithm, for `private_key_jwt` only.
@@ -35,6 +37,7 @@ impl FromRecord for ClientEntity {
             tenant: row.take("tenant")?,
             redirect_uris: row.take("redirect_uris")?,
             scope_ceiling: row.take("scope_ceiling")?,
+            resources: row.take("resources")?,
             auth_method: row.take("auth_method")?,
             assertion_alg: row.take("assertion_alg")?,
             grant_types: row.take("grant_types")?,

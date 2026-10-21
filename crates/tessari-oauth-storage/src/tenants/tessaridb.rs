@@ -36,7 +36,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      public_jwk string REQUIRED, created_at int REQUIRED, compromised bool REQUIRED, retired_at int); \
      DEFINE SPACE IF NOT EXISTS replays; \
      DEFINE TABLE IF NOT EXISTS clients (\
-     client_id string REQUIRED, tenant string REQUIRED, redirect_uris array REQUIRED, scope_ceiling array REQUIRED, auth_method string REQUIRED, \
+     client_id string REQUIRED, tenant string REQUIRED, redirect_uris array REQUIRED, scope_ceiling array REQUIRED, \
+     resources array REQUIRED, auth_method string REQUIRED, \
      assertion_alg string, grant_types array REQUIRED, jwks array REQUIRED, dpop_bound_access_tokens bool REQUIRED, \
      registered_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS secrets (sealed string REQUIRED, created_at int REQUIRED);";

@@ -2,6 +2,8 @@
 //! bound is refused without one, a public client's refresh token keeps needing the key it was issued to, and a
 //! confidential client's refresh is bound by its authentication instead.
 
+use std::collections::BTreeSet;
+
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use ring::signature::{Ed25519KeyPair, KeyPair};
@@ -144,6 +146,7 @@ fn client(id: &str, auth_method: AuthMethod, jwks: Vec<String>, bound: bool) -> 
         client_id: ClientId::parse(id).expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
         scope_ceiling: ScopeSet::parse("api:read").expect("scopes"),
+        resources: BTreeSet::new(),
         auth_method,
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         jwks,

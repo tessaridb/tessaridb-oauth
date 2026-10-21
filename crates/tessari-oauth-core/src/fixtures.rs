@@ -1,5 +1,7 @@
 //! Fixtures shared by this crate's tests: two tenants, a public client in each, an in-memory directory.
 
+use std::collections::BTreeSet;
+
 use tessari_oauth_types::{ClientId, RedirectUri, ScopeSet, TenantId};
 
 use crate::clients::{AuthMethod, ClientDirectory, ClientRegistration, GrantType};
@@ -34,6 +36,7 @@ pub(crate) fn client(tenant: TenantId, id: &str, redirects: &[&str]) -> ClientRe
             .map(|raw| RedirectUri::parse(*raw).expect("fixture redirect"))
             .collect(),
         scope_ceiling: ScopeSet::parse("openid profile notes:read").expect("fixture ceiling"),
+        resources: BTreeSet::new(),
         auth_method: AuthMethod::None,
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         keys: Vec::new(),

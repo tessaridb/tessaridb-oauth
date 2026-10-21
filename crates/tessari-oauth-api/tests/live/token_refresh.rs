@@ -2,6 +2,7 @@
 //! wide as its grant; a token presented again takes its family with it; a refused refresh leaves the token as it
 //! was; and of parallel refreshes of one token at most one is answered.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use axum::http::StatusCode;
@@ -121,6 +122,7 @@ async fn a_refused_refresh_leaves_the_token_as_it_was() {
         client_id: ClientId::parse("studio").expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
         scope_ceiling: ScopeSet::parse("api:read").expect("scopes"),
+        resources: BTreeSet::new(),
         auth_method: AuthMethod::None,
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         jwks: Vec::new(),
