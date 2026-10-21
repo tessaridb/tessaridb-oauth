@@ -18,8 +18,9 @@ portal and an embedded admin panel on its own listener.
 The design follows OAuth 2.1: authorization code with PKCE `S256` (RFC 7636) as the only browser flow, redirect
 URIs matched exactly with only the native-app loopback port exception (RFC 8252 §7.3), and DPoP (RFC 9449) for
 sender-constrained tokens, with keys named by their JWK thumbprint (RFC 7638). Implicit, hybrid token-returning and
-password grants will not be offered. Implemented so far: the PKCE `S256` check, the redirect-URI type and its
-matching rule, and the thumbprint, tenant-id and client-id value types.
+password grants will not be offered. Implemented so far, as pure functions without a server: the PKCE `S256`
+check, the redirect-URI type and its matching rule, the thumbprint, tenant, client and scope value types, and the
+authorization-request and code-redemption validators in their fixed check order.
 
 ## Layout
 

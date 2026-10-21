@@ -13,6 +13,7 @@ autotests = false
 doctest = false
 
 [dependencies]
+tessari-oauth-constants.workspace = true
 tessari-oauth-types.workspace = true
 thiserror.workspace = true
 

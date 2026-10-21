@@ -321,6 +321,7 @@ version = "0.1.0"
 name = "tessari-oauth-core"
 version = "0.1.0"
 dependencies = [
+ "tessari-oauth-constants",
  "tessari-oauth-types",
  "thiserror",
 ]
