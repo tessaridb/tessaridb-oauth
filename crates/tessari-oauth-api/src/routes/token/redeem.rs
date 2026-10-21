@@ -150,7 +150,6 @@ pub(super) fn sign(
     subject: &str,
     bound_to: Option<&KeyThumbprint>,
 ) -> Result<String, Failure> {
-    let jti = token_id().map_err(|_| Error::Internal)?;
     let grant = Grant {
         issuer: &endpoint.issuer,
         audience: &redemption.audience,
@@ -159,7 +158,17 @@ pub(super) fn sign(
         scopes: &redemption.scopes,
         bound_to,
     };
-    let payload = serde_json::to_vec(&access_token::claims(&grant, &jti, endpoint.now))
+    sign_grant(signer, endpoint, &grant)
+}
+
+/// The access token `grant` decided, signed by `signer`, the tenant's current key.
+pub(super) fn sign_grant(
+    signer: &SigningKey,
+    endpoint: &Endpoint,
+    grant: &Grant<'_>,
+) -> Result<String, Failure> {
+    let jti = token_id().map_err(|_| Error::Internal)?;
+    let payload = serde_json::to_vec(&access_token::claims(grant, &jti, endpoint.now))
         .map_err(|_| Error::Internal)?;
     Ok(signer
         .sign_compact(TYPE, &payload)

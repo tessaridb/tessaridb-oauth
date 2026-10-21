@@ -15,21 +15,10 @@ use tessari_oauth_types::{Algorithm, ClientId, RedirectUri, ScopeSet, Timestamp}
 use tower::ServiceExt;
 
 use crate::routes::{Answer, answer, header};
+use crate::token_auth::{ASSERTION_TYPE, assertion};
 use crate::token_fixture::{
-    NOW, REDIRECT, Server, issue, issuer, post, redemption, server, state, tenant, uncached,
+    NOW, REDIRECT, Server, issue, post, redemption, server, state, tenant, uncached,
 };
-
-const ASSERTION_TYPE: &str = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
-
-/// An assertion for `backend` addressed to `acme`'s issuer, identified by `jti`.
-fn assertion(key: &SigningKey, jti: &str) -> String {
-    let claims = format!(
-        r#"{{"iss":"backend","sub":"backend","aud":"{}","exp":{},"jti":"{jti}"}}"#,
-        issuer("acme"),
-        NOW + 60
-    );
-    key.sign_compact("JWT", claims.as_bytes()).expect("signed")
-}
 
 #[tokio::test]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
@@ -59,7 +48,7 @@ async fn a_client_assertion_authenticates_once() {
     for code in ["code-one", "code-two"] {
         issue(&server, "acme", "backend", code, NOW + 60).await;
     }
-    let first_assertion = assertion(&key, "assertion-1");
+    let first_assertion = assertion(&key, "backend", "assertion-1");
     let one = post(
         &server,
         "acme",
@@ -79,7 +68,7 @@ async fn a_client_assertion_authenticates_once() {
     assert_eq!(again.body["error"], "invalid_client");
     uncached(&again);
 
-    let second_assertion = assertion(&key, "assertion-2");
+    let second_assertion = assertion(&key, "backend", "assertion-2");
     let two = post(
         &server,
         "acme",

@@ -40,11 +40,17 @@ pub enum GrantType {
     AuthorizationCode,
     /// `refresh_token` (RFC 6749 §6).
     RefreshToken,
+    /// `client_credentials` (RFC 6749 §4.4): a confidential client's own token, with no user behind it.
+    ClientCredentials,
 }
 
 impl GrantType {
     /// Every grant the token endpoint redeems; the one list both the endpoint and the metadata read.
-    pub const ALL: [Self; 2] = [Self::AuthorizationCode, Self::RefreshToken];
+    pub const ALL: [Self; 3] = [
+        Self::AuthorizationCode,
+        Self::RefreshToken,
+        Self::ClientCredentials,
+    ];
 
     /// The grant's `grant_type` value.
     #[must_use]
@@ -52,6 +58,7 @@ impl GrantType {
         match self {
             Self::AuthorizationCode => "authorization_code",
             Self::RefreshToken => "refresh_token",
+            Self::ClientCredentials => "client_credentials",
         }
     }
 }

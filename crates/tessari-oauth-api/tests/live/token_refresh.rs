@@ -8,9 +8,10 @@ use std::sync::Arc;
 use axum::http::StatusCode;
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
 use tessari_oauth_storage::clients::NewClient;
-use tessari_oauth_types::{ClientId, RedirectUri, ScopeSet, Timestamp, base64url};
+use tessari_oauth_types::{ClientId, RedirectUri, ScopeSet, Timestamp};
 
 use crate::routes::Answer;
+use crate::token_auth::payload;
 use crate::token_fixture::{
     API, NOW, REDIRECT, Server, issue_scoped, post, redemption, server, tenant, uncached,
 };
@@ -40,15 +41,6 @@ async fn refresh(
     ];
     pairs.extend_from_slice(extra);
     post(server, "acme", &pairs).await
-}
-
-/// The payload of the access token in `answer`, read without verifying it (the code-grant tests verify).
-fn payload(answer: &Answer) -> serde_json::Value {
-    let compact = answer.body["access_token"]
-        .as_str()
-        .expect("an access token");
-    let middle = compact.split('.').nth(1).expect("three segments");
-    serde_json::from_slice(&base64url::decode(middle).expect("base64url")).expect("JSON")
 }
 
 fn refused(answer: &Answer, error: &str, case: &str) {

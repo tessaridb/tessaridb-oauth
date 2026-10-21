@@ -4,97 +4,17 @@
 
 use std::collections::BTreeSet;
 
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use ring::signature::{Ed25519KeyPair, KeyPair};
-use tessari_oauth_api::public_router;
+use axum::http::StatusCode;
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
 use tessari_oauth_infrastructure::custody::SigningKey;
 use tessari_oauth_storage::clients::NewClient;
-use tessari_oauth_types::{
-    Algorithm, ClientId, KeyThumbprint, RedirectUri, ScopeSet, Timestamp, base64url,
-};
-use tower::ServiceExt;
+use tessari_oauth_types::{Algorithm, ClientId, RedirectUri, ScopeSet, Timestamp};
 
-use crate::routes::{Answer, answer};
+use crate::routes::Answer;
+use crate::token_auth::{ASSERTION_TYPE, Holder, assertion, payload, post_with, target};
 use crate::token_fixture::{
-    NOW, REDIRECT, Server, issue, issuer, plenty, post, redemption, server, state, tenant, uncached,
+    NOW, REDIRECT, Server, issue, issuer, post, redemption, server, tenant, uncached,
 };
-
-const ASSERTION_TYPE: &str = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
-
-/// A client's DPoP key: an Ed25519 pair from a fixed seed.
-struct Holder {
-    pair: Ed25519KeyPair,
-}
-
-impl Holder {
-    fn new(seed: u8) -> Self {
-        Self {
-            pair: Ed25519KeyPair::from_seed_unchecked(&[seed; 32]).expect("a seed is a key"),
-        }
-    }
-
-    fn thumbprint(&self) -> String {
-        KeyThumbprint::of_ed25519(self.pair.public_key().as_ref())
-            .as_str()
-            .to_owned()
-    }
-
-    /// A proof for `htm` `htu` identified by `jti`, made now.
-    fn proof(&self, jti: &str, htm: &str, htu: &str) -> String {
-        let header = format!(
-            r#"{{"typ":"dpop+jwt","alg":"EdDSA","jwk":{{"kty":"OKP","crv":"Ed25519","x":"{}"}}}}"#,
-            base64url::encode(self.pair.public_key().as_ref())
-        );
-        let claims = format!(r#"{{"jti":"{jti}","htm":"{htm}","htu":"{htu}","iat":{NOW}}}"#);
-        let input = format!(
-            "{}.{}",
-            base64url::encode(header.as_bytes()),
-            base64url::encode(claims.as_bytes())
-        );
-        format!(
-            "{input}.{}",
-            base64url::encode(self.pair.sign(input.as_bytes()).as_ref())
-        )
-    }
-
-    /// A proof for this tenant's token endpoint.
-    fn at_token(&self, jti: &str) -> String {
-        self.proof(jti, "POST", &target())
-    }
-}
-
-/// `acme`'s token endpoint, as a proof names it.
-fn target() -> String {
-    format!("{}/oauth2/token", issuer("acme"))
-}
-
-/// POST `pairs` to `acme`'s token endpoint with one `DPoP` header per proof.
-async fn post_with(server: &Server, pairs: &[(&str, &str)], proofs: &[&str]) -> Answer {
-    let body = url::form_urlencoded::Serializer::new(String::new())
-        .extend_pairs(pairs)
-        .finish();
-    let mut request = Request::post("/acme/oauth2/token")
-        .header("content-type", "application/x-www-form-urlencoded");
-    for proof in proofs {
-        request = request.header("dpop", *proof);
-    }
-    let response = public_router(state(server, plenty()))
-        .oneshot(request.body(Body::from(body)).expect("a request"))
-        .await
-        .expect("the router answers");
-    answer(response).await
-}
-
-/// The payload of the access token in `answer`, read without verifying it (the code-grant tests verify).
-fn payload(answer: &Answer) -> serde_json::Value {
-    let compact = answer.body["access_token"]
-        .as_str()
-        .expect("an access token");
-    let middle = compact.split('.').nth(1).expect("three segments");
-    serde_json::from_slice(&base64url::decode(middle).expect("base64url")).expect("JSON")
-}
 
 fn issued(answer: &Answer, token_type: &str, case: &str) {
     assert_eq!(answer.status, StatusCode::OK, "{case}: {}", answer.body);
@@ -317,16 +237,6 @@ async fn a_public_clients_refresh_token_needs_the_key_it_was_issued_to() {
     );
 }
 
-/// An assertion for `backend` addressed to `acme`'s issuer, identified by `jti`.
-fn assertion(key: &SigningKey, jti: &str) -> String {
-    let claims = format!(
-        r#"{{"iss":"backend","sub":"backend","aud":"{}","exp":{},"jti":"{jti}"}}"#,
-        issuer("acme"),
-        NOW + 60
-    );
-    key.sign_compact("JWT", claims.as_bytes()).expect("signed")
-}
-
 #[tokio::test]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
 async fn a_confidential_clients_refresh_is_not_bound_to_the_proof_key() {
@@ -343,7 +253,7 @@ async fn a_confidential_clients_refresh_is_not_bound_to_the_proof_key() {
     )
     .await;
     issue(&server, "acme", "backend", "code-c1", NOW + 60).await;
-    let signed = assertion(&key, "assertion-1");
+    let signed = assertion(&key, "backend", "assertion-1");
     let mut pairs = redemption("backend", "code-c1");
     pairs.extend([
         ("client_assertion_type", ASSERTION_TYPE),
@@ -354,7 +264,7 @@ async fn a_confidential_clients_refresh_is_not_bound_to_the_proof_key() {
     issued(&first, "DPoP", "redeemed with a proof");
     let token = refresh_token(&first);
 
-    let signed = assertion(&key, "assertion-2");
+    let signed = assertion(&key, "backend", "assertion-2");
     let mut pairs = refreshing("backend", &token);
     pairs.extend([
         ("client_assertion_type", ASSERTION_TYPE),

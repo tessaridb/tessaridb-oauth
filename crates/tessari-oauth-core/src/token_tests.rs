@@ -237,11 +237,13 @@ fn t7_an_unknown_or_foreign_client_is_refused_as_invalid_client() {
 }
 
 #[test]
-fn t8_only_the_code_and_refresh_grants_exist_and_only_for_a_client_registered_for_them() {
-    let app = client(acme(), "app", &[REDIRECT]);
+fn t8_only_the_code_refresh_and_client_grants_exist_and_only_for_a_client_registered_for_them() {
+    let mut app = client(acme(), "app", &[REDIRECT]);
+    app.grant_types.push(GrantType::ClientCredentials);
     for (grant, expected) in [
         ("authorization_code", GrantType::AuthorizationCode),
         ("refresh_token", GrantType::RefreshToken),
+        ("client_credentials", GrantType::ClientCredentials),
     ] {
         let params = read(with("grant_type", grant)).expect("no repeats");
         assert_eq!(require_grant(&params, &app), Ok(expected), "{grant}");
@@ -259,7 +261,7 @@ fn t8_only_the_code_and_refresh_grants_exist_and_only_for_a_client_registered_fo
     for grant in [
         "password",
         "implicit",
-        "client_credentials",
+        "CLIENT_CREDENTIALS",
         "REFRESH_TOKEN",
     ] {
         let params = read(with("grant_type", grant)).expect("no repeats");

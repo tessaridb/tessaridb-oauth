@@ -202,3 +202,34 @@ async fn a_clients_resources_are_found_as_registered() {
         .expect("found");
     assert_eq!(found.resources, client.resources);
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn only_a_confidential_client_registers_the_client_credentials_grant() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    let mut public = service_client("svc-public", Vec::new());
+    public.auth_method = AuthMethod::None;
+    public.grant_types = vec![GrantType::ClientCredentials];
+    let refused = storage
+        .clients
+        .register(&tenant("acme"), &public, NOW)
+        .await;
+    assert!(
+        matches!(&refused, Err(error) if error.category() == ErrorCategory::Validation),
+        "{refused:?}"
+    );
+    let written = storage
+        .clients
+        .find(&tenant("acme"), &public.client_id)
+        .await
+        .expect("answered");
+    assert!(written.is_none(), "nothing is written for a refused client");
+
+    let mut confidential = service_client("svc-machine", vec![ED25519_JWK.to_owned()]);
+    confidential.grant_types = vec![GrantType::ClientCredentials];
+    storage
+        .clients
+        .register(&tenant("acme"), &confidential, NOW)
+        .await
+        .expect("a confidential client registers it");
+}

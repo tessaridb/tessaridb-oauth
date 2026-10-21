@@ -2,7 +2,7 @@ use serde_json::Value;
 use tessari_oauth_types::{Algorithm, Timestamp};
 
 use super::{IssuerRefused, metadata};
-use crate::clients::AuthMethod;
+use crate::clients::{AuthMethod, GrantType};
 use crate::fixtures::{ACME_ISSUER, Directory, REDIRECT, acme, client};
 use crate::token::{Endpoint, PresentedAuth, authenticate_client, require_grant};
 use crate::{Params, Reason};
@@ -73,8 +73,12 @@ fn only_the_code_flow_with_s256_and_the_iss_response_parameter_are_advertised() 
 #[test]
 fn every_advertised_grant_is_one_the_token_endpoint_redeems() {
     let advertised = names(&document(), "grant_types_supported");
-    assert_eq!(advertised, ["authorization_code", "refresh_token"]);
-    let registered = client(acme(), "app", &[REDIRECT]);
+    assert_eq!(
+        advertised,
+        ["authorization_code", "refresh_token", "client_credentials"]
+    );
+    let mut registered = client(acme(), "app", &[REDIRECT]);
+    registered.grant_types = GrantType::ALL.to_vec();
     for name in &advertised {
         let params = Params::from_pairs([("grant_type", name.as_str())]).expect("one pair");
         let grant = require_grant(&params, &registered).expect("redeemed");

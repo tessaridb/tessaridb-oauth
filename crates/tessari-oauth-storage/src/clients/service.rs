@@ -132,6 +132,15 @@ impl ClientService {
             record: "client",
             reason: "keys must be public signing keys, given exactly for private_key_jwt",
         })?;
+        // A public client's credentials are in every copy of it, so they cannot stand for a client acting as itself.
+        if client.auth_method == AuthMethod::None
+            && client.grant_types.contains(&GrantType::ClientCredentials)
+        {
+            return Err(Error::Invalid {
+                record: "client",
+                reason: "client_credentials is for confidential clients only",
+            });
+        }
         let (auth_method, assertion_alg) = method_name(client.auth_method);
         let entity = ClientEntity {
             tenant: tenant.as_str().to_owned(),

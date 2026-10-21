@@ -1,4 +1,5 @@
-//! `POST /{tenant}/oauth2/token` (RFC 6749 §3.2), redeeming an authorization code (§4.1.3) or a refresh token (§6).
+//! `POST /{tenant}/oauth2/token` (RFC 6749 §3.2), redeeming an authorization code (§4.1.3), a refresh token (§6) or
+//! a confidential client's own credentials (§4.4).
 //!
 //! The checks run in a fixed order. The client is authenticated before the code is read, so a code never names its
 //! presenter. The code is spent atomically before its bindings are checked, so it redeems once whatever the outcome,
@@ -9,6 +10,7 @@
 //! verifier or the assertion.
 
 mod answer;
+mod client;
 mod proof;
 mod redeem;
 mod refresh;
@@ -141,6 +143,9 @@ async fn exchange(
         }
         GrantType::RefreshToken => {
             refresh::refresh(state, endpoint, &client, params, proof.as_ref()).await
+        }
+        GrantType::ClientCredentials => {
+            client::client_credentials(state, endpoint, &client, params, proof.as_ref()).await
         }
     }
 }
