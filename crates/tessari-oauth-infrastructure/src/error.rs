@@ -38,6 +38,22 @@ pub enum Error {
         /// Which step failed.
         reason: &'static str,
     },
+    /// A required configuration variable is not set.
+    #[error("{key} is required")]
+    Unset {
+        /// The variable.
+        key: &'static str,
+    },
+    /// A configuration variable holds a value that does not fit; secrets are never parsed, so never carried here.
+    #[error("{key}={value:?}: expected {reason}")]
+    Invalid {
+        /// The variable.
+        key: &'static str,
+        /// The value read.
+        value: String,
+        /// What it must be.
+        reason: &'static str,
+    },
     /// A namespace or database name that is not a plain name.
     #[error("not a plain name: {name:?}")]
     InvalidName {
@@ -81,6 +97,7 @@ impl Error {
                 class: Some(RefusalClass::Throttled | RefusalClass::Unavailable),
                 ..
             } => ErrorCategory::Unavailable,
+            Self::Unset { .. } | Self::Invalid { .. } => ErrorCategory::Validation,
             Self::Refused { .. }
             | Self::InvalidName { .. }
             | Self::InvalidConfig { .. }
