@@ -15,6 +15,7 @@ pub mod id_token;
 pub mod jose;
 pub mod keys;
 mod params;
+pub mod password;
 pub mod refresh;
 mod refusal;
 pub mod subject;

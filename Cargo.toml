@@ -37,6 +37,9 @@ serde_json = { version = "1", features = ["raw_value"] }
 # Redirect URIs are parsed by the WHATWG URL parser, and a registered value must already be in the form it
 # serialises to, so the server never normalises an incoming value into a match.
 url = "2"
+# A password is compared and hashed in Unicode Normalization Form C (NIST SP 800-63B-4 §3.1.1.2), so the same
+# characters typed on two keyboards are one password.
+unicode-normalization = "0.1"
 # Reads a `.env` file into the environment for local development; a missing file is the production case.
 dotenvy = "0.15"
 # The database client is the family's own SDK; it does not publish to a registry, so it arrives pinned by tag.
