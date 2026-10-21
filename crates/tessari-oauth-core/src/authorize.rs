@@ -6,10 +6,12 @@
 //! every refusal up to and including the redirect check is rendered at the server, and only the refusals after it
 //! travel back to the client, carrying `state` and the issuer (RFC 9207).
 
-use tessari_oauth_types::{Challenge, ClientId, ErrorCode, ScopeSet, TenantId};
+use std::collections::BTreeSet;
+
+use tessari_oauth_types::{Challenge, ClientId, ErrorCode, Resource, ScopeSet, TenantId};
 
 use crate::clients::{ClientDirectory, ClientRegistration};
-use crate::{Params, Reason};
+use crate::{Params, Reason, token};
 
 /// The response type this server issues: the authorization code, and nothing in the front channel.
 pub(crate) const RESPONSE_TYPE_CODE: &str = "code";
@@ -30,6 +32,10 @@ pub struct AuthorizationRequest {
     pub challenge: Challenge,
     /// The client's `state`, echoed unchanged.
     pub state: Option<String>,
+    /// The resources the code will grant (RFC 8707): the one named, or the client's only registered one.
+    pub resources: BTreeSet<Resource>,
+    /// The client's `nonce` (OpenID Connect Core §3.1.2.1), echoed unchanged into the ID token.
+    pub nonce: Option<String>,
 }
 
 /// Why an authorization request was refused, and where the answer may go.
@@ -92,6 +98,9 @@ where
         require_s256_challenge(&params).map_err(|(error, reason)| redirect(error, reason))?;
     let scopes = reject_scope_beyond_ceiling(&client.scope_ceiling, &params)
         .map_err(|(error, reason)| redirect(error, reason))?;
+    // The same rule the token endpoint applies: the one named, or the client's only registered resource.
+    let resource = token::audience(&params, &client.resources)
+        .map_err(|refused| redirect(refused.error, refused.reason))?;
 
     Ok(AuthorizationRequest {
         client_id: client.client_id,
@@ -99,6 +108,8 @@ where
         scopes,
         challenge,
         state,
+        resources: BTreeSet::from([resource]),
+        nonce: params.get("nonce").map(str::to_owned),
     })
 }
 

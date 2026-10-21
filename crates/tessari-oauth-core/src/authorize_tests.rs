@@ -2,7 +2,13 @@ use tessari_oauth_types::ErrorCode;
 
 use super::{Refusal, validate};
 use crate::Reason;
-use crate::fixtures::{ACME_ISSUER, CHALLENGE, REDIRECT, acme, directory};
+use std::collections::BTreeSet;
+
+use tessari_oauth_types::Resource;
+
+use crate::fixtures::{
+    ACME_ISSUER, CHALLENGE, Directory, NOTES, REDIRECT, acme, client, directory,
+};
 
 /// A request every check accepts; each row below changes exactly one thing from it.
 fn valid() -> Vec<(&'static str, String)> {
@@ -235,4 +241,61 @@ fn a2_a_directory_returning_another_tenants_client_is_still_refused() {
         Err(Refusal::RenderAtServer { reason, .. }) => assert_eq!(reason, Reason::UnknownClient),
         other => panic!("expected a refusal rendered at the server, got {other:?}"),
     }
+}
+
+fn resources(names: &[&str]) -> BTreeSet<Resource> {
+    names
+        .iter()
+        .map(|name| Resource::parse(*name).expect("a resource"))
+        .collect()
+}
+
+#[test]
+fn a10_the_resource_is_the_one_named_or_the_only_one_registered() {
+    let request = run(valid()).expect("valid without a resource");
+    assert_eq!(
+        request.resources,
+        resources(&[NOTES]),
+        "the only registered one"
+    );
+    let named = run(with("resource", NOTES)).expect("valid with its resource");
+    assert_eq!(named.resources, resources(&[NOTES]));
+}
+
+#[test]
+fn a10_a_resource_the_client_did_not_register_is_redirected() {
+    for named in ["https://files.example.com/", "not a uri"] {
+        assert_eq!(
+            redirected(with("resource", named)),
+            (ErrorCode::InvalidTarget, Reason::TargetNotGranted),
+            "{named}"
+        );
+    }
+}
+
+#[test]
+fn a10_no_resource_named_where_several_are_registered_is_redirected() {
+    let mut several = client(acme(), "app", &[REDIRECT]);
+    several.resources = resources(&[NOTES, "https://files.example.com/"]);
+    match validate(&acme(), ACME_ISSUER, &Directory(vec![several]), valid()) {
+        Err(Refusal::RedirectToClient { error, reason, .. }) => {
+            assert_eq!(
+                (error, reason),
+                (ErrorCode::InvalidTarget, Reason::TargetUnnamed)
+            );
+        }
+        other => panic!("expected a redirected refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_nonce_is_carried_unchanged_and_is_absent_when_not_sent() {
+    assert_eq!(run(valid()).expect("valid").nonce, None);
+    assert_eq!(
+        run(with("nonce", "n-0S6_WzA2Mj"))
+            .expect("valid")
+            .nonce
+            .as_deref(),
+        Some("n-0S6_WzA2Mj")
+    );
 }
