@@ -55,6 +55,9 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring",
 # Self-signed certificates for the listener tests; a dev-dependency only.
 rcgen = "0.13"
 tracing = "0.1"
+# The binary's subscriber: JSON events, a filter from `RUST_LOG`, and a writer on its own thread.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "json", "fmt", "std"] }
+tracing-appender = "0.2"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
