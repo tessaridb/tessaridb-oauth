@@ -9,6 +9,7 @@ pub mod consents;
 pub mod dpop;
 mod error;
 pub mod jose;
+pub mod keys;
 mod params;
 pub mod refresh;
 mod refusal;
