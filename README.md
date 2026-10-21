@@ -60,6 +60,12 @@ answered `200` like a revoked one, another client's token is refused with `inval
 `token_type_hint` is only a hint. An access token is refused with `unsupported_token_type`: it is never recalled
 and stays valid for at most its five minutes. Discovery advertises the endpoint and its authentication methods.
 
+Every outcome at both endpoints is appended to an audit topic in the tenant's TessariDB database, which the store
+itself refuses to rewrite or delete from, and kept for 400 days: what was issued — client, user, subject, scopes,
+audience, the access token's `jti`, the authentication method and the bound key — what was refused and why, a
+replayed code, a reused refresh token and a revocation. A message never carries a token, code, verifier, assertion
+or proof. An issuance that cannot be recorded is not answered; a refusal is answered either way.
+
 ## Layout
 
 | Crate | Role |

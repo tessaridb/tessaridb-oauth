@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use tessari_oauth_infrastructure::custody::Kek;
+use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::keys::KeyService;
@@ -35,6 +36,8 @@ pub struct PublicState {
     pub kek: Arc<Kek>,
     /// The request counters.
     pub throttle: Arc<ThrottleService>,
+    /// The audit trail every token and revocation outcome is appended to.
+    pub audit: Arc<AuditService>,
     /// How many metadata and key-set reads one client address may make per window.
     pub read_limit: Limit,
     /// How many token requests one client address may make per window.

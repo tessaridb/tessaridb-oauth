@@ -10,10 +10,11 @@ use tessari_oauth_core::client_credentials;
 use tessari_oauth_core::clients::ClientRegistration;
 use tessari_oauth_core::dpop::ProofUse;
 use tessari_oauth_core::token::Endpoint;
+use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 
 use super::answer::Issued;
 use super::redeem::sign_grant;
-use super::{Failure, proof};
+use super::{Failure, audit, proof};
 use crate::Error;
 use crate::state::PublicState;
 
@@ -23,7 +24,7 @@ pub(super) async fn client_credentials(
     client: &ClientRegistration,
     params: &Params,
     proof: Option<&ProofUse>,
-) -> Result<Issued, Failure> {
+) -> Result<(Issued, AuditEvent), Failure> {
     let granted = client_credentials::grant(params, client)?;
     let signer = state
         .keys
@@ -40,6 +41,16 @@ pub(super) async fn client_credentials(
         scopes: &granted.scopes,
         bound_to,
     };
-    let access_token = sign_grant(&signer, endpoint, &grant)?;
-    Ok(Issued::new(access_token, None, &granted.scopes, bound_to))
+    let signed = sign_grant(&signer, endpoint, &grant)?;
+    let event = audit::issued(
+        AuditKind::IssuedClient,
+        &grant,
+        signed.jti,
+        None,
+        client.auth_method,
+    );
+    Ok((
+        Issued::new(signed.token, None, &granted.scopes, bound_to),
+        event,
+    ))
 }

@@ -8,6 +8,7 @@
 mod routes;
 mod throttle;
 mod token;
+mod token_audit;
 mod token_auth;
 mod token_client_credentials;
 mod token_clients;

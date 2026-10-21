@@ -122,6 +122,7 @@ async fn run(
         subjects: Arc::clone(&storage.subjects),
         kek,
         throttle: Arc::clone(&storage.throttle),
+        audit: Arc::clone(&storage.audit),
         read_limit: Limit {
             requests: config.read_limit.requests,
             window_secs: config.read_limit.window_secs,

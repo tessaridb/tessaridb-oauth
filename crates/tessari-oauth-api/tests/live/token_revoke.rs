@@ -13,7 +13,11 @@ use crate::token_client_credentials::machine;
 use crate::token_fixture::{NOW, Server, issue, plenty, post, redemption, server, state, uncached};
 
 /// POST `pairs` as a form to `acme`'s revocation endpoint, with `authorization` when given.
-async fn revoke(server: &Server, pairs: &[(&str, &str)], authorization: Option<&str>) -> Answer {
+pub(crate) async fn revoke(
+    server: &Server,
+    pairs: &[(&str, &str)],
+    authorization: Option<&str>,
+) -> Answer {
     let body = url::form_urlencoded::Serializer::new(String::new())
         .extend_pairs(pairs)
         .finish();

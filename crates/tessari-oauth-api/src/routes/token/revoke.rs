@@ -6,6 +6,7 @@
 use axum::http::HeaderMap;
 use tessari_oauth_core::token::Endpoint;
 use tessari_oauth_core::{Params, Reason};
+use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::refresh::Revocation;
 use tessari_oauth_types::{ClientId, ErrorCode, RefreshToken};
 
@@ -19,7 +20,7 @@ pub(super) async fn revoke(
     headers: &HeaderMap,
     params: &Params,
     client_id: Option<&ClientId>,
-) -> Result<(), Failure> {
+) -> Result<AuditEvent, Failure> {
     let client = authenticate(state, endpoint, headers, params, client_id).await?;
     let raw = params
         .get("token")
@@ -41,8 +42,17 @@ pub(super) async fn revoke(
         )
         .await
         .map_err(Error::Store)?;
+    let revoked = AuditEvent {
+        client_id: Some(client.client_id),
+        ..AuditEvent::of(AuditKind::RevokedByClient)
+    };
     match revocation {
-        Revocation::Revoked | Revocation::Unknown => Ok(()),
+        Revocation::Revoked => Ok(revoked),
+        // Answered as a revocation (§2.2), and recorded as the unknown token it was.
+        Revocation::Unknown => Ok(AuditEvent {
+            reason: Some(format!("{:?}", Reason::RefreshUnknown)),
+            ..revoked
+        }),
         Revocation::OtherClient => {
             Err(refusal(ErrorCode::InvalidGrant, Reason::RefreshOtherClient).into())
         }

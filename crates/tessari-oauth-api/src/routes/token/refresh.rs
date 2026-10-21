@@ -10,12 +10,13 @@ use tessari_oauth_core::clients::ClientRegistration;
 use tessari_oauth_core::dpop::ProofUse;
 use tessari_oauth_core::token::{self, Endpoint, Redemption};
 use tessari_oauth_core::{Params, Reason, refresh};
+use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::refresh::{Rotation, RotationRefusal};
 use tessari_oauth_types::ErrorCode;
 
 use super::answer::Issued;
-use super::redeem::{fresh_refresh_token, sign};
-use super::{Failure, proof, refusal};
+use super::redeem::{access_grant, fresh_refresh_token, sign_grant};
+use super::{Failure, audit, proof, refusal};
 use crate::Error;
 use crate::state::PublicState;
 
@@ -25,7 +26,7 @@ pub(super) async fn refresh(
     client: &ClientRegistration,
     params: &Params,
     proof: Option<&ProofUse>,
-) -> Result<Issued, Failure> {
+) -> Result<(Issued, AuditEvent), Failure> {
     let tenant = &endpoint.tenant;
     let invalid_grant = |reason| refusal(ErrorCode::InvalidGrant, reason);
     let presented = refresh::presented(params)?;
@@ -106,11 +107,17 @@ pub(super) async fn refresh(
         }
     }
     let bound_to = proof.map(|proof| &proof.thumbprint);
-    let access_token = sign(&signer, endpoint, &redemption, &subject, bound_to)?;
-    Ok(Issued::new(
-        access_token,
-        Some(&next),
-        &redemption.scopes,
-        bound_to,
+    let grant = access_grant(endpoint, &redemption, &subject, bound_to);
+    let signed = sign_grant(&signer, endpoint, &grant)?;
+    let event = audit::issued(
+        AuditKind::IssuedRefresh,
+        &grant,
+        signed.jti,
+        Some(&redemption.user),
+        client.auth_method,
+    );
+    Ok((
+        Issued::new(signed.token, Some(&next), &redemption.scopes, bound_to),
+        event,
     ))
 }

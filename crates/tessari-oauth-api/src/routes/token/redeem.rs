@@ -7,6 +7,7 @@ use tessari_oauth_core::dpop::ProofUse;
 use tessari_oauth_core::token::{self, Endpoint, Redemption};
 use tessari_oauth_core::{Params, Reason};
 use tessari_oauth_infrastructure::custody::{SigningKey, random_secret, token_id};
+use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::codes::Consumed;
 use tessari_oauth_storage::refresh::RefreshGrant;
 use tessari_oauth_types::{
@@ -14,7 +15,7 @@ use tessari_oauth_types::{
 };
 
 use super::answer::Issued;
-use super::{Failure, proof, refusal};
+use super::{Failure, audit, proof, refusal};
 use crate::Error;
 use crate::state::PublicState;
 
@@ -26,7 +27,7 @@ pub(super) async fn redeem(
     client: &ClientRegistration,
     params: &Params,
     proof: Option<&ProofUse>,
-) -> Result<Issued, Failure> {
+) -> Result<(Issued, AuditEvent), Failure> {
     let tenant = &endpoint.tenant;
     let code = AuthorizationCode::from_secret(
         params
@@ -85,13 +86,22 @@ pub(super) async fn redeem(
     } else {
         None
     };
-    let access_token = sign(&signer, endpoint, &redemption, &subject, bound_to)?;
-    Ok(Issued::new(
-        access_token,
+    let grant = access_grant(endpoint, &redemption, &subject, bound_to);
+    let signed = sign_grant(&signer, endpoint, &grant)?;
+    let event = audit::issued(
+        AuditKind::IssuedCode,
+        &grant,
+        signed.jti,
+        Some(&redemption.user),
+        client.auth_method,
+    );
+    let issued = Issued::new(
+        signed.token,
         refresh_token.as_ref(),
         &redemption.scopes,
         bound_to,
-    ))
+    );
+    Ok((issued, event))
 }
 
 /// The authority a code's refresh family carries: everything the code granted, bound to `key` when given.
@@ -141,24 +151,27 @@ pub(super) fn fresh_refresh_token() -> Result<RefreshToken, Failure> {
     Ok(RefreshToken::from_secret(base64url::encode(&secret)))
 }
 
-/// The access token for `redemption`, issued to `subject`, bound to `bound_to` when given, and signed by `signer`, the
-/// tenant's current key.
-pub(super) fn sign(
-    signer: &SigningKey,
-    endpoint: &Endpoint,
-    redemption: &Redemption,
-    subject: &str,
-    bound_to: Option<&KeyThumbprint>,
-) -> Result<String, Failure> {
-    let grant = Grant {
+/// An access token and the `jti` it carries, which the audit trail names in its place.
+pub(super) struct Signed {
+    pub(super) token: String,
+    pub(super) jti: String,
+}
+
+/// What the access token for `redemption` grants: issued to `subject`, bound to `bound_to` when given.
+pub(super) fn access_grant<'a>(
+    endpoint: &'a Endpoint,
+    redemption: &'a Redemption,
+    subject: &'a str,
+    bound_to: Option<&'a KeyThumbprint>,
+) -> Grant<'a> {
+    Grant {
         issuer: &endpoint.issuer,
         audience: &redemption.audience,
         subject,
         client_id: &redemption.client_id,
         scopes: &redemption.scopes,
         bound_to,
-    };
-    sign_grant(signer, endpoint, &grant)
+    }
 }
 
 /// The access token `grant` decided, signed by `signer`, the tenant's current key.
@@ -166,11 +179,12 @@ pub(super) fn sign_grant(
     signer: &SigningKey,
     endpoint: &Endpoint,
     grant: &Grant<'_>,
-) -> Result<String, Failure> {
+) -> Result<Signed, Failure> {
     let jti = token_id().map_err(|_| Error::Internal)?;
     let payload = serde_json::to_vec(&access_token::claims(grant, &jti, endpoint.now))
         .map_err(|_| Error::Internal)?;
-    Ok(signer
+    let token = signer
         .sign_compact(TYPE, &payload)
-        .map_err(|_| Error::Internal)?)
+        .map_err(|_| Error::Internal)?;
+    Ok(Signed { token, jti })
 }

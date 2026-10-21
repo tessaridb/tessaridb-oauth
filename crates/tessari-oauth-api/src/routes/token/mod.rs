@@ -5,11 +5,13 @@
 //! presenter. The code is spent atomically before its bindings are checked, so it redeems once whatever the outcome,
 //! and a code presented again revokes the refresh family it started. That family is started before the access token
 //! is signed, so a redemption that loses to a replay signs nothing. A DPoP proof is verified once the client is
-//! authenticated and spent only after every other check has passed. A refusal answers with the specification's
-//! `error` code alone and records its precise reason in the audit log — identifiers only, never the code, the
-//! verifier or the assertion.
+//! authenticated and spent only after every other check has passed. Every outcome is appended to the tenant's audit
+//! trail before it is answered — identifiers only, never a token, the code, the verifier or the assertion: an issuance
+//! that cannot be recorded is not answered, while a refusal is answered whether or not its record lands. A refusal
+//! answers with the specification's `error` code alone.
 
 mod answer;
+mod audit;
 mod client;
 mod proof;
 mod redeem;
@@ -24,6 +26,7 @@ use axum::response::{IntoResponse, Response};
 use tessari_oauth_core::clients::{ClientDirectory, ClientRegistration, GrantType};
 use tessari_oauth_core::token::{self, Endpoint, PresentedAuth, Refusal};
 use tessari_oauth_core::{Params, Reason};
+use tessari_oauth_storage::audit::AuditEvent;
 use tessari_oauth_storage::replay::Spent;
 use tessari_oauth_types::{ClientId, ErrorCode, TenantId};
 
@@ -121,17 +124,24 @@ async fn respond(
         (Ok(params), Operation::Token) => {
             exchange(state, &endpoint, headers, &params, client_id.as_ref())
                 .await
-                .map(|issued| Json(issued).into_response())
+                .map(|(issued, event)| (Json(issued).into_response(), event))
         }
         (Ok(params), Operation::Revoke) => {
             revoke::revoke(state, &endpoint, headers, &params, client_id.as_ref())
                 .await
-                .map(|()| StatusCode::OK.into_response())
+                .map(|event| (StatusCode::OK.into_response(), event))
         }
         (Err(refused), _) => Err(Failure::Refused(refused)),
     };
     match outcome {
-        Ok(answered) => Ok(no_store(answered)),
+        Ok((answered, event)) => {
+            state
+                .audit
+                .record(&endpoint.tenant, &event, endpoint.now)
+                .await
+                .map_err(Error::Store)?;
+            Ok(no_store(answered))
+        }
         Err(Failure::Server(error)) => Err(error),
         Err(Failure::Refused(refused)) => {
             let event = match operation {
@@ -146,6 +156,19 @@ async fn respond(
                 error = refused.error.as_str(),
                 "a token request was refused"
             );
+            let event = audit::refused(&refused, client_id.as_ref());
+            if let Err(failure) = state
+                .audit
+                .record(&endpoint.tenant, &event, endpoint.now)
+                .await
+            {
+                tracing::error!(
+                    event = "audit_unrecorded",
+                    tenant = endpoint.tenant.as_str(),
+                    category = ?failure.category(),
+                    "a refusal could not be appended to the audit trail"
+                );
+            }
             Ok(answer_refusal(refused, presents_basic(headers)))
         }
     }
@@ -158,7 +181,7 @@ async fn exchange(
     headers: &HeaderMap,
     params: &Params,
     client_id: Option<&ClientId>,
-) -> Result<Issued, Failure> {
+) -> Result<(Issued, AuditEvent), Failure> {
     let client = authenticate(state, endpoint, headers, params, client_id).await?;
     let proof = proof::read(headers, endpoint, &client)?;
     match token::require_grant(params, &client)? {

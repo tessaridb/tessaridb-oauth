@@ -37,6 +37,7 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         subjects: Arc::clone(&storage.subjects),
         kek: Arc::new(kek()),
         throttle: Arc::clone(&storage.throttle),
+        audit: Arc::clone(&storage.audit),
         read_limit,
         token_limit: unlimited(),
         issuers: Arc::new(HashMap::from([(acme(), ISSUER.to_owned())])),

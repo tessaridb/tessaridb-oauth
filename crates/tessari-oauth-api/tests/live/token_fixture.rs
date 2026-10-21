@@ -122,6 +122,7 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         subjects: Arc::clone(&storage.subjects),
         kek: Arc::clone(&server.kek),
         throttle: Arc::clone(&storage.throttle),
+        audit: Arc::clone(&storage.audit),
         read_limit: plenty(),
         token_limit,
         issuers: Arc::new(HashMap::from(
