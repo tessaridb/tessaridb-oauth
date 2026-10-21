@@ -19,6 +19,9 @@ pub(crate) const RESPONSE_TYPE_CODE: &str = "code";
 /// The only PKCE transform accepted (RFC 7636 §4.2).
 pub(crate) const CHALLENGE_METHOD_S256: &str = "S256";
 
+/// The `prompt` value asking that no page be shown (OpenID Connect Core §3.1.2.1).
+const PROMPT_NONE: &str = "none";
+
 /// An authorization request that passed every check and may go on to the login ceremony.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorizationRequest {
@@ -36,6 +39,9 @@ pub struct AuthorizationRequest {
     pub resources: BTreeSet<Resource>,
     /// The client's `nonce` (OpenID Connect Core §3.1.2.1), echoed unchanged into the ID token.
     pub nonce: Option<String>,
+    /// The client asked that no page be shown (`prompt=none`): the request is answered from an existing session or
+    /// refused, never sent to sign in.
+    pub silent: bool,
 }
 
 /// Why an authorization request was refused, and where the answer may go.
@@ -101,6 +107,9 @@ where
     // The same rule the token endpoint applies: the one named, or the client's only registered resource.
     let resource = token::audience(&params, &client.resources)
         .map_err(|refused| redirect(refused.error, refused.reason))?;
+    // Step 8: the OpenID Connect parameters.
+    let silent =
+        reject_prompt_none_combined(&params).map_err(|(error, reason)| redirect(error, reason))?;
 
     Ok(AuthorizationRequest {
         client_id: client.client_id,
@@ -110,6 +119,7 @@ where
         state,
         resources: BTreeSet::from([resource]),
         nonce: params.get("nonce").map(str::to_owned),
+        silent,
     })
 }
 
@@ -195,6 +205,25 @@ fn reject_scope_beyond_ceiling(
     Ok(scopes)
 }
 
+/// Step 8: whether `prompt` is `none` alone, which asks that no page be shown; `none` beside any other value
+/// contradicts itself (OpenID Connect Core §3.1.2.1).
+fn reject_prompt_none_combined(params: &Params) -> Result<bool, (ErrorCode, Reason)> {
+    let Some(prompt) = params.get("prompt") else {
+        return Ok(false);
+    };
+    if !prompt.split(' ').any(|value| value == PROMPT_NONE) {
+        return Ok(false);
+    }
+    if prompt != PROMPT_NONE {
+        return Err((ErrorCode::InvalidRequest, Reason::PromptNoneCombined));
+    }
+    Ok(true)
+}
+
 #[cfg(test)]
 #[path = "authorize_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "authorize_prompt_tests.rs"]
+mod prompt_tests;

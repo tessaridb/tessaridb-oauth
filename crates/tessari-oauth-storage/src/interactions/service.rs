@@ -48,6 +48,8 @@ fn to_request(entity: InteractionEntity) -> Result<AuthorizationRequest> {
             .map(|resource| Resource::parse(resource).map_err(|_| unreadable("resources")))
             .collect::<Result<BTreeSet<Resource>>>()?,
         nonce: entity.nonce,
+        // A silent request is answered without a page, so it is never kept for a sign-in.
+        silent: false,
     })
 }
 

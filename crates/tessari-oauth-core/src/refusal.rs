@@ -26,6 +26,8 @@ pub enum Reason {
     UnsupportedChallengeMethod,
     /// A requested scope is beyond the client's ceiling.
     ScopeBeyondCeiling,
+    /// `prompt` named `none` together with another value.
+    PromptNoneCombined,
     /// The client authenticated with a method other than the one pinned at registration.
     AuthMethodNotPinned,
     /// `grant_type` is not one this endpoint redeems.

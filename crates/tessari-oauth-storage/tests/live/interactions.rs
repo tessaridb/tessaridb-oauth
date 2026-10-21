@@ -31,6 +31,7 @@ fn request(state: Option<&str>, nonce: Option<&str>) -> AuthorizationRequest {
             Resource::parse("https://api.example.com/").expect("a resource")
         ]),
         nonce: nonce.map(str::to_owned),
+        silent: false,
     }
 }
 

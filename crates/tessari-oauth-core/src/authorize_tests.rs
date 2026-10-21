@@ -11,7 +11,7 @@ use crate::fixtures::{
 };
 
 /// A request every check accepts; each row below changes exactly one thing from it.
-fn valid() -> Vec<(&'static str, String)> {
+pub(super) fn valid() -> Vec<(&'static str, String)> {
     vec![
         ("response_type", "code".to_owned()),
         ("client_id", "app".to_owned()),
@@ -23,7 +23,7 @@ fn valid() -> Vec<(&'static str, String)> {
     ]
 }
 
-fn with(name: &'static str, value: &str) -> Vec<(&'static str, String)> {
+pub(super) fn with(name: &'static str, value: &str) -> Vec<(&'static str, String)> {
     let mut pairs: Vec<_> = valid()
         .into_iter()
         .filter(|(key, _)| *key != name)
@@ -39,7 +39,9 @@ fn without(name: &str) -> Vec<(&'static str, String)> {
         .collect()
 }
 
-fn run(pairs: Vec<(&'static str, String)>) -> Result<super::AuthorizationRequest, Refusal> {
+pub(super) fn run(
+    pairs: Vec<(&'static str, String)>,
+) -> Result<super::AuthorizationRequest, Refusal> {
     validate(&acme(), ACME_ISSUER, &directory(), pairs)
 }
 
@@ -50,7 +52,7 @@ fn rendered(pairs: Vec<(&'static str, String)>) -> Reason {
     }
 }
 
-fn redirected(pairs: Vec<(&'static str, String)>) -> (ErrorCode, Reason) {
+pub(super) fn redirected(pairs: Vec<(&'static str, String)>) -> (ErrorCode, Reason) {
     match run(pairs) {
         Err(Refusal::RedirectToClient {
             redirect_uri,
