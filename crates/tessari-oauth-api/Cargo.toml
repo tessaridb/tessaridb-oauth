@@ -13,8 +13,22 @@ autotests = false
 doctest = false
 
 [dependencies]
+tessari-oauth-constants.workspace = true
 tessari-oauth-types.workspace = true
 thiserror.workspace = true
+axum.workspace = true
+tower.workspace = true
+hyper-util.workspace = true
+http-body.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+tokio = { workspace = true, features = ["rt", "macros"] }
+tracing.workspace = true
+
+[dev-dependencies]
+tessari-oauth-infrastructure.workspace = true
+rcgen.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util"] }
 
 [lints]
 workspace = true
