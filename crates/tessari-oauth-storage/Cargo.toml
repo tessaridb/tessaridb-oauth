@@ -27,6 +27,7 @@ async-trait.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+tessari-oauth-test-support.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 [lints]

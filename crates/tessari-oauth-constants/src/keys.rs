@@ -9,3 +9,7 @@ pub const SIGNING_KEY_LIFETIME_SECS: u64 = 2_592_000;
 /// successor started signing, so every token it signed still verifies. Access tokens live 5 minutes; the margin covers
 /// ID tokens and clock skew.
 pub const SIGNED_TOKEN_MAX_TTL_SECS: u64 = 3_600;
+
+/// How many tenants one rotation run works on at once. Each tenant costs a few small store round trips, so this
+/// bounds the run's share of the connection pool rather than its CPU.
+pub const KEY_ROTATION_CONCURRENCY: usize = 8;

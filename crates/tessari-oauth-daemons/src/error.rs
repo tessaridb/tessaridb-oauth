@@ -1,19 +1,29 @@
-//! Failures of `tessari-oauth-daemons`.
-//!
-//! Nothing in this crate can fail yet, so the enum has no variants; each one arrives with the operation that
-//! produces it, mapped to its category in the workspace taxonomy.
+//! Failures of `tessari-oauth-daemons`: a run that did not complete, named by its daemon.
 
 use tessari_oauth_types::ErrorCategory;
 
 /// A failure of this crate.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum Error {}
+pub enum Error {
+    /// A run of `daemon` failed; `message` says where, without secret material.
+    #[error("daemon {daemon} failed: {message}")]
+    Run {
+        /// The daemon's name.
+        daemon: &'static str,
+        /// What failed.
+        message: String,
+        /// The category of the underlying failure.
+        category: ErrorCategory,
+    },
+}
 
 impl Error {
     /// The taxonomy category of this failure.
     #[must_use]
     pub const fn category(&self) -> ErrorCategory {
-        match *self {}
+        match self {
+            Self::Run { category, .. } => *category,
+        }
     }
 }
 

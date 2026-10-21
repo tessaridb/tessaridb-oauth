@@ -503,8 +503,15 @@ dependencies = [
 name = "tessari-oauth-daemons"
 version = "0.1.0"
 dependencies = [
+ "tessari-oauth-constants",
+ "tessari-oauth-core",
+ "tessari-oauth-infrastructure",
+ "tessari-oauth-storage",
+ "tessari-oauth-test-support",
  "tessari-oauth-types",
  "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -539,9 +546,18 @@ dependencies = [
  "tessari-oauth-constants",
  "tessari-oauth-core",
  "tessari-oauth-infrastructure",
+ "tessari-oauth-test-support",
  "tessari-oauth-types",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "tessari-oauth-test-support"
+version = "0.1.0"
+dependencies = [
+ "tessari-oauth-infrastructure",
+ "tessari-oauth-storage",
 ]
 
 [[package]]

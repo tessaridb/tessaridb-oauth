@@ -20,6 +20,7 @@ tessari-oauth-infrastructure = { path = "crates/tessari-oauth-infrastructure" }
 tessari-oauth-storage = { path = "crates/tessari-oauth-storage" }
 tessari-oauth-api = { path = "crates/tessari-oauth-api" }
 tessari-oauth-daemons = { path = "crates/tessari-oauth-daemons" }
+tessari-oauth-test-support = { path = "crates/tessari-oauth-test-support" }
 
 thiserror = "2"
 sha2 = "0.10"
