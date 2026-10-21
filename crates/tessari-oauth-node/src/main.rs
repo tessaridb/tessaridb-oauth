@@ -105,7 +105,7 @@ async fn run(
     let (stop, stopped) = watch::channel(false);
     let rotation = Arc::new(KeyRotation {
         keys: Arc::clone(&storage.keys),
-        kek,
+        kek: Arc::clone(&kek),
         tenants: config.tenants.clone(),
         algorithm: Algorithm::Es256,
         clock: Arc::clone(&clock),
@@ -115,10 +115,20 @@ async fn run(
     let rotating = tokio::spawn(tessari_oauth_daemons::run(rotation, stopped.clone()));
     let state = PublicState {
         keys: Arc::clone(&storage.keys),
+        clients: Arc::clone(&storage.clients),
+        codes: Arc::clone(&storage.codes),
+        refresh: Arc::clone(&storage.refresh),
+        replay: Arc::clone(&storage.replay),
+        subjects: Arc::clone(&storage.subjects),
+        kek,
         throttle: Arc::clone(&storage.throttle),
         read_limit: Limit {
             requests: config.read_limit.requests,
             window_secs: config.read_limit.window_secs,
+        },
+        token_limit: Limit {
+            requests: config.token_limit.requests,
+            window_secs: config.token_limit.window_secs,
         },
         issuers: Arc::new(issuers),
         clock,

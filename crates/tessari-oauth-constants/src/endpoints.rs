@@ -7,3 +7,7 @@ pub const TOKEN_PATH: &str = "/oauth2/token";
 
 /// The key set path (RFC 8414 `jwks_uri`).
 pub const JWKS_PATH: &str = "/oauth2/jwks";
+
+/// The largest token-request body read, in bytes. A token request is a handful of short parameters; a client
+/// assertion is the longest and stays well under this. A larger body is refused before it is parsed.
+pub const TOKEN_BODY_MAX_BYTES: usize = 16 * 1024;

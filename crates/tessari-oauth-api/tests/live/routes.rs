@@ -30,8 +30,15 @@ fn acme() -> TenantId {
 pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
     PublicState {
         keys: Arc::clone(&storage.keys),
+        clients: Arc::clone(&storage.clients),
+        codes: Arc::clone(&storage.codes),
+        refresh: Arc::clone(&storage.refresh),
+        replay: Arc::clone(&storage.replay),
+        subjects: Arc::clone(&storage.subjects),
+        kek: Arc::new(kek()),
         throttle: Arc::clone(&storage.throttle),
         read_limit,
+        token_limit: unlimited(),
         issuers: Arc::new(HashMap::from([(acme(), ISSUER.to_owned())])),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
     }

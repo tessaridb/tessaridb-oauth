@@ -35,6 +35,15 @@ what must be asked, simultaneous grants are all kept, and a revocation records w
 presented again after it was rotated revokes its whole family, and a token lives at most 14 days unused and 30 days
 in all.
 
+The token endpoint `POST <issuer>/oauth2/token` redeems authorization codes (RFC 6749 §4.1.3). It reads a form body
+of at most 16 KiB, refuses a repeated parameter or more than one client authentication method, and authenticates
+the client by its pinned method before it reads the code. The code is spent first and its bindings checked after,
+so a code redeems once whatever the outcome; a code presented again is refused and revokes the refresh family it
+started. The access token is an RFC 9068 JWT addressed to one resource, carrying only `iss`, `aud`, `sub`,
+`client_id`, `scope`, `iat`, `exp` and `jti`, valid for five minutes — the time a revoked grant can still be used —
+with `sub` a pairwise identifier per client. A client registered for refresh tokens also receives one. Refusals
+carry the `error` code alone; tokens are `Bearer` for now, and the refresh grant is not yet redeemed.
+
 ## Layout
 
 | Crate | Role |
@@ -67,6 +76,7 @@ first, for development only.
 | `REGION` | the region whose tenants this server holds (namespace `oauth_<REGION>`) | required |
 | `TENANTS` | the tenants this server is the issuer for, comma-separated | required |
 | `READ_LIMIT`, `READ_WINDOW_SECS` | metadata and key-set requests one client address may make per window | `300`, `60` |
+| `TOKEN_LIMIT`, `TOKEN_WINDOW_SECS` | token requests one client address may make per window | `60`, `60` |
 
 ```sh
 cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary
@@ -74,7 +84,8 @@ curl --cacert cert.pem https://localhost:8443/acme/.well-known/oauth-authorizati
 ```
 
 At start the server provisions each tenant's database, makes a signing key for any tenant without one and then
-checks every five minutes for keys due to rotate. Each read is counted per client address in TessariDB; past the limit
+checks every five minutes for keys due to rotate. Each read and each token request is counted per client address in
+TessariDB, under separate limits; past the limit
 the answer is `429` with `Retry-After`, every counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`,
 and when the store cannot count the request is refused with `503` rather than served. Logs are JSON on standard
 output, filtered by `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the

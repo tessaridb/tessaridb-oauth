@@ -64,4 +64,16 @@ pub enum Reason {
     TargetNotGranted,
     /// No `resource` was named and the code was granted for more than one, or for none.
     TargetUnnamed,
+    /// A token request body was not `application/x-www-form-urlencoded`, or was larger than the endpoint reads.
+    BodyNotForm,
+    /// A token request presented more than one client authentication method.
+    SeveralAuthMethods,
+    /// A client assertion had been presented before.
+    AssertionReplayed,
+    /// No such authorization code in this tenant.
+    CodeUnknown,
+    /// The authorization code had already been redeemed.
+    CodeReplayed,
+    /// The refresh family a code would start had already been revoked for a replay of that code.
+    CodeFamilyRevoked,
 }

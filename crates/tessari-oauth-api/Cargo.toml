@@ -19,11 +19,13 @@ doctest = false
 [dependencies]
 tessari-oauth-constants.workspace = true
 tessari-oauth-core.workspace = true
+tessari-oauth-infrastructure.workspace = true
 tessari-oauth-storage.workspace = true
 tessari-oauth-types.workspace = true
 thiserror.workspace = true
 axum.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 tower.workspace = true
 hyper-util.workspace = true
 http-body.workspace = true
@@ -33,10 +35,9 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 tracing.workspace = true
 
 [dev-dependencies]
-tessari-oauth-infrastructure.workspace = true
 tessari-oauth-test-support.workspace = true
 rcgen.workspace = true
-serde_json.workspace = true
+url.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util"] }
 
 [lints]
