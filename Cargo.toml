@@ -1,0 +1,61 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "BUSL-1.1"
+authors = ["boogvar"]
+repository = "https://github.com/tessaridb/tessaridb-oauth"
+publish = false
+
+[workspace.dependencies]
+tessari-oauth-constants = { path = "crates/tessari-oauth-constants" }
+tessari-oauth-types = { path = "crates/tessari-oauth-types" }
+tessari-oauth-core = { path = "crates/tessari-oauth-core" }
+tessari-oauth-observability = { path = "crates/tessari-oauth-observability" }
+tessari-oauth-infrastructure = { path = "crates/tessari-oauth-infrastructure" }
+tessari-oauth-storage = { path = "crates/tessari-oauth-storage" }
+tessari-oauth-api = { path = "crates/tessari-oauth-api" }
+tessari-oauth-daemons = { path = "crates/tessari-oauth-daemons" }
+
+thiserror = "2"
+sha2 = "0.10"
+subtle = "2"
+# Redirect URIs are parsed by the WHATWG URL parser, and a registered value must already be in the form it
+# serialises to, so the server never normalises an incoming value into a match.
+url = "2"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_sign_loss = "deny"
+cast_precision_loss = "deny"
+unwrap_used = "deny"
+panic = "deny"
+expect_used = "deny"
+arithmetic_side_effects = "deny"
+todo = "warn"
+unimplemented = "warn"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+debug = "line-tables-only"
+opt-level = 0
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.build-override]
+opt-level = 3

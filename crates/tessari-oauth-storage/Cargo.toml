@@ -1,0 +1,20 @@
+[package]
+name = "tessari-oauth-storage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+# Integration tests are declared one binary per crate when they exist; never one per file under `tests/`.
+autotests = false
+
+[lib]
+doctest = false
+
+[dependencies]
+tessari-oauth-types.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

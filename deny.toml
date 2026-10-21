@@ -1,0 +1,35 @@
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# A workspace path dependency has no version to range over and no publisher but us; cargo-deny reads the internal
+# crates as wildcards. The exemption covers path dependencies only — a registry wildcard is still refused.
+allow-wildcard-paths = true
+
+[licenses]
+version = 2
+# Licences acceptable in third-party dependencies; this work's own licence is BUSL-1.1 converting to Apache 2.0 on
+# the Change Date (see LICENSE). Copyleft, weak copyleft included, is a blocking finding: the eventual Apache 2.0
+# conversion has to be honourable, and a copyleft dependency would make it impossible. An exception names one crate
+# and the reason, never a licence for everything.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+]
+private = { ignore = true }
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
