@@ -12,7 +12,7 @@ use tessari_oauth_storage::Storage;
 use tessari_oauth_storage::throttle::Limit;
 use tower::ServiceExt;
 
-use crate::routes::{Answer, answer, live_storage, protected, state, unreachable_storage};
+use crate::routes::{Answer, answer, header, live_storage, protected, state, unreachable_storage};
 
 const METADATA: &str = "/acme/.well-known/oauth-authorization-server";
 
@@ -42,15 +42,25 @@ async fn get_from(storage: &Storage, limit: Limit, path: &str, from: Option<&str
 async fn a_client_past_its_limit_is_refused_with_the_time_to_wait_while_others_are_served() {
     let storage = live_storage().await;
     let from = Some("203.0.113.9:40000");
-    for path in [METADATA, "/acme/oauth2/jwks"] {
+    for (path, remaining) in [(METADATA, "1"), ("/acme/oauth2/jwks", "0")] {
         let served = get_from(&storage, limit(2), path, from).await;
         assert_ne!(served.status, StatusCode::TOO_MANY_REQUESTS, "{path}");
+        assert_eq!(header(&served, "x-ratelimit-limit"), "2", "{path}");
+        assert_eq!(
+            header(&served, "x-ratelimit-remaining"),
+            remaining,
+            "{path}"
+        );
+        assert_eq!(header(&served, "x-ratelimit-class"), "read", "{path}");
     }
     let refused = get_from(&storage, limit(2), METADATA, Some("203.0.113.9:40001")).await;
     assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(refused.body["code"], "rate_limited");
     // The clock stands at a whole minute, so the whole window is left to wait.
-    assert_eq!(crate::routes::header(&refused, "retry-after"), "60");
+    assert_eq!(header(&refused, "retry-after"), "60");
+    assert_eq!(header(&refused, "x-ratelimit-limit"), "2");
+    assert_eq!(header(&refused, "x-ratelimit-remaining"), "0");
+    assert_eq!(header(&refused, "x-ratelimit-class"), "read");
     protected(&refused);
     let other = get_from(&storage, limit(2), METADATA, Some("198.51.100.7:40000")).await;
     assert_eq!(other.status, StatusCode::OK);

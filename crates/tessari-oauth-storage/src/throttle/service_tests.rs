@@ -79,9 +79,9 @@ async fn a_client_is_admitted_up_to_the_limit_and_refused_until_its_window_ends(
     assert_eq!(
         seen,
         [
-            Admission::Admitted,
-            Admission::Admitted,
-            Admission::Admitted,
+            Admission::Admitted { remaining: 2 },
+            Admission::Admitted { remaining: 1 },
+            Admission::Admitted { remaining: 0 },
             Admission::Refused {
                 retry_after_secs: 20
             }

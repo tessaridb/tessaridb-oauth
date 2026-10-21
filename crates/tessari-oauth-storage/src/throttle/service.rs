@@ -30,7 +30,10 @@ pub struct Limit {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Admission {
     /// Within the limit; the request may proceed.
-    Admitted,
+    Admitted {
+        /// Requests still admitted in this window.
+        remaining: u64,
+    },
     /// Past the limit; nothing is admitted until the window ends.
     Refused {
         /// Seconds until the window ends.
@@ -106,7 +109,9 @@ impl ThrottleService {
                 retry_after_secs: left,
             }
         } else {
-            Admission::Admitted
+            Admission::Admitted {
+                remaining: limit.requests.get().saturating_sub(count),
+            }
         })
     }
 }

@@ -4,13 +4,16 @@
 //! subscriber is commonly given whole and could otherwise spend as many limits as it has addresses. A forwarded
 //! header is not read, because the client writes it unless a trusted proxy overwrites it. A request that arrives with
 //! no peer address — never on the listener, which always records one — is counted under one shared name rather than
-//! not at all. Counting needs the store, and a store that does not answer refuses the request.
+//! not at all. Counting needs the store, and a store that does not answer refuses the request. Every counted answer,
+//! served or refused, says the limit, what is left of it and the group it belongs to, so a client can slow down
+//! before it is refused.
 
 use std::net::{IpAddr, SocketAddr};
 
 use axum::extract::{ConnectInfo, Request, State};
+use axum::http::{HeaderName, HeaderValue};
 use axum::middleware::Next;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use tessari_oauth_storage::throttle::Admission;
 
 use crate::state::PublicState;
@@ -55,11 +58,23 @@ pub(crate) async fn reads(
         .admit(READ_GROUP, &client, state.read_limit, (state.clock)())
         .await
         .map_err(Error::Store)?;
-    match admission {
-        Admission::Admitted => Ok(next.run(request).await),
+    let (mut response, remaining) = match admission {
+        Admission::Admitted { remaining } => (next.run(request).await, remaining),
         Admission::Refused { retry_after_secs } => {
             tracing::warn!(group = READ_GROUP, %client, "a client passed its request limit");
-            Err(Error::Throttled { retry_after_secs })
+            (Error::Throttled { retry_after_secs }.into_response(), 0)
         }
+    };
+    let headers = response.headers_mut();
+    for (name, value) in [
+        ("x-ratelimit-limit", state.read_limit.requests.get()),
+        ("x-ratelimit-remaining", remaining),
+    ] {
+        headers.insert(HeaderName::from_static(name), HeaderValue::from(value));
     }
+    headers.insert(
+        HeaderName::from_static("x-ratelimit-class"),
+        HeaderValue::from_static(READ_GROUP),
+    );
+    Ok(response)
 }

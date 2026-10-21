@@ -45,11 +45,11 @@ async fn a_client_is_refused_past_its_limit_while_other_clients_and_groups_are_c
     storage.throttle.prepare().await.expect("prepared again");
     assert_eq!(
         admit(&storage, "metadata", "203.0.113.9").await,
-        Admission::Admitted
+        Admission::Admitted { remaining: 1 }
     );
     assert_eq!(
         admit(&storage, "metadata", "203.0.113.9").await,
-        Admission::Admitted
+        Admission::Admitted { remaining: 0 }
     );
     assert_eq!(
         admit(&storage, "metadata", "203.0.113.9").await,
@@ -59,11 +59,11 @@ async fn a_client_is_refused_past_its_limit_while_other_clients_and_groups_are_c
     );
     assert_eq!(
         admit(&storage, "metadata", "198.51.100.7").await,
-        Admission::Admitted
+        Admission::Admitted { remaining: 1 }
     );
     assert_eq!(
         admit(&storage, "jwks", "203.0.113.9").await,
-        Admission::Admitted
+        Admission::Admitted { remaining: 1 }
     );
 }
 
@@ -118,7 +118,7 @@ async fn simultaneous_requests_are_each_counted_once_so_exactly_the_limit_is_adm
     let mut refused = 0;
     while let Some(answer) = requests.join_next().await {
         match answer.expect("a request task") {
-            Admission::Admitted => admitted += 1,
+            Admission::Admitted { .. } => admitted += 1,
             Admission::Refused { .. } => refused += 1,
         }
     }
