@@ -8,5 +8,5 @@ mod runner;
 
 pub use daemon::{Daemon, DaemonFuture, DaemonReport};
 pub use error::{Error, Result};
-pub use key_rotation::{Clock, KeyRotation};
+pub use key_rotation::KeyRotation;
 pub use runner::run;

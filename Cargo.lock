@@ -894,6 +894,7 @@ version = "0.1.0"
 dependencies = [
  "tessari-oauth-infrastructure",
  "tessari-oauth-storage",
+ "thiserror",
 ]
 
 [[package]]

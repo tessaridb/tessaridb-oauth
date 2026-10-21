@@ -3,4 +3,4 @@
 
 mod node;
 
-pub use node::{fresh_storage, need, plain_node, unique};
+pub use node::{Error, fresh_storage, need, plain_node, unique};

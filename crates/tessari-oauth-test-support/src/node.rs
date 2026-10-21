@@ -7,6 +7,20 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tessari_oauth_infrastructure::tessaridb::{Database, StoreConfig};
 use tessari_oauth_storage::{Storage, Tenancy};
 
+/// Why a fixture could not be built.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    /// A variable the live suite needs is unset.
+    #[error("{0} is required for the live suite")]
+    Unset(String),
+    /// The connection pool refused the configuration.
+    #[error("the pool refused the configuration")]
+    Pool(#[source] tessari_oauth_infrastructure::Error),
+    /// The generated region name was refused.
+    #[error("the region name was refused")]
+    Region(#[source] tessari_oauth_storage::Error),
+}
+
 /// Names handed out in this process, so two tests never share one; an independent counter.
 static TURNS: AtomicU32 = AtomicU32::new(0);
 
@@ -15,8 +29,8 @@ static TURNS: AtomicU32 = AtomicU32::new(0);
 /// # Errors
 ///
 /// When `key` is unset — a live test is `ignored` unless its node is configured.
-pub fn need(key: &str) -> Result<String, String> {
-    std::env::var(key).map_err(|_| format!("{key} is required for the live suite"))
+pub fn need(key: &str) -> Result<String, Error> {
+    std::env::var(key).map_err(|_| Error::Unset(key.to_owned()))
 }
 
 /// A name starting with `prefix` that no other call in this process returns, and that a later process is unlikely to
@@ -36,7 +50,7 @@ pub fn unique(prefix: &str) -> String {
 /// # Errors
 ///
 /// When the node's variables are unset.
-pub fn plain_node() -> Result<StoreConfig, String> {
+pub fn plain_node() -> Result<StoreConfig, Error> {
     Ok(StoreConfig {
         address: need("TESSARIDB_OAUTH_TEST_STORE")?,
         user: need("TESSARIDB_OAUTH_TEST_USER")?,
@@ -51,8 +65,8 @@ pub fn plain_node() -> Result<StoreConfig, String> {
 /// # Errors
 ///
 /// When the pool refuses the configuration.
-pub fn fresh_storage(config: StoreConfig, connections: usize) -> Result<Storage, String> {
-    let database = Database::new(config, connections).map_err(|error| error.to_string())?;
-    let tenancy = Tenancy::for_region(&unique("live")).map_err(|error| error.to_string())?;
+pub fn fresh_storage(config: StoreConfig, connections: usize) -> Result<Storage, Error> {
+    let database = Database::new(config, connections).map_err(Error::Pool)?;
+    let tenancy = Tenancy::for_region(&unique("live")).map_err(Error::Region)?;
     Ok(Storage::new(&database, &tenancy))
 }

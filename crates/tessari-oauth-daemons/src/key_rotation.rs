@@ -13,14 +13,11 @@ use tessari_oauth_constants::KEY_ROTATION_CONCURRENCY;
 use tessari_oauth_core::keys::{self, KeyRecord};
 use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
 use tessari_oauth_storage::keys::{KeyService, StoredKey};
-use tessari_oauth_types::{Algorithm, ErrorCategory, TenantId, Timestamp};
+use tessari_oauth_types::{Algorithm, Clock, ErrorCategory, TenantId, Timestamp};
 use tokio::task::JoinSet;
 
 use crate::daemon::{Daemon, DaemonFuture, DaemonReport};
 use crate::{Error, Result};
-
-/// The time a run judges keys at; the system clock in the server, a fixed one in tests.
-pub type Clock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
 
 /// The rotation daemon and everything a run needs.
 pub struct KeyRotation {

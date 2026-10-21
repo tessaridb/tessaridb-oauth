@@ -32,5 +32,5 @@ pub use resource::Resource;
 pub use scope::ScopeSet;
 pub use tenant_id::TenantId;
 pub use thumbprint::KeyThumbprint;
-pub use timestamp::Timestamp;
+pub use timestamp::{Clock, Timestamp};
 pub use user_id::UserId;

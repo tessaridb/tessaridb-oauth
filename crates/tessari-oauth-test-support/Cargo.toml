@@ -14,6 +14,7 @@ doctest = false
 [dependencies]
 tessari-oauth-infrastructure.workspace = true
 tessari-oauth-storage.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true
