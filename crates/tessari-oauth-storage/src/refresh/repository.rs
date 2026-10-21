@@ -19,6 +19,9 @@ pub(crate) trait RefreshRepository: Send + Sync {
         token: &TokenEntity,
     ) -> Result<()>;
 
+    /// Create the family `id` with no token, refused when it exists.
+    async fn create_family(&self, place: &Place, id: &str, family: &FamilyEntity) -> Result<()>;
+
     /// The token at `id`, if any.
     async fn find_token(&self, place: &Place, id: &str) -> Result<Option<TokenEntity>>;
 

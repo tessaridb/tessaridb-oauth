@@ -73,6 +73,31 @@ impl RefreshRepository for TessaridbRefreshRepository {
         Ok(())
     }
 
+    async fn create_family(&self, place: &Place, id: &str, family: &FamilyEntity) -> Result<()> {
+        self.database
+            .run_at(
+                place,
+                "CREATE refresh_families:$id = { tenant: $tenant, client_id: $client_id, user_id: $user_id, \
+                 created_at: $created_at, expires_at: $expires_at, revoked_at: $revoked_at, \
+                 revoked_reason: $revoked_reason };",
+                vec![
+                    ("id".to_owned(), text(id)),
+                    ("tenant".to_owned(), text(&family.tenant)),
+                    ("client_id".to_owned(), text(&family.client_id)),
+                    ("user_id".to_owned(), text(&family.user_id)),
+                    ("created_at".to_owned(), Value::from(family.created_at)),
+                    ("expires_at".to_owned(), Value::from(family.expires_at)),
+                    ("revoked_at".to_owned(), family.revoked_at.map_or(Value::None, Value::from)),
+                    (
+                        "revoked_reason".to_owned(),
+                        family.revoked_reason.as_deref().map_or(Value::None, text),
+                    ),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn find_token(&self, place: &Place, id: &str) -> Result<Option<TokenEntity>> {
         let answers = self
             .database

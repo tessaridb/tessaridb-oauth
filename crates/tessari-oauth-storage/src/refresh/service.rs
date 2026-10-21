@@ -15,7 +15,7 @@ use tessari_oauth_constants::{
 };
 use tessari_oauth_infrastructure::tessaridb::Place;
 use tessari_oauth_types::{
-    ClientId, RefreshToken, Resource, ScopeSet, TenantId, Timestamp, UserId,
+    ClientId, ErrorCategory, RefreshToken, Resource, ScopeSet, TenantId, Timestamp, UserId,
 };
 
 use super::repository::RefreshRepository;
@@ -24,6 +24,9 @@ use crate::{Error, Result, Tenancy, retry};
 
 /// Why a family was revoked when the reuse of one of its tokens ended it.
 const REUSE: &str = "reuse";
+
+/// Why a family was revoked when the code it was started from came back a second time.
+const REPLAY: &str = "code_replayed";
 
 /// Refresh-token families.
 #[derive(Clone)]
@@ -65,6 +68,19 @@ fn to_grant(token: &TokenEntity) -> Result<RefreshGrant> {
     })
 }
 
+/// A family carrying `grant`, made at `at`, standing or already revoked for `revoked`.
+fn family(grant: &RefreshGrant, at: i64, revoked: Option<&str>) -> Result<FamilyEntity> {
+    Ok(FamilyEntity {
+        tenant: grant.tenant.as_str().to_owned(),
+        client_id: grant.client_id.as_str().to_owned(),
+        user_id: grant.user.as_str().to_owned(),
+        created_at: at,
+        expires_at: later(at, REFRESH_ABSOLUTE_TTL_SECS)?,
+        revoked_at: revoked.map(|_| at),
+        revoked_reason: revoked.map(str::to_owned),
+    })
+}
+
 impl RefreshService {
     pub(crate) fn new(repository: Arc<dyn RefreshRepository>, tenancy: Tenancy) -> Self {
         Self {
@@ -73,31 +89,25 @@ impl RefreshService {
         }
     }
 
-    /// Start a family whose first token is `first`, carrying `grant`, at `now`.
+    /// Start the family `family_id` — the digest of the code it is issued from — whose first token is `first`,
+    /// carrying `grant`, at `now`.
     ///
     /// # Errors
     ///
-    /// When the store is unavailable or refuses — including a token that already exists at that digest.
+    /// When the store is unavailable or refuses — including a family or a token that already exists, which is what a
+    /// family already revoked for a replay of its code meets.
     pub async fn start(
         &self,
         first: &RefreshToken,
         grant: &RefreshGrant,
+        family_id: &str,
         now: Timestamp,
     ) -> Result<()> {
         let place = self.tenancy.place(&grant.tenant)?;
         let at = seconds(now)?;
-        let family_id = first.digest();
-        let family = FamilyEntity {
-            tenant: grant.tenant.as_str().to_owned(),
-            client_id: grant.client_id.as_str().to_owned(),
-            user_id: grant.user.as_str().to_owned(),
-            created_at: at,
-            expires_at: later(at, REFRESH_ABSOLUTE_TTL_SECS)?,
-            revoked_at: None,
-            revoked_reason: None,
-        };
+        let family = family(grant, at, None)?;
         let token = TokenEntity {
-            family_id: family_id.clone(),
+            family_id: family_id.to_owned(),
             tenant: family.tenant.clone(),
             client_id: family.client_id.clone(),
             user_id: family.user_id.clone(),
@@ -111,8 +121,45 @@ impl RefreshService {
             rotated_at: None,
         };
         self.repository
-            .start(&place, &family_id, &family, &family_id, &token)
+            .start(&place, family_id, &family, &first.digest(), &token)
             .await
+    }
+
+    /// Revoke the family `family_id` a replayed code started, carrying `grant`; when it has not been started yet,
+    /// record it already revoked, so it never can be.
+    ///
+    /// # Errors
+    ///
+    /// When the store is unavailable or refuses for a reason other than the family existing or being revoked already.
+    pub async fn revoke_for_replay(
+        &self,
+        grant: &RefreshGrant,
+        family_id: &str,
+        now: Timestamp,
+    ) -> Result<()> {
+        let place = self.tenancy.place(&grant.tenant)?;
+        let at = seconds(now)?;
+        if self
+            .repository
+            .find_family(&place, family_id)
+            .await?
+            .is_some()
+        {
+            return self.end_family(&place, family_id, at, REPLAY).await;
+        }
+        let tombstone = family(grant, at, Some(REPLAY))?;
+        match self
+            .repository
+            .create_family(&place, family_id, &tombstone)
+            .await
+        {
+            Ok(()) => Ok(()),
+            // The redemption that won started the family meanwhile: revoke what it started.
+            Err(Error::Store(store)) if store.category() == ErrorCategory::Conflict => {
+                self.end_family(&place, family_id, at, REPLAY).await
+            }
+            Err(failure) => Err(failure),
+        }
     }
 
     /// Present `presented` from `client` at `now`, rotating it to `next` when it may rotate.

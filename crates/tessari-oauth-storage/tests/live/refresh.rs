@@ -50,7 +50,7 @@ async fn each_token_rotates_once_into_a_successor_carrying_the_same_grant() {
     let storage = fresh(&tenant(), 2).await;
     let refresh = &storage.refresh;
     refresh
-        .start(&token("a"), &grant(), at(START))
+        .start(&token("a"), &grant(), "family-a", at(START))
         .await
         .expect("started");
 
@@ -99,7 +99,7 @@ async fn a_spent_token_presented_again_revokes_the_whole_family() {
     let storage = fresh(&tenant(), 2).await;
     let refresh = &storage.refresh;
     refresh
-        .start(&token("a"), &grant(), at(START))
+        .start(&token("a"), &grant(), "family-a", at(START))
         .await
         .expect("started");
     refresh
@@ -150,7 +150,7 @@ async fn a_token_of_another_client_is_refused_and_stays_usable_by_its_own() {
     let refresh = &storage.refresh;
     let other = ClientId::parse("other-app").expect("a client id");
     refresh
-        .start(&token("a"), &grant(), at(START))
+        .start(&token("a"), &grant(), "family-a", at(START))
         .await
         .expect("started");
 
@@ -183,7 +183,7 @@ async fn a_token_unused_past_its_idle_bound_or_a_family_past_its_absolute_bound_
     let storage = fresh(&tenant(), 2).await;
     let refresh = &storage.refresh;
     refresh
-        .start(&token("idle"), &grant(), at(START))
+        .start(&token("idle"), &grant(), "family-idle", at(START))
         .await
         .expect("started");
     let idle = refresh
@@ -203,7 +203,7 @@ async fn a_token_unused_past_its_idle_bound_or_a_family_past_its_absolute_bound_
 
     // Used every 13 days, a family still ends at its absolute bound.
     refresh
-        .start(&token("a"), &grant(), at(START))
+        .start(&token("a"), &grant(), "family-a", at(START))
         .await
         .expect("started");
     for (from, to, day) in [("a", "b", 13), ("b", "c", 26)] {
@@ -250,7 +250,7 @@ async fn simultaneous_rotations_of_one_token_rotate_once_and_revoke_the_family()
         let first = token(&format!("round-{round}"));
         storage
             .refresh
-            .start(&first, &grant(), at(START))
+            .start(&first, &grant(), &first.digest(), at(START))
             .await
             .expect("started");
         let start = Arc::new(Barrier::new(CONTENDERS));
