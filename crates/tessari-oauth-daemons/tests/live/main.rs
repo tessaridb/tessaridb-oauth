@@ -9,12 +9,11 @@
 
 mod key_rotation;
 
-use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 
 use tessari_oauth_infrastructure::custody::Kek;
 use tessari_oauth_storage::Storage;
-use tessari_oauth_test_support::{fresh_storage, plain_node, unique};
+use tessari_oauth_test_support::{fresh_storage, plain_node};
 
 /// Storage on the plain test node for a region nobody else uses.
 pub(crate) fn storage() -> Storage {
@@ -24,12 +23,5 @@ pub(crate) fn storage() -> Storage {
 
 /// A key-encryption key read from a fresh owner-only file, which is removed once read.
 pub(crate) fn fresh_kek() -> Arc<Kek> {
-    let path = std::env::temp_dir().join(unique("kek"));
-    let bytes: Vec<u8> = (0_u8..32).collect();
-    std::fs::write(&path, bytes).expect("the key file is written");
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
-        .expect("the key file is owner-only");
-    let kek = Kek::load(&path).expect("a valid key file");
-    std::fs::remove_file(&path).expect("the key file is removed");
-    Arc::new(kek)
+    Arc::new(tessari_oauth_test_support::fresh_kek().expect("a test key-encryption key"))
 }

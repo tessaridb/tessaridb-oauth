@@ -2,6 +2,10 @@
 /// legitimate needs longer, and the bound is also how long its `jti` must be remembered to refuse a replay.
 pub const CLIENT_ASSERTION_MAX_TTL_SECS: u64 = 300;
 
+/// How long an access token is valid, in seconds. A signed token cannot be recalled, so this is also the stated
+/// revocation latency: a revoked grant stops working at most this long after the refresh that would renew it fails.
+pub const ACCESS_TOKEN_TTL_SECS: u64 = 300;
+
 /// Clock difference tolerated between this server and a client, in seconds. Seconds, not minutes: a wider allowance
 /// only hides unsynchronised hosts and lengthens every replay window by the same amount.
 pub const CLOCK_SKEW_SECS: u64 = 5;

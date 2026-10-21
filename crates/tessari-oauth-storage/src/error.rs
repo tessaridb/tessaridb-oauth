@@ -24,6 +24,9 @@ pub enum Error {
         /// What did not fit.
         reason: String,
     },
+    /// The tenant has no key the rotation rule lets sign; nothing is signed until the rotation daemon makes one.
+    #[error("the tenant has no signing key")]
+    NoSigningKey,
 }
 
 impl Error {
@@ -34,6 +37,7 @@ impl Error {
             Self::Store(store) => store.category(),
             Self::Invalid { .. } => ErrorCategory::Validation,
             Self::Unreadable { .. } => ErrorCategory::Internal,
+            Self::NoSigningKey => ErrorCategory::Unavailable,
         }
     }
 }

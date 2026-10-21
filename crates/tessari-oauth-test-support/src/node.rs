@@ -19,6 +19,12 @@ pub enum Error {
     /// The generated region name was refused.
     #[error("the region name was refused")]
     Region(#[source] tessari_oauth_storage::Error),
+    /// The test key file could not be written, restricted or removed.
+    #[error("the test key file could not be handled")]
+    KeyFile(#[source] std::io::Error),
+    /// The key-encryption key was refused.
+    #[error("the test key-encryption key was refused")]
+    Kek(#[source] tessari_oauth_infrastructure::Error),
 }
 
 /// Names handed out in this process, so two tests never share one; an independent counter.

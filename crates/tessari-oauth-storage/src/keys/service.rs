@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use tessari_oauth_core::keys::{self, KeyRecord};
+use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
 use tessari_oauth_types::{Algorithm, KeyThumbprint, TenantId, Timestamp, base64url};
 
 use super::repository::KeyRepository;
@@ -86,6 +88,33 @@ impl KeyService {
             .into_iter()
             .map(to_model)
             .collect()
+    }
+
+    /// The key `tenant` signs with at `now`, as the rotation rule chooses it, opened under `kek`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoSigningKey`] when the rule has no key to sign with; a custody failure when the key does not open for
+    /// this tenant and `kid`; and the store's failures.
+    pub async fn signer(&self, tenant: &TenantId, kek: &Kek, now: Timestamp) -> Result<SigningKey> {
+        let live = self.live(tenant).await?;
+        let records: Vec<KeyRecord> = live
+            .iter()
+            .map(|key| KeyRecord {
+                kid: key.kid.clone(),
+                created_at: key.created_at,
+                compromised: key.compromised,
+            })
+            .collect();
+        let kid = keys::plan(&records, now)
+            .signing
+            .ok_or(Error::NoSigningKey)?;
+        let key = live
+            .into_iter()
+            .find(|key| key.kid == kid)
+            .ok_or(Error::NoSigningKey)?;
+        let pkcs8 = kek.unseal(tenant, kid.as_str(), &key.sealed)?;
+        Ok(SigningKey::from_pkcs8(key.algorithm, &pkcs8)?)
     }
 
     /// Retire `kid` of `tenant` at `at`; it is no longer published.
