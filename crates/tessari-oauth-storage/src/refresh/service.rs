@@ -20,7 +20,7 @@ use tessari_oauth_types::{
 };
 
 use super::repository::RefreshRepository;
-use super::{FamilyEntity, RefreshGrant, Rotation, RotationRefusal, TokenEntity};
+use super::{FamilyEntity, RefreshGrant, Revocation, Rotation, RotationRefusal, TokenEntity};
 use crate::{Error, Result, Tenancy, retry};
 
 /// Why a family was revoked when the reuse of one of its tokens ended it.
@@ -28,6 +28,9 @@ const REUSE: &str = "reuse";
 
 /// Why a family was revoked when the code it was started from came back a second time.
 const REPLAY: &str = "code_replayed";
+
+/// Why a family was revoked when its client asked for one of its tokens to be revoked.
+const REVOKED: &str = "revoked_by_client";
 
 /// Refresh-token families.
 #[derive(Clone)]
@@ -265,6 +268,36 @@ impl RefreshService {
     async fn reused(&self, place: &Place, token: &TokenEntity, at: i64) -> Result<Rotation> {
         self.end_family(place, &token.family_id, at, REUSE).await?;
         Ok(Rotation::Reused(to_grant(token)?))
+    }
+
+    /// Revoke the family of `presented` in `tenant` at `client`'s request at `now` (RFC 7009 §2.1): the whole family,
+    /// since a token cannot be revoked without its successors; another client's token changes nothing.
+    ///
+    /// # Errors
+    ///
+    /// When the store is unavailable, refuses for a reason other than the family being revoked already, or holds a
+    /// row this crate cannot read.
+    pub async fn revoke_token(
+        &self,
+        tenant: &TenantId,
+        presented: &RefreshToken,
+        client: &ClientId,
+        now: Timestamp,
+    ) -> Result<Revocation> {
+        let place = self.tenancy.place(tenant)?;
+        let Some(token) = self
+            .repository
+            .find_token(&place, &presented.digest())
+            .await?
+        else {
+            return Ok(Revocation::Unknown);
+        };
+        if token.client_id != client.as_str() {
+            return Ok(Revocation::OtherClient);
+        }
+        self.end_family(&place, &token.family_id, seconds(now)?, REVOKED)
+            .await?;
+        Ok(Revocation::Revoked)
     }
 
     /// Revoke the family `family_id` in `tenant` for `reason`; a family already revoked stays as it was.

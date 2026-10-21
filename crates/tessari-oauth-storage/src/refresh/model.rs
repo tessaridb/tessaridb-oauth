@@ -34,6 +34,17 @@ pub enum RotationRefusal {
     OtherClient,
 }
 
+/// What a client's request to revoke a refresh token did (RFC 7009 §2.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Revocation {
+    /// The token's whole family is revoked — by this request, or already before it.
+    Revoked,
+    /// No such token in this tenant.
+    Unknown,
+    /// The token belongs to another client; nothing changed.
+    OtherClient,
+}
+
 /// What presenting a refresh token did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Rotation {

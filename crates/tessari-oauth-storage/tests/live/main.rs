@@ -16,6 +16,7 @@ mod keys;
 mod refresh;
 mod refresh_grant;
 mod refresh_replay;
+mod refresh_revoke;
 mod replay;
 mod signer;
 mod subjects;
