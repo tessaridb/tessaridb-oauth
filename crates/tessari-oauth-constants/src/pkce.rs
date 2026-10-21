@@ -10,6 +10,11 @@ pub const PKCE_VERIFIER_MAX_LEN: usize = 128;
 /// needs longer: the client redeems the code in the request that receives it.
 pub const AUTHORIZATION_CODE_TTL_SECS: u64 = 60;
 
+/// Lifetime of a pending authorization — a validated `/authorize` request waiting for its user to sign in — in
+/// seconds: ten minutes, long enough for a login ceremony and short enough that an abandoned one is gone before it
+/// could be resumed by someone else. The store expires the record after the same time.
+pub const INTERACTION_TTL_SECS: u64 = 600;
+
 /// Longest a refresh token stays usable without being used, in seconds: 14 days (RFC 9700 §4.14.2 asks for an
 /// idle and an absolute bound). Each rotation starts the idle clock again for its successor.
 pub const REFRESH_IDLE_TTL_SECS: u64 = 1_209_600;
