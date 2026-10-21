@@ -6,7 +6,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use tessari_oauth_constants::ACCESS_TOKEN_TTL_SECS;
 use tessari_oauth_core::token::Refusal;
-use tessari_oauth_types::{ErrorCode, RefreshToken, ScopeSet};
+use tessari_oauth_types::{ErrorCode, KeyThumbprint, RefreshToken, ScopeSet};
 
 /// A successful token response (RFC 6749 §5.1).
 #[derive(Serialize)]
@@ -20,15 +20,17 @@ pub(super) struct Issued {
 }
 
 impl Issued {
-    /// A bearer answer: `access_token` for `scopes`, with `refresh_token` when one was issued.
-    pub(super) fn bearer(
+    /// The answer for `access_token` over `scopes`, with `refresh_token` when one was issued: of type `DPoP` when the
+    /// access token is bound to a key (RFC 9449 §5), `Bearer` otherwise.
+    pub(super) fn new(
         access_token: String,
         refresh_token: Option<&RefreshToken>,
         scopes: &ScopeSet,
+        bound_to: Option<&KeyThumbprint>,
     ) -> Self {
         Self {
             access_token,
-            token_type: "Bearer",
+            token_type: if bound_to.is_some() { "DPoP" } else { "Bearer" },
             expires_in: ACCESS_TOKEN_TTL_SECS,
             refresh_token: refresh_token.map(|token| token.expose().to_owned()),
             scope: scopes.iter().collect::<Vec<_>>().join(" "),

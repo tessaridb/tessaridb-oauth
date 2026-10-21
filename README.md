@@ -44,8 +44,11 @@ started. The access token is an RFC 9068 JWT addressed to one resource, carrying
 with `sub` a pairwise identifier per client. A client registered for refresh tokens also receives one, and redeems
 it at the same endpoint (RFC 6749 §6): the request is judged on the family's grant before the token is rotated, so
 a refused refresh leaves the token usable; the access token may be narrowed to fewer scopes or one of the grant's
-resources but never widened, and a token presented after it was rotated revokes its family. Refusals carry the
-`error` code alone; tokens are `Bearer` for now.
+resources but never widened, and a token presented after it was rotated revokes its family. A request carrying a
+DPoP proof (RFC 9449) — one `DPoP` header, verified for this endpoint and spent once, after every other check —
+receives a `DPoP` token naming the proof's key in `cnf.jkt`; a client registered with `dpop_bound_access_tokens`
+is refused without one, and a public client's refresh token keeps needing the key it was issued to. Without a
+proof the token is `Bearer`. Refusals carry the `error` code alone.
 
 ## Layout
 

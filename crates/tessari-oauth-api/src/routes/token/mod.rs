@@ -3,11 +3,13 @@
 //! The checks run in a fixed order. The client is authenticated before the code is read, so a code never names its
 //! presenter. The code is spent atomically before its bindings are checked, so it redeems once whatever the outcome,
 //! and a code presented again revokes the refresh family it started. That family is started before the access token
-//! is signed, so a redemption that loses to a replay signs nothing. A refusal answers with the specification's
+//! is signed, so a redemption that loses to a replay signs nothing. A DPoP proof is verified once the client is
+//! authenticated and spent only after every other check has passed. A refusal answers with the specification's
 //! `error` code alone and records its precise reason in the audit log — identifiers only, never the code, the
 //! verifier or the assertion.
 
 mod answer;
+mod proof;
 mod redeem;
 mod refresh;
 
@@ -132,9 +134,14 @@ async fn exchange(
         }
     }
     let client = authenticated.client;
+    let proof = proof::read(headers, endpoint, &client)?;
     match token::require_grant(params, &client)? {
-        GrantType::AuthorizationCode => redeem(state, endpoint, &client, params).await,
-        GrantType::RefreshToken => refresh::refresh(state, endpoint, &client, params).await,
+        GrantType::AuthorizationCode => {
+            redeem(state, endpoint, &client, params, proof.as_ref()).await
+        }
+        GrantType::RefreshToken => {
+            refresh::refresh(state, endpoint, &client, params, proof.as_ref()).await
+        }
     }
 }
 

@@ -48,6 +48,12 @@ pub enum Reason {
     DpopClaims,
     /// A DPoP proof is older than the acceptance window or ahead of the clock.
     DpopTime,
+    /// A request carried more than one DPoP proof.
+    DpopSeveralProofs,
+    /// No DPoP proof came from a client registered as bound, or for a refresh token bound to a key.
+    DpopMissing,
+    /// A DPoP proof had been presented before.
+    DpopReplayed,
     /// The code was issued to another client.
     CodeClientMismatch,
     /// The code was issued in another tenant.
@@ -86,4 +92,6 @@ pub enum Reason {
     RefreshExpired,
     /// The refresh token's family was revoked.
     RefreshRevoked,
+    /// The refresh token is bound to a DPoP key other than the proof's.
+    RefreshOtherKey,
 }

@@ -901,6 +901,7 @@ dependencies = [
  "http-body",
  "hyper-util",
  "rcgen",
+ "ring",
  "rustls",
  "serde",
  "serde_json",
