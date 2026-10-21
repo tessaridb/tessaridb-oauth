@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tessari_oauth_infrastructure::tessaridb::Database;
 
 use crate::Tenancy;
+use crate::clients::{ClientService, TessaridbClientRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
 use crate::consents::{ConsentService, TessaridbConsentRepository};
 use crate::keys::{KeyService, TessaridbKeyRepository};
@@ -18,6 +19,8 @@ use crate::throttle::{TessaridbThrottleRepository, ThrottleService};
 pub struct Storage {
     /// Tenant provisioning.
     pub tenants: Arc<TenantService>,
+    /// Client registrations.
+    pub clients: Arc<ClientService>,
     /// Authorization codes.
     pub codes: Arc<CodeService>,
     /// Users' grants to clients.
@@ -37,6 +40,7 @@ impl Storage {
     #[must_use]
     pub fn new(database: &Database, tenancy: &Tenancy) -> Self {
         let tenant_repository = Arc::new(TessaridbTenantRepository::new(database.clone()));
+        let client_repository = Arc::new(TessaridbClientRepository::new(database.clone()));
         let code_repository = Arc::new(TessaridbCodeRepository::new(database.clone()));
         let consent_repository = Arc::new(TessaridbConsentRepository::new(database.clone()));
         let refresh_repository = Arc::new(TessaridbRefreshRepository::new(database.clone()));
@@ -45,6 +49,7 @@ impl Storage {
         let throttle_repository = Arc::new(TessaridbThrottleRepository::new(database.clone()));
         Self {
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
+            clients: Arc::new(ClientService::new(client_repository, tenancy.clone())),
             codes: Arc::new(CodeService::new(code_repository, tenancy.clone())),
             consents: Arc::new(ConsentService::new(consent_repository, tenancy.clone())),
             refresh: Arc::new(RefreshService::new(refresh_repository, tenancy.clone())),

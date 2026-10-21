@@ -13,7 +13,8 @@ use crate::Result;
 /// a user's grant list is read by user, while every check reads one record by its id. `refresh_families` and
 /// `refresh_tokens` hold each family and each of its tokens under a digest; every read is by id. `signing_keys`
 /// holds each key sealed with its public half and dates; it is listed whole, oldest first. `replays` is a space of
-/// spent client assertions and DPoP proofs whose keys expire with what they record.
+/// spent client assertions and DPoP proofs whose keys expire with what they record. `clients` holds each client's
+/// registration under its id; every read is by id.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, expires_at int REQUIRED, redeemed_at int); \
@@ -31,7 +32,10 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS signing_keys (\
      kid string REQUIRED, tenant string REQUIRED, algorithm string REQUIRED, sealed string REQUIRED, \
      public_jwk string REQUIRED, created_at int REQUIRED, compromised bool REQUIRED, retired_at int); \
-     DEFINE SPACE IF NOT EXISTS replays;";
+     DEFINE SPACE IF NOT EXISTS replays; \
+     DEFINE TABLE IF NOT EXISTS clients (\
+     client_id string REQUIRED, tenant string REQUIRED, redirect_uris array REQUIRED, scope_ceiling array REQUIRED, auth_method string REQUIRED, \
+     assertion_alg string, grant_types array REQUIRED, jwks array REQUIRED, registered_at int REQUIRED);";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

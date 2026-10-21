@@ -8,6 +8,14 @@ pub enum Error {
     /// The store could not be reached, or refused in a way this crate does not interpret.
     #[error(transparent)]
     Store(#[from] tessari_oauth_infrastructure::Error),
+    /// A record handed in breaks a rule of its kind; nothing was written.
+    #[error("an invalid {record}: {reason}")]
+    Invalid {
+        /// The kind of record.
+        record: &'static str,
+        /// The rule it breaks.
+        reason: &'static str,
+    },
     /// A stored record does not have the shape this crate writes; nothing can currently judge it.
     #[error("a stored {record} is unreadable: {reason}")]
     Unreadable {
@@ -24,6 +32,7 @@ impl Error {
     pub const fn category(&self) -> ErrorCategory {
         match self {
             Self::Store(store) => store.category(),
+            Self::Invalid { .. } => ErrorCategory::Validation,
             Self::Unreadable { .. } => ErrorCategory::Internal,
         }
     }
