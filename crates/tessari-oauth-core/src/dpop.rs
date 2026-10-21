@@ -1,14 +1,17 @@
-//! DPoP proofs at the token endpoint (RFC 9449 §4.3, §5).
+//! DPoP proofs at the token endpoint and at a resource (RFC 9449 §4.3, §5, §7.1).
 //!
 //! A proof shows the client holds the private key of the public key it carries; it authenticates nobody. What it
 //! yields is that key's thumbprint, which the minted token names in `cnf.jkt`, so the token is worthless without the
 //! key. Every field is checked, because each closes a different hole: `typ` keeps a proof from passing as another
 //! JWT, the server's algorithm list keeps the proof from choosing its verification, `htm` and `htu` bind it to this
-//! request, `iat` to now, and `jti` — recorded by the caller until the window closes — to one use.
+//! request, `iat` to now, and `jti` — recorded by the caller until the window closes — to one use. At a resource the
+//! proof also carries `ath`, the hash of the access token it accompanies (§4.3 check 12), so it cannot be moved to
+//! another token.
 
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use tessari_oauth_constants::{CLOCK_SKEW_SECS, DPOP_PROOF_WINDOW_SECS, JTI_MAX_LEN};
-use tessari_oauth_types::{ErrorCode, KeyThumbprint, Timestamp};
+use tessari_oauth_types::{ErrorCode, KeyThumbprint, Timestamp, base64url};
 use url::Url;
 
 use crate::Reason;
@@ -39,6 +42,7 @@ struct Claims {
     htm: String,
     htu: String,
     iat: u64,
+    ath: Option<String>,
 }
 
 /// Verify `proof` for a request with `method` to `target` at `now`.
@@ -53,6 +57,37 @@ pub fn verify_proof(
     target: &str,
     now: Timestamp,
 ) -> Result<ProofUse, Refusal> {
+    checked(proof, method, target, now).map(|(used, _)| used)
+}
+
+/// Verify `proof` for a request with `method` to `target` at `now` that presents `access_token` to a resource.
+///
+/// # Errors
+///
+/// As [`verify_proof`], and [`Reason::DpopClaims`] when `ath` is absent or is not the base64url SHA-256 of the ASCII
+/// `access_token`.
+pub fn verify_resource_proof(
+    proof: &str,
+    method: &str,
+    target: &str,
+    access_token: &str,
+    now: Timestamp,
+) -> Result<ProofUse, Refusal> {
+    let (used, ath) = checked(proof, method, target, now)?;
+    let expected = base64url::encode(Sha256::digest(access_token.as_bytes()).as_slice());
+    if ath.as_deref() != Some(expected.as_str()) {
+        return Err(refuse(Reason::DpopClaims));
+    }
+    Ok(used)
+}
+
+/// The checks every proof passes, leaving what it spends and the `ath` it carried.
+fn checked(
+    proof: &str,
+    method: &str,
+    target: &str,
+    now: Timestamp,
+) -> Result<(ProofUse, Option<String>), Refusal> {
     let (verified, key) =
         jose::verify_embedded(proof, &ALGORITHMS).map_err(|_| refuse(Reason::DpopProof))?;
     if verified.typ.as_deref() != Some(PROOF_TYPE) {
@@ -68,11 +103,12 @@ pub fn verify_proof(
         .filter(|jti| !jti.is_empty() && jti.chars().count() <= JTI_MAX_LEN)
         .ok_or(refuse(Reason::DpopClaims))?;
     let expires_at = fresh_until(claims.iat, now)?;
-    Ok(ProofUse {
+    let used = ProofUse {
         thumbprint: key.thumbprint().clone(),
         jti,
         expires_at,
-    })
+    };
+    Ok((used, claims.ath))
 }
 
 /// Whether `claimed` and `target` name the same resource once each is normalised (RFC 3986 §6.2.2–6.2.3) and stripped

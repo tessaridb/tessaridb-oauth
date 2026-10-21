@@ -65,6 +65,21 @@ pub enum Reason {
     DpopMissing,
     /// A DPoP proof had been presented before.
     DpopReplayed,
+    /// An access token is not a JWS signed under the configured algorithm by one of the tenant's published keys.
+    AccessTokenUnverified,
+    /// An access token's `typ` is not `at+jwt`, or its claims are not an access token's.
+    AccessTokenType,
+    /// An access token was issued by another tenant.
+    AccessTokenIssuer,
+    /// An access token is addressed to another resource.
+    AccessTokenAudience,
+    /// An access token is expired, or issued ahead of the clock.
+    AccessTokenTime,
+    /// An access token's key binding and the way it was presented disagree: a bound token as a bearer, an unbound
+    /// one under DPoP, or a proof by another key.
+    AccessTokenBinding,
+    /// An access token at UserInfo does not carry `openid`.
+    ScopeWithoutOpenId,
     /// The code was issued to another client.
     CodeClientMismatch,
     /// The code was issued in another tenant.

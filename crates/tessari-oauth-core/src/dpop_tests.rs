@@ -1,7 +1,7 @@
 use ring::signature::Ed25519KeyPair;
 use tessari_oauth_types::{ErrorCode, KeyThumbprint, Timestamp, base64url};
 
-use super::{ProofUse, verify_proof};
+use super::{ProofUse, verify_proof, verify_resource_proof};
 use crate::Reason;
 use crate::token::Refusal;
 
@@ -176,6 +176,42 @@ fn a_jti_is_required_and_bounded() {
             check(&signed(&header(), &body)),
             refused(Reason::DpopClaims),
             "{body}"
+        );
+    }
+}
+
+/// RFC 9449 §7.1: an access token and the `ath` its proofs carry.
+const RFC_ACCESS_TOKEN: &str = "Kz~8mXK1EalYznwH-LC-1fBAo.4Ljp~zsPE_NeO.gxU";
+const RFC_ATH: &str = "fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEo";
+
+fn at_resource(proof: &str) -> Result<ProofUse, Refusal> {
+    verify_resource_proof(
+        proof,
+        "POST",
+        "https://id.example.com/acme/token",
+        RFC_ACCESS_TOKEN,
+        Timestamp::from_unix_secs(NOW),
+    )
+}
+
+#[test]
+fn a_proof_at_a_resource_carries_the_hash_of_the_token_it_accompanies() {
+    let used = at_resource(&signed(
+        &header(),
+        &claims(&format!(r#","ath":"{RFC_ATH}""#)),
+    ))
+    .expect("the RFC hash of the RFC token");
+    assert_eq!(used.jti, "p-1");
+    for extra in [
+        String::new(),
+        r#","ath":"""#.to_owned(),
+        r#","ath":"fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEp""#.to_owned(),
+        format!(r#","ath":"{RFC_ATH}=""#),
+    ] {
+        assert_eq!(
+            at_resource(&signed(&header(), &claims(&extra))),
+            refused(Reason::DpopClaims),
+            "{extra}"
         );
     }
 }

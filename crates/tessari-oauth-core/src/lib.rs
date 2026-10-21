@@ -19,6 +19,7 @@ pub mod refresh;
 mod refusal;
 pub mod subject;
 pub mod token;
+pub mod userinfo;
 
 pub use error::{Error, Result};
 pub use params::Params;
