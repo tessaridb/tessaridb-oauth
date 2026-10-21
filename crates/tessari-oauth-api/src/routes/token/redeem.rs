@@ -137,6 +137,7 @@ pub(super) fn sign(
         subject,
         client_id: &redemption.client_id,
         scopes: &redemption.scopes,
+        bound_to: None,
     };
     let payload = serde_json::to_vec(&access_token::claims(&grant, &jti, endpoint.now))
         .map_err(|_| Error::Internal)?;
