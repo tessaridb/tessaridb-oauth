@@ -14,6 +14,7 @@ mod codes;
 mod consents;
 mod keys;
 mod refresh;
+mod refresh_cascade;
 mod refresh_grant;
 mod refresh_replay;
 mod refresh_revoke;

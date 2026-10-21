@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
 
-use super::{FamilyEntity, TokenEntity};
+use super::{FamilyEntity, Holder, TokenEntity};
 use crate::Result;
 
 /// Storage of families and their tokens, each under its digest.
@@ -37,6 +37,9 @@ pub(crate) trait RefreshRepository: Send + Sync {
         next_id: &str,
         next: &TokenEntity,
     ) -> Result<()>;
+
+    /// The ids of the families `holder` names that are not revoked.
+    async fn standing(&self, place: &Place, holder: &Holder<'_>) -> Result<Vec<String>>;
 
     /// Mark the family revoked only while it is not; refused by the store when it already is.
     async fn revoke_family(&self, place: &Place, id: &str, at: i64, reason: &str) -> Result<()>;

@@ -35,8 +35,8 @@ const REVOKED: &str = "revoked_by_client";
 /// Refresh-token families.
 #[derive(Clone)]
 pub struct RefreshService {
-    repository: Arc<dyn RefreshRepository>,
-    tenancy: Tenancy,
+    pub(super) repository: Arc<dyn RefreshRepository>,
+    pub(super) tenancy: Tenancy,
 }
 
 fn unreadable(reason: &str) -> Error {
@@ -46,7 +46,7 @@ fn unreadable(reason: &str) -> Error {
     }
 }
 
-fn seconds(at: Timestamp) -> Result<i64> {
+pub(super) fn seconds(at: Timestamp) -> Result<i64> {
     i64::try_from(at.unix_secs()).map_err(|_| unreadable("time beyond i64"))
 }
 
@@ -317,7 +317,7 @@ impl RefreshService {
             .await
     }
 
-    async fn end_family(
+    pub(super) async fn end_family(
         &self,
         place: &Place,
         family_id: &str,

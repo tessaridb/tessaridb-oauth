@@ -11,8 +11,8 @@ use crate::Result;
 /// `codes` holds the bindings of each issued authorization code, its resources among them, under the code's digest;
 /// `redeemed_at` is absent until the single redemption sets it. `consents` holds one grant per user and client; it
 /// is indexed by user because a user's grant list is read by user, while every check reads one record by its id.
-/// `refresh_families` and `refresh_tokens` hold each family and each of its tokens under a digest; every read is by
-/// id. `signing_keys` holds each key sealed with its public half and dates; it is listed whole, oldest first.
+/// `refresh_families` and `refresh_tokens` hold each family and each of its tokens under a digest; a token is read by
+/// id, and the families an account event revokes are found by user or by client. `signing_keys` holds each key sealed with its public half and dates; it is listed whole, oldest first.
 /// `replays` is a space of spent client assertions and DPoP proofs whose keys expire with what they record.
 /// `clients` holds each client's registration under its id; every read is by id. `secrets` holds the tenant's sealed
 /// secrets under the id naming their purpose — the pairwise salt.
@@ -28,6 +28,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS refresh_families (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, created_at int REQUIRED, \
      expires_at int REQUIRED, revoked_at int, revoked_reason string); \
+     DEFINE INDEX IF NOT EXISTS by_user ON refresh_families FIELDS user_id; \
+     DEFINE INDEX IF NOT EXISTS by_client ON refresh_families FIELDS client_id; \
      DEFINE TABLE IF NOT EXISTS refresh_tokens (\
      family_id string REQUIRED, tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, \
      scopes array REQUIRED, resources array REQUIRED, idle_expires_at int REQUIRED, rotated_at int, jkt string); \

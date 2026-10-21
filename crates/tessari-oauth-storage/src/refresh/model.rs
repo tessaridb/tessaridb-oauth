@@ -21,6 +21,22 @@ pub struct RefreshGrant {
     pub bound_to: Option<KeyThumbprint>,
 }
 
+/// Whose standing families an account event revokes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Holder<'a> {
+    /// Every family of the user, at every client.
+    User(&'a UserId),
+    /// Every family of the client, for every user.
+    Client(&'a ClientId),
+    /// The user's families at the one client.
+    Grant {
+        /// The user.
+        user: &'a UserId,
+        /// The client.
+        client: &'a ClientId,
+    },
+}
+
 /// Why a presented token did not rotate, leaving its family as it was.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RotationRefusal {
