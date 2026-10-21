@@ -2,6 +2,7 @@
 //! and the specification it comes from.
 
 mod encoding;
+mod endpoints;
 mod ids;
 mod jose;
 mod keys;
@@ -9,6 +10,7 @@ mod pkce;
 mod storage;
 
 pub use encoding::{BASE64URL_ALPHABET, SHA256_BASE64URL_LEN};
+pub use endpoints::{AUTHORIZATION_PATH, JWKS_PATH, TOKEN_PATH};
 pub use ids::{CLIENT_ID_MAX_LEN, TENANT_ID_MAX_LEN, USER_ID_MAX_LEN};
 pub use jose::{
     CLIENT_ASSERTION_MAX_TTL_SECS, CLOCK_SKEW_SECS, DPOP_PROOF_WINDOW_SECS, JTI_MAX_LEN,

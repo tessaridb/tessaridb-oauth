@@ -12,11 +12,9 @@ use crate::clients::{AuthMethod, ClientDirectory, ClientRegistration, GrantType}
 use crate::codes::IssuedCode;
 use crate::{Params, Reason};
 
-/// The `grant_type` of the authorization-code grant.
-const GRANT_AUTHORIZATION_CODE: &str = "authorization_code";
-
-/// The `grant_type` of the refresh grant.
-const GRANT_REFRESH_TOKEN: &str = "refresh_token";
+/// The names of the client authentication methods [`authenticate_client`] verifies — the ones the metadata may
+/// advertise. Kept beside the match that verifies them, and held to it by a test that asks the match.
+pub(crate) const VERIFIED_AUTH_METHODS: [&str; 2] = ["none", "private_key_jwt"];
 
 /// A token-endpoint refusal: the `error` value for the caller and the reason for the audit log.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -155,17 +153,16 @@ fn presented_assertion(
 /// `invalid_request` when absent; `unsupported_grant_type` for a grant this endpoint does not redeem;
 /// `unauthorized_client` for one the client did not register.
 pub fn require_grant(params: &Params, client: &ClientRegistration) -> Result<GrantType, Refusal> {
-    let grant = match params.get("grant_type") {
-        None => return Err(refuse(ErrorCode::InvalidRequest, Reason::MissingParameter)),
-        Some(GRANT_AUTHORIZATION_CODE) => GrantType::AuthorizationCode,
-        Some(GRANT_REFRESH_TOKEN) => GrantType::RefreshToken,
-        Some(_) => {
-            return Err(refuse(
-                ErrorCode::UnsupportedGrantType,
-                Reason::UnsupportedGrantType,
-            ));
-        }
-    };
+    let requested = params
+        .get("grant_type")
+        .ok_or(refuse(ErrorCode::InvalidRequest, Reason::MissingParameter))?;
+    let grant = GrantType::ALL
+        .into_iter()
+        .find(|grant| grant.name() == requested)
+        .ok_or(refuse(
+            ErrorCode::UnsupportedGrantType,
+            Reason::UnsupportedGrantType,
+        ))?;
     if !client.grant_types.contains(&grant) {
         return Err(refuse(
             ErrorCode::UnauthorizedClient,

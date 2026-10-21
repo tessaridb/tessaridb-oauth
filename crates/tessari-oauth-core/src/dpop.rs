@@ -19,7 +19,7 @@ use crate::token::Refusal;
 const PROOF_TYPE: &str = "dpop+jwt";
 
 /// The algorithms a proof may be signed with — the server's list, never the proof's.
-const ALLOWED: [Algorithm; 2] = [Algorithm::EdDsa, Algorithm::Es256];
+pub const ALGORITHMS: [Algorithm; 2] = [Algorithm::EdDsa, Algorithm::Es256];
 
 /// What a verified proof leaves: the key to bind, and the `jti` to remember as spent until `expires_at`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,7 +54,7 @@ pub fn verify_proof(
     now: Timestamp,
 ) -> Result<ProofUse, Refusal> {
     let (verified, key) =
-        jose::verify_embedded(proof, &ALLOWED).map_err(|_| refuse(Reason::DpopProof))?;
+        jose::verify_embedded(proof, &ALGORITHMS).map_err(|_| refuse(Reason::DpopProof))?;
     if verified.typ.as_deref() != Some(PROOF_TYPE) {
         return Err(refuse(Reason::DpopProof));
     }

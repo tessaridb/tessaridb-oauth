@@ -12,10 +12,10 @@ use crate::clients::{ClientDirectory, ClientRegistration};
 use crate::{Params, Reason};
 
 /// The response type this server issues: the authorization code, and nothing in the front channel.
-const RESPONSE_TYPE_CODE: &str = "code";
+pub(crate) const RESPONSE_TYPE_CODE: &str = "code";
 
 /// The only PKCE transform accepted (RFC 7636 §4.2).
-const CHALLENGE_METHOD_S256: &str = "S256";
+pub(crate) const CHALLENGE_METHOD_S256: &str = "S256";
 
 /// An authorization request that passed every check and may go on to the login ceremony.
 #[derive(Debug, Clone, PartialEq, Eq)]

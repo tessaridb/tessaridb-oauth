@@ -12,6 +12,9 @@ pub enum Algorithm {
 }
 
 impl Algorithm {
+    /// Every algorithm, in the order the server metadata lists them.
+    pub const ALL: [Self; 2] = [Self::EdDsa, Self::Es256];
+
     /// The algorithm's name in the JOSE registry, as an `alg` header writes it.
     #[must_use]
     pub const fn name(self) -> &'static str {

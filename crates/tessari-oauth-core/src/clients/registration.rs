@@ -18,6 +18,19 @@ pub enum AuthMethod {
     PrivateKeyJwt(Algorithm),
 }
 
+impl AuthMethod {
+    /// The method's name in the OAuth registry, as `token_endpoint_auth_method` writes it.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::ClientSecretBasic => "client_secret_basic",
+            Self::ClientSecretPost => "client_secret_post",
+            Self::PrivateKeyJwt(_) => "private_key_jwt",
+        }
+    }
+}
+
 /// A grant the token endpoint redeems. A client redeems only the ones it registered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GrantType {
@@ -25,6 +38,20 @@ pub enum GrantType {
     AuthorizationCode,
     /// `refresh_token` (RFC 6749 §6).
     RefreshToken,
+}
+
+impl GrantType {
+    /// Every grant the token endpoint redeems; the one list both the endpoint and the metadata read.
+    pub const ALL: [Self; 2] = [Self::AuthorizationCode, Self::RefreshToken];
+
+    /// The grant's `grant_type` value.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::AuthorizationCode => "authorization_code",
+            Self::RefreshToken => "refresh_token",
+        }
+    }
 }
 
 /// What a client is allowed to do, registered in one tenant.

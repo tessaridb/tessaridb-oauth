@@ -1,0 +1,89 @@
+//! The authorization-server metadata (RFC 8414), rendered from the lists the request checks enforce.
+//!
+//! Nothing here is written by hand: each supported value is read from the constant or enum that the matching check
+//! consults, so the document cannot advertise what the server refuses. A field whose check does not exist yet is
+//! absent rather than promised.
+
+use serde::Serialize;
+use tessari_oauth_constants::{AUTHORIZATION_PATH, JWKS_PATH, TOKEN_PATH};
+use tessari_oauth_types::Algorithm;
+use url::Url;
+
+use crate::authorize::{CHALLENGE_METHOD_S256, RESPONSE_TYPE_CODE};
+use crate::clients::GrantType;
+use crate::dpop;
+use crate::token::VERIFIED_AUTH_METHODS;
+
+/// The issuer is not an `https` URL without query, fragment, credentials or trailing slash in its exact
+/// serialised form (RFC 8414 §2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("the issuer is not a plain https URL")]
+pub struct IssuerRefused;
+
+/// One tenant's metadata document.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Metadata {
+    issuer: String,
+    authorization_endpoint: String,
+    token_endpoint: String,
+    jwks_uri: String,
+    response_types_supported: [&'static str; 1],
+    grant_types_supported: Vec<&'static str>,
+    token_endpoint_auth_methods_supported: [&'static str; 2],
+    token_endpoint_auth_signing_alg_values_supported: Vec<&'static str>,
+    code_challenge_methods_supported: [&'static str; 1],
+    dpop_signing_alg_values_supported: Vec<&'static str>,
+    authorization_response_iss_parameter_supported: bool,
+}
+
+/// The `issuer` exactly as given, when it is a valid issuer identifier.
+fn checked(issuer: &str) -> Result<&str, IssuerRefused> {
+    let url = Url::parse(issuer).map_err(|_| IssuerRefused)?;
+    let plain = url.scheme() == "https"
+        && url.query().is_none()
+        && url.fragment().is_none()
+        && url.username().is_empty()
+        && url.password().is_none()
+        && !issuer.ends_with('/')
+        // The parser's serialisation must be the input, so every token's `iss` can equal it byte for byte.
+        && url.as_str() == issuer;
+    if plain {
+        Ok(issuer)
+    } else {
+        Err(IssuerRefused)
+    }
+}
+
+fn algorithm_names(algorithms: &[Algorithm]) -> Vec<&'static str> {
+    algorithms
+        .iter()
+        .map(|algorithm| algorithm.name())
+        .collect()
+}
+
+/// The metadata of the tenant whose issuer is `issuer`.
+///
+/// # Errors
+///
+/// [`IssuerRefused`] when `issuer` is not a valid issuer identifier.
+pub fn metadata(issuer: &str) -> Result<Metadata, IssuerRefused> {
+    let issuer = checked(issuer)?;
+    Ok(Metadata {
+        issuer: issuer.to_owned(),
+        authorization_endpoint: format!("{issuer}{AUTHORIZATION_PATH}"),
+        token_endpoint: format!("{issuer}{TOKEN_PATH}"),
+        jwks_uri: format!("{issuer}{JWKS_PATH}"),
+        response_types_supported: [RESPONSE_TYPE_CODE],
+        grant_types_supported: GrantType::ALL.iter().map(|grant| grant.name()).collect(),
+        token_endpoint_auth_methods_supported: VERIFIED_AUTH_METHODS,
+        token_endpoint_auth_signing_alg_values_supported: algorithm_names(&Algorithm::ALL),
+        code_challenge_methods_supported: [CHALLENGE_METHOD_S256],
+        dpop_signing_alg_values_supported: algorithm_names(&dpop::ALGORITHMS),
+        // Every authorization response carries `iss` (RFC 9207).
+        authorization_response_iss_parameter_supported: true,
+    })
+}
+
+#[cfg(test)]
+#[path = "discovery_tests.rs"]
+mod tests;
