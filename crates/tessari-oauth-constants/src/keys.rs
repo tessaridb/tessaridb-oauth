@@ -13,3 +13,10 @@ pub const SIGNED_TOKEN_MAX_TTL_SECS: u64 = 3_600;
 /// How many tenants one rotation run works on at once. Each tenant costs a few small store round trips, so this
 /// bounds the run's share of the connection pool rather than its CPU.
 pub const KEY_ROTATION_CONCURRENCY: usize = 8;
+
+/// How often the rotation daemon checks every tenant's keys, in seconds. A successor is due well inside a key's
+/// lifetime, so checking every five minutes only bounds how late after its due time a key is made.
+pub const KEY_ROTATION_CHECK_SECS: u64 = 300;
+
+/// The most one rotation run may take, in seconds, before it is abandoned and the next run tries again.
+pub const KEY_ROTATION_RUN_TIMEOUT_SECS: u64 = 60;

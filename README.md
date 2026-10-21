@@ -4,8 +4,8 @@ An OAuth 2.1 authorization server and OpenID provider that keeps every piece of 
 [TessariDB](https://docs.tessaridb.com/). One binary carries the protocol endpoints, the users' account
 portal and an embedded admin panel on its own listener.
 
-> Status: early development. The protocol value types, the request validators, single-use code storage,
-> consent records and rotating refresh-token families on TessariDB exist; no endpoint is served yet.
+> Status: early development. The binary serves each tenant's server metadata (RFC 8414) and key set (RFC 7517)
+> over TLS and rotates the tenants' signing keys; the authorization, token and account endpoints are not served yet.
 
 ## What it is for
 
@@ -48,6 +48,37 @@ in all.
 | `tessari-oauth-api` | protocol, account and admin routes |
 | `tessari-oauth-daemons` | expiry, key rotation, logout delivery |
 | `tessari-oauth-node` | the `tessaridb-oauth` binary |
+
+## Running
+
+The server reads its configuration from the environment when it starts, checks all of it, and refuses to start —
+naming the variable — when anything is missing or does not fit. A `.env` file in the working directory is read
+first, for development only.
+
+| Variable (`TESSARIDB_OAUTH_…`) | Meaning | Default |
+|---|---|---|
+| `PUBLIC_URL` | the https base URL; tenant `acme`'s issuer is `<PUBLIC_URL>/acme` | required |
+| `PUBLIC_ADDRESS` | where the public listener binds | `0.0.0.0:8443` |
+| `TLS_CERT`, `TLS_KEY` | the listener's certificate chain and private key, PEM | required |
+| `KEK` | the 32-byte key-encryption key file, mode 600 or 400; signing keys are stored sealed under it | required |
+| `STORE`, `STORE_USER`, `STORE_PASSWORD` | the TessariDB node's wire address and the account the server signs in with | required |
+| `STORE_AUTHORITY` | the PEM the node's certificate must lead to; without it only a loopback store is reached | none |
+| `STORE_CONNECTIONS` | connections to the store at most | `16` |
+| `REGION` | the region whose tenants this server holds (namespace `oauth_<REGION>`) | required |
+| `TENANTS` | the tenants this server is the issuer for, comma-separated | required |
+| `READ_LIMIT`, `READ_WINDOW_SECS` | metadata and key-set requests one client address may make per window | `300`, `60` |
+
+```sh
+cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary
+curl --cacert cert.pem https://localhost:8443/acme/.well-known/oauth-authorization-server
+```
+
+At start the server provisions each tenant's database, makes a signing key for any tenant without one and then
+checks every five minutes for keys due to rotate. Each read is counted per client address in TessariDB; past the limit
+the answer is `429` with `Retry-After`, every counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`,
+and when the store cannot count the request is refused with `503` rather than served. Logs are JSON on standard
+output, filtered by `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the
+requests in flight finish within 25 seconds, and the process exits 0.
 
 ## Building and checking
 

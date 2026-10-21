@@ -15,6 +15,17 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
+tessari-oauth-constants.workspace = true
+tessari-oauth-types.workspace = true
+tessari-oauth-core.workspace = true
+tessari-oauth-observability.workspace = true
+tessari-oauth-infrastructure.workspace = true
+tessari-oauth-storage.workspace = true
+tessari-oauth-api.workspace = true
+tessari-oauth-daemons.workspace = true
+rustls.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "signal", "macros"] }
 
 [lints]
 workspace = true
