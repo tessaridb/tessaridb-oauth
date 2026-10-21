@@ -55,7 +55,8 @@ impl fmt::Debug for StoreSettings {
     }
 }
 
-/// How many metadata and key-set reads one client address may make per window.
+/// How many requests of one class — metadata and key-set reads, or token requests — one client address may make per
+/// window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ReadLimit {
     /// Requests admitted per window.
@@ -79,6 +80,8 @@ pub struct NodeConfig {
     pub tenants: Vec<TenantId>,
     /// The read limit on the public routes.
     pub read_limit: ReadLimit,
+    /// The limit on the token endpoint, counted apart from reads.
+    pub token_limit: ReadLimit,
 }
 
 /// The environment as a lookup answers it.
@@ -200,6 +203,18 @@ impl NodeConfig {
                 "a whole number of seconds above zero",
             )?,
         };
+        let token_limit = ReadLimit {
+            requests: variables.parsed(
+                "TESSARIDB_OAUTH_TOKEN_LIMIT",
+                NonZeroU64::MIN.saturating_add(59),
+                "a whole number of requests above zero",
+            )?,
+            window_secs: variables.parsed(
+                "TESSARIDB_OAUTH_TOKEN_WINDOW_SECS",
+                NonZeroU64::MIN.saturating_add(59),
+                "a whole number of seconds above zero",
+            )?,
+        };
         Ok(Self {
             public,
             store,
@@ -207,6 +222,7 @@ impl NodeConfig {
             region: variables.required("TESSARIDB_OAUTH_REGION")?,
             tenants: tenants(variables.required("TESSARIDB_OAUTH_TENANTS")?)?,
             read_limit,
+            token_limit,
         })
     }
 }
