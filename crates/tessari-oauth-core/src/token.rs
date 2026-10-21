@@ -5,7 +5,7 @@
 //! then — after the storage layer has atomically consumed the code — every binding the code was issued with, each
 //! refused on its own. The refresh grant's own checks are in [`crate::refresh`].
 
-use tessari_oauth_types::{ClientId, ErrorCode, ScopeSet, TenantId, Timestamp};
+use tessari_oauth_types::{ClientId, ErrorCode, Resource, ScopeSet, TenantId, Timestamp, UserId};
 
 use crate::assertion::{self, AssertionUse};
 use crate::clients::{AuthMethod, ClientDirectory, ClientRegistration, GrantType};
@@ -68,6 +68,10 @@ pub struct Redemption {
     pub client_id: ClientId,
     /// The scopes the code granted.
     pub scopes: ScopeSet,
+    /// The user the tokens act for.
+    pub user: UserId,
+    /// The one resource the access token is addressed to.
+    pub audience: Resource,
 }
 
 /// Read a token request's parameters, refusing a repeated one.
@@ -206,7 +210,25 @@ pub fn redeem_code(
     Ok(Redemption {
         client_id: code.client_id.clone(),
         scopes: code.scopes.clone(),
+        user: code.user.clone(),
+        audience: audience(params, code)?,
     })
+}
+
+/// The one resource a token from `code` is addressed to: the `resource` the request names, which must be one the code
+/// was granted for, or the code's only resource when none is named (RFC 8707 §2.2).
+fn audience(params: &Params, code: &IssuedCode) -> Result<Resource, Refusal> {
+    let invalid_target = |reason| refuse(ErrorCode::InvalidTarget, reason);
+    match params.get("resource") {
+        Some(named) => Resource::parse(named)
+            .ok()
+            .filter(|resource| code.resources.contains(resource))
+            .ok_or(invalid_target(Reason::TargetNotGranted)),
+        None => match (code.resources.first(), code.resources.len()) {
+            (Some(only), 1) => Ok(only.clone()),
+            _ => Err(invalid_target(Reason::TargetUnnamed)),
+        },
+    }
 }
 
 #[cfg(test)]

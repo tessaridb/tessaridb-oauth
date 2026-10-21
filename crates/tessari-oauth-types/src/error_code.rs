@@ -22,6 +22,8 @@ pub enum ErrorCode {
     UnsupportedGrantType,
     /// The DPoP proof is missing, malformed or does not hold (RFC 9449 §5).
     InvalidDpopProof,
+    /// The requested resource is not one the grant covers, or none was named where one must be (RFC 8707 §2).
+    InvalidTarget,
 }
 
 impl ErrorCode {
@@ -37,6 +39,7 @@ impl ErrorCode {
             Self::UnauthorizedClient => "unauthorized_client",
             Self::UnsupportedGrantType => "unsupported_grant_type",
             Self::InvalidDpopProof => "invalid_dpop_proof",
+            Self::InvalidTarget => "invalid_target",
         }
     }
 }

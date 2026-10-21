@@ -21,6 +21,7 @@ fn spent_row() -> CodeEntity {
         redirect_uri: "https://portal.example.com/callback".to_owned(),
         challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM".to_owned(),
         scopes: vec!["openid".to_owned()],
+        resources: vec!["https://api.example.com/orders".to_owned()],
         expires_at: 1_800_000_060,
         redeemed_at: Some(1_800_000_000),
     }

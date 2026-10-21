@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tessari_oauth_constants::CODE_SPEND_ATTEMPTS;
 use tessari_oauth_core::codes::IssuedCode;
 use tessari_oauth_types::{
-    AuthorizationCode, Challenge, ClientId, ScopeSet, TenantId, Timestamp, UserId,
+    AuthorizationCode, Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp, UserId,
 };
 
 use tessari_oauth_infrastructure::tessaridb::Place;
@@ -57,6 +57,11 @@ fn to_entity(code: &IssuedCode) -> Result<CodeEntity> {
         redirect_uri: code.redirect_uri.clone(),
         challenge: code.challenge.as_str().to_owned(),
         scopes: code.scopes.iter().map(str::to_owned).collect(),
+        resources: code
+            .resources
+            .iter()
+            .map(|resource| resource.as_str().to_owned())
+            .collect(),
         expires_at: i64::try_from(code.expires_at.unix_secs())
             .map_err(|_| unreadable("expiry beyond i64"))?,
         redeemed_at: None,
@@ -72,6 +77,12 @@ fn to_model(row: CodeEntity) -> Result<IssuedCode> {
         redirect_uri: row.redirect_uri,
         challenge: Challenge::parse(row.challenge).map_err(|_| unreadable("challenge"))?,
         scopes: ScopeSet::parse(&row.scopes.join(" ")).map_err(|_| unreadable("scopes"))?,
+        resources: row
+            .resources
+            .into_iter()
+            .map(Resource::parse)
+            .collect::<std::result::Result<_, _>>()
+            .map_err(|_| unreadable("resources"))?,
         expires_at: Timestamp::from_unix_secs(seconds),
     })
 }

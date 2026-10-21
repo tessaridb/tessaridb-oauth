@@ -8,16 +8,17 @@ use crate::Result;
 
 /// The tables of a tenant's database. Every definition carries `IF NOT EXISTS`, so provisioning is re-runnable.
 ///
-/// `codes` holds the bindings of each issued authorization code under the code's digest; `redeemed_at` is absent
-/// until the single redemption sets it. `consents` holds one grant per user and client; it is indexed by user because
-/// a user's grant list is read by user, while every check reads one record by its id. `refresh_families` and
-/// `refresh_tokens` hold each family and each of its tokens under a digest; every read is by id. `signing_keys`
-/// holds each key sealed with its public half and dates; it is listed whole, oldest first. `replays` is a space of
-/// spent client assertions and DPoP proofs whose keys expire with what they record. `clients` holds each client's
-/// registration under its id; every read is by id.
+/// `codes` holds the bindings of each issued authorization code, its resources among them, under the code's digest;
+/// `redeemed_at` is absent until the single redemption sets it. `consents` holds one grant per user and client; it
+/// is indexed by user because a user's grant list is read by user, while every check reads one record by its id.
+/// `refresh_families` and `refresh_tokens` hold each family and each of its tokens under a digest; every read is by
+/// id. `signing_keys` holds each key sealed with its public half and dates; it is listed whole, oldest first.
+/// `replays` is a space of spent client assertions and DPoP proofs whose keys expire with what they record.
+/// `clients` holds each client's registration under its id; every read is by id.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
-     challenge string REQUIRED, scopes array REQUIRED, expires_at int REQUIRED, redeemed_at int); \
+     challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
+     redeemed_at int); \
      DEFINE TABLE IF NOT EXISTS consents (\
      tenant string REQUIRED, user_id string REQUIRED, client_id string REQUIRED, scopes array REQUIRED, \
      resources array REQUIRED, policy_version int REQUIRED, shown_version string REQUIRED, \

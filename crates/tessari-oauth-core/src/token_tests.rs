@@ -1,5 +1,7 @@
+use std::collections::BTreeSet;
 use tessari_oauth_constants::AUTHORIZATION_CODE_TTL_SECS;
-use tessari_oauth_types::{Challenge, ClientId, ErrorCode, ScopeSet, Timestamp, UserId};
+
+use tessari_oauth_types::{Challenge, ClientId, ErrorCode, Resource, ScopeSet, Timestamp, UserId};
 
 use super::{
     Endpoint, PresentedAuth, Refusal, authenticate_client, read, redeem_code, require_grant,
@@ -27,8 +29,16 @@ fn issued() -> IssuedCode {
         redirect_uri: REDIRECT.to_owned(),
         challenge: Challenge::parse(CHALLENGE).expect("fixture"),
         scopes: ScopeSet::parse("openid").expect("fixture"),
+        resources: BTreeSet::from([resource(ORDERS)]),
         expires_at: Timestamp::from_unix_secs(ISSUED_AT + AUTHORIZATION_CODE_TTL_SECS),
     }
+}
+
+const ORDERS: &str = "https://api.example.com/orders";
+const BILLING: &str = "https://api.example.com/billing";
+
+fn resource(uri: &str) -> Resource {
+    Resource::parse(uri).expect("fixture")
 }
 
 fn request() -> Vec<(&'static str, String)> {
@@ -86,6 +96,39 @@ fn a_code_redeems_with_every_binding_intact() {
     let redemption = redeem(request(), &issued(), just_before_expiry()).expect("all bindings hold");
     assert_eq!(redemption.client_id.as_str(), "app");
     assert_eq!(redemption.scopes.iter().collect::<Vec<_>>(), ["openid"]);
+    assert_eq!(redemption.user.as_str(), "user-1");
+    assert_eq!(
+        redemption.audience.as_str(),
+        ORDERS,
+        "the code's only resource"
+    );
+}
+
+#[test]
+fn t9_the_audience_is_one_resource_the_code_was_granted_for() {
+    let mut code = issued();
+    code.resources = BTreeSet::from([resource(ORDERS), resource(BILLING)]);
+    let named = redeem(with("resource", BILLING), &code, just_before_expiry()).expect("granted");
+    assert_eq!(named.audience.as_str(), BILLING);
+    for (pairs, reason) in [
+        (request(), Reason::TargetUnnamed),
+        (
+            with("resource", "https://api.example.com/other"),
+            Reason::TargetNotGranted,
+        ),
+        (
+            with("resource", "http://api.example.com/orders"),
+            Reason::TargetNotGranted,
+        ),
+    ] {
+        assert_eq!(
+            redeem(pairs, &code, just_before_expiry()),
+            Err(Refusal {
+                error: ErrorCode::InvalidTarget,
+                reason
+            })
+        );
+    }
 }
 
 #[test]

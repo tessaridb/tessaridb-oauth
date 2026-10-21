@@ -1,6 +1,8 @@
 //! The record an authorization code points at, carrying every binding a redemption must re-check.
 
-use tessari_oauth_types::{Challenge, ClientId, ScopeSet, TenantId, Timestamp, UserId};
+use std::collections::BTreeSet;
+
+use tessari_oauth_types::{Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp, UserId};
 
 /// An issued authorization code's bindings. Stored under the code's hash; the code itself is never stored.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +19,8 @@ pub struct IssuedCode {
     pub challenge: Challenge,
     /// The scopes granted with the code.
     pub scopes: ScopeSet,
+    /// The resources the scopes were granted at; each token redeemed from the code is addressed to one of them.
+    pub resources: BTreeSet<Resource>,
     /// The instant after which the code no longer redeems.
     pub expires_at: Timestamp,
 }

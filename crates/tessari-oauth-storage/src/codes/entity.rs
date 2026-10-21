@@ -17,6 +17,8 @@ pub struct CodeEntity {
     pub challenge: String,
     /// The granted scopes.
     pub scopes: Vec<String>,
+    /// The resources the scopes were granted at.
+    pub resources: Vec<String>,
     /// Unix seconds after which the code no longer redeems.
     pub expires_at: i64,
     /// Unix seconds of the redemption; absent while the code is unspent.
@@ -32,6 +34,7 @@ impl FromRecord for CodeEntity {
             redirect_uri: row.take("redirect_uri")?,
             challenge: row.take("challenge")?,
             scopes: row.take("scopes")?,
+            resources: row.take("resources")?,
             expires_at: row.take("expires_at")?,
             redeemed_at: row.take("redeemed_at")?,
         })

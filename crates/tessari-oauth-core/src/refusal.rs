@@ -60,4 +60,8 @@ pub enum Reason {
     VerifierMismatch,
     /// The code outlived its lifetime.
     CodeExpired,
+    /// The `resource` named is not one the code was granted for, or is not a resource indicator at all.
+    TargetNotGranted,
+    /// No `resource` was named and the code was granted for more than one, or for none.
+    TargetUnnamed,
 }

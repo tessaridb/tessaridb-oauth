@@ -25,11 +25,18 @@ fn text(value: &str) -> Value {
 impl CodeRepository for TessaridbCodeRepository {
     async fn create(&self, place: &Place, digest: &str, code: &CodeEntity) -> Result<()> {
         let scopes = Value::Array(code.scopes.iter().map(|scope| text(scope)).collect());
+        let resources = Value::Array(
+            code.resources
+                .iter()
+                .map(|resource| text(resource))
+                .collect(),
+        );
         self.database
             .run_at(
                 place,
                 "CREATE codes:$id = { tenant: $tenant, client_id: $client_id, user_id: $user_id, \
-                 redirect_uri: $redirect_uri, challenge: $challenge, scopes: $scopes, expires_at: $expires_at };",
+                 redirect_uri: $redirect_uri, challenge: $challenge, scopes: $scopes, resources: $resources, \
+                 expires_at: $expires_at };",
                 vec![
                     ("id".to_owned(), text(digest)),
                     ("tenant".to_owned(), text(&code.tenant)),
@@ -38,6 +45,7 @@ impl CodeRepository for TessaridbCodeRepository {
                     ("redirect_uri".to_owned(), text(&code.redirect_uri)),
                     ("challenge".to_owned(), text(&code.challenge)),
                     ("scopes".to_owned(), scopes),
+                    ("resources".to_owned(), resources),
                     ("expires_at".to_owned(), Value::from(code.expires_at)),
                 ],
             )

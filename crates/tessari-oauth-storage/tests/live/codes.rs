@@ -1,11 +1,13 @@
 //! A code is spent once: in sequence, by an unknown digest, and under simultaneity on separate connections.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use tessari_oauth_core::codes::IssuedCode;
 use tessari_oauth_storage::codes::Consumed;
 use tessari_oauth_types::{
-    AuthorizationCode, Challenge, ClientId, ErrorCategory, ScopeSet, TenantId, Timestamp, UserId,
+    AuthorizationCode, Challenge, ClientId, ErrorCategory, Resource, ScopeSet, TenantId, Timestamp,
+    UserId,
 };
 use tokio::sync::Barrier;
 
@@ -29,6 +31,10 @@ pub(crate) fn issued() -> IssuedCode {
         redirect_uri: "https://portal.example.com/callback".to_owned(),
         challenge: Challenge::of(VERIFIER).expect("a challenge"),
         scopes: ScopeSet::parse("openid profile").expect("scopes"),
+        resources: BTreeSet::from([
+            Resource::parse("https://api.example.com/orders").expect("a resource"),
+            Resource::parse("https://api.example.com/billing").expect("a resource"),
+        ]),
         expires_at: Timestamp::from_unix_secs(EXPIRES),
     }
 }
