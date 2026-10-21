@@ -72,6 +72,20 @@ fn a_scope_must_be_named_well_formed_and_within_the_ceiling() {
 }
 
 #[test]
+fn openid_is_refused_because_no_user_stands_behind_the_token() {
+    let mut svc = service(&[API]);
+    svc.scope_ceiling = ScopeSet::parse("openid notes:read").expect("a ceiling");
+    for asked in ["openid", "notes:read openid"] {
+        assert_eq!(
+            grant(&request(&[("scope", asked)]), &svc),
+            refused(ErrorCode::InvalidScope, Reason::OpenIdWithoutUser),
+            "{asked}"
+        );
+    }
+    assert!(grant(&request(&[("scope", "notes:read")]), &svc).is_ok());
+}
+
+#[test]
 fn the_audience_is_one_of_the_clients_resources() {
     assert_eq!(
         grant(

@@ -47,8 +47,8 @@ it at the same endpoint (RFC 6749 §6): the request is judged on the family's gr
 a refused refresh leaves the token usable; the access token may be narrowed to fewer scopes or one of the grant's
 resources but never widened, and a token presented after it was rotated revokes its family. A confidential client
 registered for `client_credentials` (RFC 6749 §4.4; a public client cannot register it) gets its own token: it names
-its scopes within its ceiling and one of the resources it registered, the token's `sub` is the client itself
-(RFC 9068 §2.2), and no refresh token is issued. A request carrying a
+its scopes within its ceiling — never `openid`, since no user signed in — and one of the resources it registered,
+the token's `sub` is the client itself (RFC 9068 §2.2), and no refresh token is issued. A request carrying a
 DPoP proof (RFC 9449) — one `DPoP` header, verified for this endpoint and spent once, after every other check —
 receives a `DPoP` token naming the proof's key in `cnf.jkt`; a client registered with `dpop_bound_access_tokens`
 is refused without one, and a public client's refresh token keeps needing the key it was issued to. Without a

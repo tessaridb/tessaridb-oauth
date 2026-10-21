@@ -26,6 +26,8 @@ pub enum Reason {
     UnsupportedChallengeMethod,
     /// A requested scope is beyond the client's ceiling.
     ScopeBeyondCeiling,
+    /// `openid` asked for by a grant with no user behind it.
+    OpenIdWithoutUser,
     /// `prompt` named `none` together with another value.
     PromptNoneCombined,
     /// `prompt=none` asked for no page, and there is no session to answer it from.

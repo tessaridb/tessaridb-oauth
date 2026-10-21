@@ -8,6 +8,7 @@ mod jose;
 mod keys;
 mod listeners;
 mod pkce;
+mod scopes;
 mod storage;
 mod throttle;
 
@@ -34,6 +35,7 @@ pub use pkce::{
     PKCE_VERIFIER_MIN_LEN, PUSHED_REQUEST_TTL_SECS, REFRESH_ABSOLUTE_TTL_SECS,
     REFRESH_IDLE_TTL_SECS,
 };
+pub use scopes::OPENID_SCOPE;
 pub use storage::{
     CODE_SPEND_ATTEMPTS, CONSENT_WRITE_ATTEMPTS, INTERACTION_CLAIM_ATTEMPTS,
     REFRESH_ROTATE_ATTEMPTS, REPLAY_SPEND_ATTEMPTS, SECRET_CREATE_ATTEMPTS,
