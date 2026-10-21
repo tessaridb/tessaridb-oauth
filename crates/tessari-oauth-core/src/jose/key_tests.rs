@@ -82,3 +82,27 @@ fn the_algorithms_are_named_as_the_jose_registry_names_them() {
     assert_eq!(Algorithm::EdDsa.name(), "EdDSA");
     assert_eq!(Algorithm::Es256.name(), "ES256");
 }
+
+#[test]
+fn thumbprints_match_the_rfc_examples() {
+    let ed = VerifyingKey::from_jwk(
+        &format!(r#"{{"kty":"OKP","crv":"Ed25519","x":"{ED25519_X}","kid":"ignored"}}"#),
+        Algorithm::EdDsa,
+    )
+    .expect("RFC 8037 key");
+    // RFC 8037 §A.3.
+    assert_eq!(
+        ed.thumbprint().as_str(),
+        "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+    );
+    // RFC 9449 §6: the key of the proofs in its §5.
+    let ec = VerifyingKey::from_jwk(
+        r#"{"kty":"EC","x":"l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs","y":"9VE4jf_Ok_o64zbTTlcuNJajHmt6v9TDVrU0CdvGRDA","crv":"P-256"}"#,
+        Algorithm::Es256,
+    )
+    .expect("RFC 9449 key");
+    assert_eq!(
+        ec.thumbprint().as_str(),
+        "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I"
+    );
+}

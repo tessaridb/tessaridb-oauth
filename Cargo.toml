@@ -29,7 +29,8 @@ subtle = "2"
 ring = "0.17"
 # Typed JOSE headers, claims and keys; never an untyped value tree.
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# `raw_value` keeps an embedded JWK as the slice it arrived as, parsed once by the key reader.
+serde_json = { version = "1", features = ["raw_value"] }
 # Redirect URIs are parsed by the WHATWG URL parser, and a registered value must already be in the form it
 # serialises to, so the server never normalises an incoming value into a match.
 url = "2"

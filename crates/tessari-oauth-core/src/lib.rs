@@ -6,6 +6,7 @@ pub mod authorize;
 pub mod clients;
 pub mod codes;
 pub mod consents;
+pub mod dpop;
 mod error;
 pub mod jose;
 mod params;

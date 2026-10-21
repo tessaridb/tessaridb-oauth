@@ -42,6 +42,12 @@ pub enum Reason {
     AssertionAudience,
     /// A client assertion is expired, not yet valid, or valid for longer than allowed.
     AssertionTime,
+    /// A DPoP proof is not a `dpop+jwt` signed under an allowed algorithm by the public key it carries.
+    DpopProof,
+    /// A DPoP proof's `jti`, `htm` or `htu` does not hold for this request.
+    DpopClaims,
+    /// A DPoP proof is older than the acceptance window or ahead of the clock.
+    DpopTime,
     /// The code was issued to another client.
     CodeClientMismatch,
     /// The code was issued in another tenant.

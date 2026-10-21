@@ -492,9 +492,11 @@ dependencies = [
  "ring",
  "serde",
  "serde_json",
+ "sha2",
  "tessari-oauth-constants",
  "tessari-oauth-types",
  "thiserror",
+ "url",
 ]
 
 [[package]]

@@ -6,6 +6,7 @@
 //! base64url text, and a binding compared against the wrong one of the two matches nothing and reads like a client
 //! with the wrong key.
 
+use sha2::Digest as _;
 use tessari_oauth_constants::SHA256_BASE64URL_LEN;
 
 use crate::{Error, Result, base64url};
@@ -30,6 +31,15 @@ impl KeyThumbprint {
             });
         }
         Ok(Self(raw))
+    }
+
+    /// The thumbprint of a key given as its RFC 7638 canonical JSON: the required members only, in lexicographic
+    /// order, with no whitespace. Building that form is the caller's part; hashing it is this one.
+    #[must_use]
+    pub fn of_canonical_jwk(canonical: &str) -> Self {
+        Self(base64url::encode(&sha2::Sha256::digest(
+            canonical.as_bytes(),
+        )))
     }
 
     /// The thumbprint as written.

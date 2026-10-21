@@ -2,7 +2,7 @@
 
 use ring::signature::{self, UnparsedPublicKey};
 use serde::Deserialize;
-use tessari_oauth_types::base64url;
+use tessari_oauth_types::{KeyThumbprint, base64url};
 
 use super::JoseError;
 
@@ -39,6 +39,8 @@ pub struct VerifyingKey {
     algorithm: Algorithm,
     /// The raw key: 32 bytes for Ed25519, an uncompressed SEC 1 point for P-256.
     bytes: Vec<u8>,
+    /// The key's RFC 7638 thumbprint, taken from its members when it was read.
+    thumbprint: KeyThumbprint,
 }
 
 /// The JWK members read here; every other member is ignored. `d` is read only to refuse a private key.
@@ -71,13 +73,29 @@ impl VerifyingKey {
         if !public_signing {
             return Err(JoseError::KeyRefused);
         }
-        let bytes = match (algorithm, jwk.kty.as_str(), jwk.crv.as_deref()) {
-            (Algorithm::EdDsa, "OKP", Some("Ed25519")) => component(jwk.x.as_deref())?,
+        // The thumbprint's canonical form (RFC 7638 §3.2): the required members in lexicographic order. The
+        // coordinates are written as read; strict decoding gives each byte string exactly one spelling.
+        let (bytes, canonical) = match (algorithm, jwk.kty.as_str(), jwk.crv.as_deref()) {
+            (Algorithm::EdDsa, "OKP", Some("Ed25519")) => {
+                let x = component(jwk.x.as_deref())?;
+                let canonical = format!(
+                    r#"{{"crv":"Ed25519","kty":"OKP","x":"{}"}}"#,
+                    base64url::encode(&x)
+                );
+                (x, canonical)
+            }
             (Algorithm::Es256, "EC", Some("P-256")) => {
+                let x = component(jwk.x.as_deref())?;
+                let y = component(jwk.y.as_deref())?;
+                let canonical = format!(
+                    r#"{{"crv":"P-256","kty":"EC","x":"{}","y":"{}"}}"#,
+                    base64url::encode(&x),
+                    base64url::encode(&y)
+                );
                 let mut point = vec![UNCOMPRESSED_POINT];
-                point.extend(component(jwk.x.as_deref())?);
-                point.extend(component(jwk.y.as_deref())?);
-                point
+                point.extend(x);
+                point.extend(y);
+                (point, canonical)
             }
             _ => return Err(JoseError::KeyRefused),
         };
@@ -85,6 +103,7 @@ impl VerifyingKey {
             kid: jwk.kid,
             algorithm,
             bytes,
+            thumbprint: KeyThumbprint::of_canonical_jwk(&canonical),
         })
     }
 
@@ -98,6 +117,12 @@ impl VerifyingKey {
     #[must_use]
     pub const fn algorithm(&self) -> Algorithm {
         self.algorithm
+    }
+
+    /// The key's RFC 7638 thumbprint: the value a DPoP-bound token's `cnf.jkt` names.
+    #[must_use]
+    pub const fn thumbprint(&self) -> &KeyThumbprint {
+        &self.thumbprint
     }
 
     /// Whether `signature` signs `message` under this key.

@@ -9,3 +9,7 @@ pub const CLOCK_SKEW_SECS: u64 = 5;
 /// Longest `jti` accepted, in characters. A bound at all, so a stranger cannot make the replay store hold an
 /// unbounded key.
 pub const JTI_MAX_LEN: usize = 256;
+
+/// How long after its `iat` a DPoP proof is accepted, in seconds (RFC 9449 §11.1: seconds or minutes). A proof is
+/// made per request, so a minute covers a slow network; it is also how long its `jti` must be remembered.
+pub const DPOP_PROOF_WINDOW_SECS: u64 = 60;

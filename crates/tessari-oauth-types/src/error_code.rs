@@ -1,4 +1,4 @@
-//! The `error` values an OAuth response may carry (RFC 6749 §4.1.2.1 and §5.2).
+//! The `error` values an OAuth response may carry (RFC 6749 §4.1.2.1 and §5.2, RFC 9449 §5).
 //!
 //! Only these strings ever reach a client; the precise reason for a refusal goes to the audit log instead, so the
 //! answer cannot become an oracle about which check failed.
@@ -20,6 +20,8 @@ pub enum ErrorCode {
     UnauthorizedClient,
     /// The authorization server does not support this `grant_type`.
     UnsupportedGrantType,
+    /// The DPoP proof is missing, malformed or does not hold (RFC 9449 §5).
+    InvalidDpopProof,
 }
 
 impl ErrorCode {
@@ -34,6 +36,7 @@ impl ErrorCode {
             Self::InvalidGrant => "invalid_grant",
             Self::UnauthorizedClient => "unauthorized_client",
             Self::UnsupportedGrantType => "unsupported_grant_type",
+            Self::InvalidDpopProof => "invalid_dpop_proof",
         }
     }
 }

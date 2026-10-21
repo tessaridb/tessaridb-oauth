@@ -6,7 +6,7 @@
 mod jws;
 mod key;
 
-pub use jws::{Verified, verify};
+pub use jws::{Verified, verify, verify_embedded};
 pub use key::{Algorithm, VerifyingKey};
 
 /// Why a signed object or a key was refused. Each is answered to the caller as the same protocol error; the variant

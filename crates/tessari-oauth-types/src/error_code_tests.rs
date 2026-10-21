@@ -13,6 +13,7 @@ fn each_code_is_spelled_as_the_specification_spells_it() {
         (ErrorCode::InvalidGrant, "invalid_grant"),
         (ErrorCode::UnauthorizedClient, "unauthorized_client"),
         (ErrorCode::UnsupportedGrantType, "unsupported_grant_type"),
+        (ErrorCode::InvalidDpopProof, "invalid_dpop_proof"),
     ] {
         assert_eq!(code.as_str(), wire);
     }

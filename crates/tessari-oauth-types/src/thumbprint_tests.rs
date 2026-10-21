@@ -28,3 +28,14 @@ fn anything_but_43_base64url_characters_is_refused() {
         );
     }
 }
+
+#[test]
+fn the_thumbprint_of_a_canonical_jwk_is_its_sha256_in_base64url() {
+    // RFC 8037 §A.3: the canonical members of its Ed25519 key and the thumbprint they hash to.
+    let canonical =
+        r#"{"crv":"Ed25519","kty":"OKP","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}"#;
+    assert_eq!(
+        KeyThumbprint::of_canonical_jwk(canonical).as_str(),
+        "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+    );
+}
