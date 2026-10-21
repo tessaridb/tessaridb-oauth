@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use tessari_oauth_types::{ClientId, Resource, ScopeSet, TenantId, UserId};
+use tessari_oauth_types::{ClientId, KeyThumbprint, Resource, ScopeSet, TenantId, UserId};
 
 /// What a refresh token carries: the authority its family was granted, unchanged by rotation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +17,8 @@ pub struct RefreshGrant {
     pub scopes: ScopeSet,
     /// The resources the scopes were granted at.
     pub resources: BTreeSet<Resource>,
+    /// The DPoP key every refresh must prove, for a family started by a public client that presented one.
+    pub bound_to: Option<KeyThumbprint>,
 }
 
 /// Why a presented token did not rotate, leaving its family as it was.

@@ -167,6 +167,7 @@ async fn a_code_whose_family_a_replay_already_revoked_issues_nothing() {
         client_id: ClientId::parse("portal").expect("a client id"),
         scopes: ScopeSet::parse("api:read").expect("scopes"),
         resources: [Resource::parse(API).expect("a resource")].into(),
+        bound_to: None,
     };
     let family = AuthorizationCode::from_secret("code-late").digest();
     server
@@ -213,6 +214,7 @@ async fn a_tenant_with_no_key_to_sign_with_starts_no_refresh_family() {
         client_id: ClientId::parse("portal").expect("a client id"),
         scopes: ScopeSet::parse("api:read").expect("scopes"),
         resources: [Resource::parse(API).expect("a resource")].into(),
+        bound_to: None,
     };
     let family = AuthorizationCode::from_secret("code-unsigned").digest();
     server

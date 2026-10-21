@@ -15,7 +15,8 @@ use tessari_oauth_constants::{
 };
 use tessari_oauth_infrastructure::tessaridb::Place;
 use tessari_oauth_types::{
-    ClientId, ErrorCategory, RefreshToken, Resource, ScopeSet, TenantId, Timestamp, UserId,
+    ClientId, ErrorCategory, KeyThumbprint, RefreshToken, Resource, ScopeSet, TenantId, Timestamp,
+    UserId,
 };
 
 use super::repository::RefreshRepository;
@@ -65,6 +66,12 @@ fn to_grant(token: &TokenEntity) -> Result<RefreshGrant> {
         client_id: ClientId::parse(token.client_id.clone()).map_err(|_| unreadable("client_id"))?,
         scopes: ScopeSet::parse(&token.scopes.join(" ")).map_err(|_| unreadable("scopes"))?,
         resources,
+        bound_to: token
+            .jkt
+            .clone()
+            .map(KeyThumbprint::parse)
+            .transpose()
+            .map_err(|_| unreadable("jkt"))?,
     })
 }
 
@@ -119,6 +126,10 @@ impl RefreshService {
                 .collect(),
             idle_expires_at: later(at, REFRESH_IDLE_TTL_SECS)?.min(family.expires_at),
             rotated_at: None,
+            jkt: grant
+                .bound_to
+                .as_ref()
+                .map(|thumbprint| thumbprint.as_str().to_owned()),
         };
         self.repository
             .start(&place, family_id, &family, &first.digest(), &token)

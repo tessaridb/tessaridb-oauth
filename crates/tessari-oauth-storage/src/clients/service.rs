@@ -94,6 +94,7 @@ fn registration(tenant: &TenantId, entity: ClientEntity) -> Result<ClientRegistr
         grant_types,
         keys: keys(auth_method, &entity.jwks)
             .ok_or_else(|| unreadable("a key that does not parse"))?,
+        dpop_bound_access_tokens: entity.dpop_bound_access_tokens,
     })
 }
 
@@ -140,6 +141,7 @@ impl ClientService {
                 .map(|grant| grant.name().to_owned())
                 .collect(),
             jwks: client.jwks.clone(),
+            dpop_bound_access_tokens: client.dpop_bound_access_tokens,
             registered_at: i64::try_from(now.unix_secs())
                 .map_err(|_| unreadable("a time beyond i64"))?,
         };

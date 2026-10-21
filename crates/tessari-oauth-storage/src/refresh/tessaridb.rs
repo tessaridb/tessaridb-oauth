@@ -39,12 +39,16 @@ fn token_values(id: &str, token: &TokenEntity) -> Vec<(String, Value)> {
             "token_idle_expires_at".to_owned(),
             Value::from(token.idle_expires_at),
         ),
+        (
+            "token_jkt".to_owned(),
+            token.jkt.as_deref().map_or(Value::None, text),
+        ),
     ]
 }
 
 const CREATE_TOKEN: &str = "CREATE refresh_tokens:$token_id = { family_id: $token_family_id, \
      tenant: $token_tenant, client_id: $token_client_id, user_id: $token_user_id, scopes: $token_scopes, \
-     resources: $token_resources, idle_expires_at: $token_idle_expires_at };";
+     resources: $token_resources, idle_expires_at: $token_idle_expires_at, jkt: $token_jkt };";
 
 #[async_trait]
 impl RefreshRepository for TessaridbRefreshRepository {

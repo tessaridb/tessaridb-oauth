@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use tessari_oauth_storage::refresh::{RefreshGrant, Rotation};
 use tessari_oauth_types::{
-    ClientId, RefreshToken, Resource, ScopeSet, TenantId, Timestamp, UserId,
+    ClientId, KeyThumbprint, RefreshToken, Resource, ScopeSet, TenantId, Timestamp, UserId,
 };
 
 use crate::fresh;
@@ -26,6 +26,7 @@ fn grant() -> RefreshGrant {
             Resource::parse("https://api.example.com/").expect("a resource"),
             Resource::parse("https://files.example.com/").expect("a resource"),
         ]),
+        bound_to: None,
     }
 }
 
@@ -90,5 +91,45 @@ async fn every_token_of_a_family_reads_as_its_grant_and_an_unknown_one_as_none()
             .expect("read"),
         None,
         "another tenant's token is unknown here"
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_family_bound_to_a_key_keeps_it_through_a_rotation() {
+    let acme = tenant("acme");
+    let storage = fresh(&acme, 2).await;
+    let bound = RefreshGrant {
+        bound_to: Some(KeyThumbprint::of_ed25519(&[7; 32])),
+        ..grant()
+    };
+    let refresh = &storage.refresh;
+    refresh
+        .start(
+            &token("k1"),
+            &bound,
+            "family-k",
+            Timestamp::from_unix_secs(START),
+        )
+        .await
+        .expect("started");
+    assert_eq!(
+        refresh.grant(&acme, &token("k1")).await.expect("read"),
+        Some(bound.clone())
+    );
+    let rotation = refresh
+        .rotate(
+            &acme,
+            &token("k1"),
+            &token("k2"),
+            &bound.client_id,
+            Timestamp::from_unix_secs(START + 1),
+        )
+        .await
+        .expect("answered");
+    assert_eq!(rotation, Rotation::Rotated(bound.clone()));
+    assert_eq!(
+        refresh.grant(&acme, &token("k2")).await.expect("read"),
+        Some(bound)
     );
 }

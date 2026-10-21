@@ -37,6 +37,7 @@ pub(crate) fn client(tenant: TenantId, id: &str, redirects: &[&str]) -> ClientRe
         auth_method: AuthMethod::None,
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         keys: Vec::new(),
+        dpop_bound_access_tokens: false,
     }
 }
 

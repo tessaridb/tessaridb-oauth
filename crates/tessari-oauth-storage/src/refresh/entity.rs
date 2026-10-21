@@ -40,6 +40,8 @@ pub struct TokenEntity {
     pub idle_expires_at: i64,
     /// Unix seconds of its rotation; absent while unspent.
     pub rotated_at: Option<i64>,
+    /// The thumbprint of the DPoP key its family is bound to; absent for an unbound family.
+    pub jkt: Option<String>,
 }
 
 impl FromRecord for FamilyEntity {
@@ -67,6 +69,7 @@ impl FromRecord for TokenEntity {
             resources: row.take("resources")?,
             idle_expires_at: row.take("idle_expires_at")?,
             rotated_at: row.take("rotated_at")?,
+            jkt: row.take("jkt")?,
         })
     }
 }

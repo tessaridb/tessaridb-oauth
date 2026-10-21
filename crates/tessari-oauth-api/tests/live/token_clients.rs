@@ -42,6 +42,7 @@ async fn a_client_assertion_authenticates_once() {
         auth_method: AuthMethod::PrivateKeyJwt(Algorithm::Es256),
         grant_types: vec![GrantType::AuthorizationCode],
         jwks: vec![key.public_jwk().expect("a JWK")],
+        dpop_bound_access_tokens: false,
     };
     server
         .storage

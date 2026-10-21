@@ -18,4 +18,6 @@ pub struct NewClient {
     pub grant_types: Vec<GrantType>,
     /// Its public signing keys as JWKs; required for `private_key_jwt`, empty otherwise.
     pub jwks: Vec<String>,
+    /// Whether every access token issued to it must be bound to a DPoP key (RFC 9449 §5.2).
+    pub dpop_bound_access_tokens: bool,
 }

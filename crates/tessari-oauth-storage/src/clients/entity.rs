@@ -22,6 +22,8 @@ pub struct ClientEntity {
     pub grant_types: Vec<String>,
     /// Its public keys, each a JWK as registered.
     pub jwks: Vec<String>,
+    /// Whether every access token issued to it must be DPoP-bound.
+    pub dpop_bound_access_tokens: bool,
     /// Unix seconds of the registration.
     pub registered_at: i64,
 }
@@ -37,6 +39,7 @@ impl FromRecord for ClientEntity {
             assertion_alg: row.take("assertion_alg")?,
             grant_types: row.take("grant_types")?,
             jwks: row.take("jwks")?,
+            dpop_bound_access_tokens: row.take("dpop_bound_access_tokens")?,
             registered_at: row.take("registered_at")?,
         })
     }

@@ -85,6 +85,7 @@ pub(crate) async fn server(connections: usize) -> Server {
                 auth_method: AuthMethod::None,
                 grant_types: grants,
                 jwks: Vec::new(),
+                dpop_bound_access_tokens: false,
             };
             let at = Timestamp::from_unix_secs(NOW - 100);
             storage

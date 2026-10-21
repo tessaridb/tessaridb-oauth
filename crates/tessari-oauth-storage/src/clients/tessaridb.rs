@@ -35,7 +35,8 @@ impl ClientRepository for TessaridbClientRepository {
                 place,
                 "CREATE clients:$id = { client_id: $id, tenant: $tenant, redirect_uris: $redirect_uris, \
                  scope_ceiling: $scope_ceiling, auth_method: $auth_method, assertion_alg: $assertion_alg, \
-                 grant_types: $grant_types, jwks: $jwks, registered_at: $registered_at };",
+                 grant_types: $grant_types, jwks: $jwks, dpop_bound_access_tokens: $dpop_bound_access_tokens, \
+                 registered_at: $registered_at };",
                 vec![
                     ("id".to_owned(), Value::from(client.client_id.as_str())),
                     ("tenant".to_owned(), Value::from(client.tenant.as_str())),
@@ -51,6 +52,10 @@ impl ClientRepository for TessaridbClientRepository {
                     ),
                     ("grant_types".to_owned(), texts(&client.grant_types)),
                     ("jwks".to_owned(), texts(&client.jwks)),
+                    (
+                        "dpop_bound_access_tokens".to_owned(),
+                        Value::from(client.dpop_bound_access_tokens),
+                    ),
                     ("registered_at".to_owned(), Value::from(client.registered_at)),
                 ],
             )

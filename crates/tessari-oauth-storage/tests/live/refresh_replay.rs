@@ -29,6 +29,7 @@ fn grant() -> RefreshGrant {
         resources: BTreeSet::from([
             Resource::parse("https://api.example.com/").expect("a resource")
         ]),
+        bound_to: None,
     }
 }
 

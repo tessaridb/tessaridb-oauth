@@ -124,6 +124,7 @@ async fn a_refused_refresh_leaves_the_token_as_it_was() {
         auth_method: AuthMethod::None,
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         jwks: Vec::new(),
+        dpop_bound_access_tokens: false,
     };
     server
         .storage

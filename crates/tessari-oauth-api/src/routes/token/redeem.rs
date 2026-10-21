@@ -92,6 +92,7 @@ fn family_grant(issued: &IssuedCode) -> RefreshGrant {
         client_id: issued.client_id.clone(),
         scopes: issued.scopes.clone(),
         resources: issued.resources.clone(),
+        bound_to: None,
     }
 }
 

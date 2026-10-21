@@ -71,6 +71,8 @@ pub struct ClientRegistration {
     pub grant_types: Vec<GrantType>,
     /// The public keys the client signs its assertions with; empty unless it authenticates by `private_key_jwt`.
     pub keys: Vec<VerifyingKey>,
+    /// Whether every access token issued to this client must be bound to a DPoP key (RFC 9449 §5.2).
+    pub dpop_bound_access_tokens: bool,
 }
 
 /// Finds a tenant's client registrations; the storage layer implements it.

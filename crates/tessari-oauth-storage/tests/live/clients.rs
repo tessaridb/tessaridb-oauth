@@ -27,6 +27,7 @@ fn service_client(id: &str, jwks: Vec<String>) -> NewClient {
         auth_method: AuthMethod::PrivateKeyJwt(Algorithm::EdDsa),
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         jwks,
+        dpop_bound_access_tokens: false,
     }
 }
 
@@ -145,4 +146,33 @@ async fn a_key_that_is_not_a_public_signing_key_is_refused_before_anything_is_wr
         .await
         .expect("answered");
     assert!(found.is_none());
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_client_registered_dpop_bound_is_found_bound_and_one_registered_plain_is_not() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    let mut bound = service_client("svc-bound", vec![ED25519_JWK.to_owned()]);
+    bound.dpop_bound_access_tokens = true;
+    let plain = service_client("svc-plain", vec![ED25519_JWK.to_owned()]);
+    for client in [&bound, &plain] {
+        let registered = storage
+            .clients
+            .register(&tenant("acme"), client, NOW)
+            .await
+            .expect("registered");
+        let found = storage
+            .clients
+            .find(&tenant("acme"), &client.client_id)
+            .await
+            .expect("answered")
+            .expect("found");
+        assert_eq!(
+            found.dpop_bound_access_tokens,
+            client.dpop_bound_access_tokens,
+            "{}",
+            client.client_id.as_str()
+        );
+        assert_eq!(found, registered);
+    }
 }

@@ -30,14 +30,15 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      expires_at int REQUIRED, revoked_at int, revoked_reason string); \
      DEFINE TABLE IF NOT EXISTS refresh_tokens (\
      family_id string REQUIRED, tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, \
-     scopes array REQUIRED, resources array REQUIRED, idle_expires_at int REQUIRED, rotated_at int); \
+     scopes array REQUIRED, resources array REQUIRED, idle_expires_at int REQUIRED, rotated_at int, jkt string); \
      DEFINE TABLE IF NOT EXISTS signing_keys (\
      kid string REQUIRED, tenant string REQUIRED, algorithm string REQUIRED, sealed string REQUIRED, \
      public_jwk string REQUIRED, created_at int REQUIRED, compromised bool REQUIRED, retired_at int); \
      DEFINE SPACE IF NOT EXISTS replays; \
      DEFINE TABLE IF NOT EXISTS clients (\
      client_id string REQUIRED, tenant string REQUIRED, redirect_uris array REQUIRED, scope_ceiling array REQUIRED, auth_method string REQUIRED, \
-     assertion_alg string, grant_types array REQUIRED, jwks array REQUIRED, registered_at int REQUIRED); \
+     assertion_alg string, grant_types array REQUIRED, jwks array REQUIRED, dpop_bound_access_tokens bool REQUIRED, \
+     registered_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS secrets (sealed string REQUIRED, created_at int REQUIRED);";
 
 pub(crate) struct TessaridbTenantRepository {
