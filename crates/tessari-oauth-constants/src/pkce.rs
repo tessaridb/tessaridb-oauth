@@ -15,6 +15,11 @@ pub const AUTHORIZATION_CODE_TTL_SECS: u64 = 60;
 /// could be resumed by someone else. The store expires the record after the same time.
 pub const INTERACTION_TTL_SECS: u64 = 600;
 
+/// How long a pushed authorization request (RFC 9126) waits for the browser to bring its `request_uri` to
+/// `/authorize`, in seconds — the client redirects the browser the moment it receives the answer (RFC 9126 §2.2 gives
+/// sixty seconds as its example). Once claimed, the request lives on as a pending authorization.
+pub const PUSHED_REQUEST_TTL_SECS: u64 = 60;
+
 /// Longest a refresh token stays usable without being used, in seconds: 14 days (RFC 9700 §4.14.2 asks for an
 /// idle and an absolute bound). Each rotation starts the idle clock again for its successor.
 pub const REFRESH_IDLE_TTL_SECS: u64 = 1_209_600;

@@ -21,8 +21,12 @@ pub struct InteractionEntity {
     pub resources: Vec<String>,
     /// The client's `nonce`.
     pub nonce: Option<String>,
+    /// Whether the client asked that no page be shown.
+    pub silent: bool,
     /// Unix seconds of the request.
     pub created_at: i64,
+    /// Unix seconds the browser brought it — absent while a pushed request waits for its browser.
+    pub claimed_at: Option<i64>,
 }
 
 impl FromRecord for InteractionEntity {
@@ -36,7 +40,9 @@ impl FromRecord for InteractionEntity {
             state: row.take("state")?,
             resources: row.take("resources")?,
             nonce: row.take("nonce")?,
+            silent: row.take("silent")?,
             created_at: row.take("created_at")?,
+            claimed_at: row.take("claimed_at")?,
         })
     }
 }

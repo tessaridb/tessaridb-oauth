@@ -4,6 +4,10 @@
 /// surfaces as a failure instead of a loop.
 pub const CODE_SPEND_ATTEMPTS: u32 = 8;
 
+/// Attempts at claiming one pushed authorization request when the store answers `retry`, counting the first — the
+/// same race as a code spend, between two arrivals of one `request_uri`.
+pub const INTERACTION_CLAIM_ATTEMPTS: u32 = 8;
+
 /// Attempts at spending one client assertion or DPoP proof. The spend is a conditional `SET` that the store already re-runs for up
 /// to a second when it loses a race; an attempt here answers the `retry` that survives that. A bound at all, as above.
 pub const REPLAY_SPEND_ATTEMPTS: u32 = 8;

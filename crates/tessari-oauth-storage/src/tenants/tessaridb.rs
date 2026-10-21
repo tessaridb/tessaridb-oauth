@@ -15,7 +15,8 @@ use crate::Result;
 /// id, and the families an account event revokes are found by user or by client. `signing_keys` holds each key sealed with its public half and dates; it is listed whole, oldest first.
 /// `replays` is a space of spent client assertions and DPoP proofs whose keys expire with what they record.
 /// `interactions` holds each pending authorization — a validated `/authorize` request waiting for its user to sign
-/// in — under a random id, and the store expires it after ten minutes (`INTERACTION_TTL_SECS`); every read is by id.
+/// in, or a pushed one (RFC 9126) waiting unclaimed for its browser — under a random id, and the store expires it
+/// after ten minutes (`INTERACTION_TTL_SECS`); every read and the single claim are by id.
 /// `audit` is a topic of one message per issuance, refusal, replay, reuse and revocation, which the store keeps in commit
 /// order and never lets anyone rewrite or delete; a message is kept for 400 days.
 /// `clients` holds each client's registration under its id; every read is by id. `secrets` holds the tenant's sealed
@@ -42,7 +43,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      public_jwk string REQUIRED, created_at int REQUIRED, compromised bool REQUIRED, retired_at int); \
      DEFINE TABLE IF NOT EXISTS interactions (\
      tenant string REQUIRED, client_id string REQUIRED, redirect_uri string REQUIRED, scopes array REQUIRED, \
-     challenge string REQUIRED, state string, resources array REQUIRED, nonce string, created_at int REQUIRED) \
+     challenge string REQUIRED, state string, resources array REQUIRED, nonce string, silent bool REQUIRED, \
+     created_at int REQUIRED, claimed_at int) \
      EXPIRE AFTER 10m; \
      DEFINE SPACE IF NOT EXISTS replays; \
      DEFINE TOPIC IF NOT EXISTS audit RETAIN 400d; \
