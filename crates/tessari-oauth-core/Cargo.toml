@@ -16,6 +16,9 @@ doctest = false
 tessari-oauth-constants.workspace = true
 tessari-oauth-types.workspace = true
 thiserror.workspace = true
+ring.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

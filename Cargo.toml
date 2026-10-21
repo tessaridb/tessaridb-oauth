@@ -24,6 +24,12 @@ tessari-oauth-daemons = { path = "crates/tessari-oauth-daemons" }
 thiserror = "2"
 sha2 = "0.10"
 subtle = "2"
+# Signature verification for client assertions and DPoP proofs. Already in the tree through the TLS stack, so it adds
+# no new supply-chain surface; it verifies in constant time and offers exactly the curves this server accepts.
+ring = "0.17"
+# Typed JOSE headers, claims and keys; never an untyped value tree.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 # Redirect URIs are parsed by the WHATWG URL parser, and a registered value must already be in the form it
 # serialises to, so the server never normalises an incoming value into a match.
 url = "2"

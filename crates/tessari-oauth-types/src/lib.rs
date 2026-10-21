@@ -3,7 +3,7 @@
 //! the error taxonomy every crate maps its failures into.
 
 mod authorization_code;
-mod base64url;
+pub mod base64url;
 mod category;
 mod client_id;
 mod error;
