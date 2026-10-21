@@ -1,4 +1,4 @@
-//! The public router: per tenant, the server metadata and the key set.
+//! The public router: per tenant, the server metadata and the key set, both under the read limit.
 
 mod jwks;
 mod metadata;
@@ -17,6 +17,11 @@ pub fn public_router(state: PublicState) -> Router {
             get(metadata::metadata),
         )
         .route("/{tenant}/oauth2/jwks", get(jwks::jwks))
+        // On the matched routes only: a path that matches nothing costs no store work, so it is not counted.
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::throttle::reads,
+        ))
         .fallback(|| async { crate::Error::NotFound })
         .with_state(state)
         .layer(axum::middleware::map_response(|response| async {

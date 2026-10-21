@@ -7,6 +7,7 @@ mod idle_body;
 mod routes;
 mod serve;
 mod state;
+mod throttle;
 
 pub use error::{Error, Result};
 pub use routes::public_router;

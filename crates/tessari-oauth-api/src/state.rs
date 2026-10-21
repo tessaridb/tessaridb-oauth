@@ -1,9 +1,11 @@
-//! What the public routes read: the tenants this server is the issuer for, their key records, and the clock.
+//! What the public routes read: the tenants this server is the issuer for, their key records, the request counters
+//! and the clock.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use tessari_oauth_storage::keys::KeyService;
+use tessari_oauth_storage::throttle::{Limit, ThrottleService};
 use tessari_oauth_types::{Clock, TenantId};
 
 use crate::{Error, Result};
@@ -13,6 +15,10 @@ use crate::{Error, Result};
 pub struct PublicState {
     /// The tenants' signing-key records.
     pub keys: Arc<KeyService>,
+    /// The request counters.
+    pub throttle: Arc<ThrottleService>,
+    /// How many metadata and key-set reads one client address may make per window.
+    pub read_limit: Limit,
     /// Each served tenant's issuer identifier, fixed at start-up from the configuration.
     pub issuers: Arc<HashMap<TenantId, String>>,
     /// The clock the key rule is judged at.

@@ -9,6 +9,7 @@ mod keys;
 mod listeners;
 mod pkce;
 mod storage;
+mod throttle;
 
 pub use encoding::{BASE64URL_ALPHABET, SHA256_BASE64URL_LEN};
 pub use endpoints::{AUTHORIZATION_PATH, JWKS_PATH, TOKEN_PATH};
@@ -32,3 +33,4 @@ pub use storage::{
     STORE_RETRY_FIRST_PAUSE_MS, STORE_RETRY_MAX_PAUSE_MS, STORE_SIGNIN_ATTEMPTS,
     STORE_SIGNIN_CONCURRENCY,
 };
+pub use throttle::THROTTLE_SPACE_MAX_KEYS;

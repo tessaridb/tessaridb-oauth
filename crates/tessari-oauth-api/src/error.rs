@@ -2,7 +2,7 @@
 //! never the inner error's text, which may name hosts, tables or records.
 
 use axum::Json;
-use axum::http::StatusCode;
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use tessari_oauth_types::ErrorCategory;
@@ -19,6 +19,12 @@ pub enum Error {
     /// A stored value could not be turned into the answer: a defect, not the caller's.
     #[error("an answer could not be built")]
     Internal,
+    /// The client made more requests than its limit allows in this window.
+    #[error("too many requests")]
+    Throttled {
+        /// Seconds until the window ends.
+        retry_after_secs: u64,
+    },
 }
 
 impl Error {
@@ -29,6 +35,7 @@ impl Error {
             Self::NotFound => ErrorCategory::NotFound,
             Self::Store(store) => store.category(),
             Self::Internal => ErrorCategory::Internal,
+            Self::Throttled { .. } => ErrorCategory::Throttled,
         }
     }
 }
@@ -42,6 +49,18 @@ struct Body {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
+        if let Self::Throttled { retry_after_secs } = self {
+            // RFC 9110 §10.2.3: the wait in whole seconds.
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                [(header::RETRY_AFTER, retry_after_secs.to_string())],
+                Json(Body {
+                    code: "rate_limited",
+                    message: "too many requests; try again after the stated wait",
+                }),
+            )
+                .into_response();
+        }
         let (status, code, message) = match self.category() {
             ErrorCategory::NotFound => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

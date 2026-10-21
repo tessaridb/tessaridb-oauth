@@ -11,6 +11,7 @@ mod retry;
 mod storage;
 mod tenancy;
 pub mod tenants;
+pub mod throttle;
 
 pub use error::{Error, Result};
 pub use storage::Storage;

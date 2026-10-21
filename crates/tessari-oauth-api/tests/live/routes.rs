@@ -1,17 +1,20 @@
 //! The metadata and key set routes: what each answers, what each refuses, and the headers on every answer.
 
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use axum::response::Response;
 use serde_json::Value;
 use tessari_oauth_api::{PublicState, public_router};
 use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
 use tessari_oauth_infrastructure::tessaridb::StoreConfig;
 use tessari_oauth_storage::Storage;
 use tessari_oauth_storage::keys::StoredKey;
+use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_test_support::{fresh_storage, plain_node, unique};
 use tessari_oauth_types::{Algorithm, TenantId, Timestamp};
 use tower::ServiceExt;
@@ -23,25 +26,41 @@ fn acme() -> TenantId {
     TenantId::parse("acme").expect("a tenant id")
 }
 
-fn state(storage: &Storage) -> PublicState {
+/// The public state over `storage`, serving `acme` and limiting reads to `read_limit` per client.
+pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
     PublicState {
         keys: Arc::clone(&storage.keys),
+        throttle: Arc::clone(&storage.throttle),
+        read_limit,
         issuers: Arc::new(HashMap::from([(acme(), ISSUER.to_owned())])),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
     }
 }
 
-struct Answer {
-    status: StatusCode,
-    headers: axum::http::HeaderMap,
-    body: Value,
+/// A limit these route tests never reach.
+fn unlimited() -> Limit {
+    Limit {
+        requests: NonZeroU64::new(1_000).expect("non-zero"),
+        window_secs: NonZeroU64::new(60).expect("non-zero"),
+    }
+}
+
+pub(crate) struct Answer {
+    pub(crate) status: StatusCode,
+    pub(crate) headers: axum::http::HeaderMap,
+    pub(crate) body: Value,
 }
 
 async fn get(storage: &Storage, path: &str) -> Answer {
-    let response = public_router(state(storage))
+    let response = public_router(state(storage, unlimited()))
         .oneshot(Request::get(path).body(Body::empty()).expect("a request"))
         .await
         .expect("the router answers");
+    answer(response).await
+}
+
+/// The parts of `response` a test reads; every body is JSON.
+pub(crate) async fn answer(response: Response) -> Answer {
     let status = response.status();
     let headers = response.headers().clone();
     let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024)
@@ -55,7 +74,7 @@ async fn get(storage: &Storage, path: &str) -> Answer {
     }
 }
 
-fn header<'a>(answer: &'a Answer, name: &str) -> &'a str {
+pub(crate) fn header<'a>(answer: &'a Answer, name: &str) -> &'a str {
     answer
         .headers
         .get(name)
@@ -65,7 +84,7 @@ fn header<'a>(answer: &'a Answer, name: &str) -> &'a str {
 }
 
 /// Every answer, success or refusal, carries the same protective headers.
-fn protected(answer: &Answer) {
+pub(crate) fn protected(answer: &Answer) {
     assert_eq!(header(answer, "x-content-type-options"), "nosniff");
     assert_eq!(header(answer, "referrer-policy"), "no-referrer");
     assert_eq!(
@@ -81,7 +100,7 @@ fn protected(answer: &Answer) {
 }
 
 /// Storage over a node that is not there: every store call fails.
-fn unreachable_storage() -> Storage {
+pub(crate) fn unreachable_storage() -> Storage {
     let config = StoreConfig {
         address: "127.0.0.1:1".to_owned(),
         user: "nobody".to_owned(),
@@ -91,14 +110,18 @@ fn unreachable_storage() -> Storage {
     fresh_storage(config, 1).expect("a configuration the pool accepts")
 }
 
-fn live_storage() -> Storage {
-    fresh_storage(plain_node().expect("the plain node is named"), 2)
-        .expect("a configuration the pool accepts")
+/// Storage on the live node for a fresh region, its request counters prepared.
+pub(crate) async fn live_storage() -> Storage {
+    let storage = fresh_storage(plain_node().expect("the plain node is named"), 2)
+        .expect("a configuration the pool accepts");
+    storage.throttle.prepare().await.expect("counters prepared");
+    storage
 }
 
 #[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
 async fn the_metadata_names_the_tenants_issuer_and_is_cacheable() {
-    let storage = unreachable_storage();
+    let storage = live_storage().await;
     let answer = get(&storage, "/acme/.well-known/oauth-authorization-server").await;
     assert_eq!(answer.status, StatusCode::OK);
     assert_eq!(answer.body["issuer"], ISSUER);
@@ -108,8 +131,9 @@ async fn the_metadata_names_the_tenants_issuer_and_is_cacheable() {
 }
 
 #[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
 async fn a_tenant_this_server_does_not_serve_is_not_found_and_not_named_back() {
-    let storage = unreachable_storage();
+    let storage = live_storage().await;
     for path in [
         "/globex/.well-known/oauth-authorization-server",
         "/globex/oauth2/jwks",
@@ -179,7 +203,7 @@ async fn stored_key(storage: &Storage, kek: &Kek, created_at: u64) -> String {
 #[tokio::test]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
 async fn the_key_set_publishes_exactly_the_rules_keys_and_never_a_withdrawn_one() {
-    let storage = live_storage();
+    let storage = live_storage().await;
     storage
         .tenants
         .provision(&acme())

@@ -14,6 +14,7 @@ mod consents;
 mod keys;
 mod refresh;
 mod replay;
+mod throttle;
 mod tls;
 
 use tessari_oauth_infrastructure::tessaridb::StoreConfig;

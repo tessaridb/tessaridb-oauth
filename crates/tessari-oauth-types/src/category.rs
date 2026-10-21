@@ -15,6 +15,8 @@ pub enum ErrorCategory {
     Forbidden,
     /// The operation exceeded its budget.
     Timeout,
+    /// The caller made more requests than its allowance; asking again after the stated wait can succeed.
+    Throttled,
     /// A dependency is not reachable.
     Unavailable,
     /// A defect or a broken invariant.
