@@ -214,3 +214,53 @@ async fn a_password_credential_is_replaced_whole_and_kept_to_its_account() {
         Ok(None)
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn accounts_are_listed_page_by_page_in_id_order_with_their_addresses() {
+    let acme = tenant("acme");
+    let storage = fresh(&acme, 2).await;
+    let mut registered = Vec::new();
+    for index in 0..5 {
+        let address = format!("person{index}@example.com");
+        let user = created(
+            storage
+                .users
+                .register(&acme, &email(&address), Timestamp::from_unix_secs(100))
+                .await
+                .expect("registered"),
+        );
+        registered.push((user, address));
+    }
+    registered.sort_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
+    let mut listed = Vec::new();
+    let mut after: Option<UserId> = None;
+    loop {
+        let page = storage
+            .users
+            .page(&acme, after.as_ref(), 2)
+            .await
+            .expect("a page");
+        assert!(page.len() <= 2, "a page holds at most what was asked");
+        let Some(last) = page.last() else { break };
+        after = Some(last.user.clone());
+        listed.extend(
+            page.into_iter()
+                .map(|account| (account.user, account.email.as_str().to_owned())),
+        );
+    }
+    assert_eq!(
+        listed, registered,
+        "every account once, in id order, with its own address"
+    );
+    let capped = storage
+        .users
+        .page(&acme, None, 10_000)
+        .await
+        .expect("a page");
+    assert_eq!(
+        capped.len(),
+        5,
+        "an oversized request is served up to the cap"
+    );
+}

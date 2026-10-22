@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use tessari_oauth_constants::USER_PAGE_MAX;
 use tessari_oauth_infrastructure::custody::token_id;
 use tessari_oauth_types::{EmailAddress, ErrorCategory, TenantId, Timestamp, UserId};
 
@@ -194,6 +195,47 @@ impl UserService {
             pepper: u32::try_from(credential.pepper)
                 .map_err(|_| unreadable("credential", "a pepper version out of range"))?,
         }))
+    }
+    /// At most `count` accounts of `tenant`, never more than [`USER_PAGE_MAX`], after the account `after` in id order,
+    /// each with the address it signs in with.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, among them the refusal of an anchor the company does not hold, and [`Error::Unreadable`].
+    pub async fn page(
+        &self,
+        tenant: &TenantId,
+        after: Option<&UserId>,
+        count: u32,
+    ) -> Result<Vec<UserAccount>> {
+        let place = self.tenancy.place(tenant)?;
+        let accounts = self
+            .repository
+            .page(&place, after.map(UserId::as_str), count.min(USER_PAGE_MAX))
+            .await?;
+        if accounts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ids: Vec<String> = accounts
+            .iter()
+            .map(|account| account.user_id.clone())
+            .collect();
+        let addresses: std::collections::HashMap<String, EmailEntity> = self
+            .repository
+            .emails_of(&place, &ids)
+            .await?
+            .into_iter()
+            .map(|address| (address.user_id.clone(), address))
+            .collect();
+        accounts
+            .into_iter()
+            .map(|account| {
+                let address = addresses
+                    .get(&account.user_id)
+                    .ok_or_else(|| unreadable("user", "an account with no address"))?;
+                account_of(address, account)
+            })
+            .collect()
     }
 }
 

@@ -100,3 +100,6 @@ pub const SYSTEM_COMPANY: &str = "system";
 
 /// The client every company registers for its own admin console, which signs operators in at the company's issuer.
 pub const ADMIN_CONSOLE_CLIENT: &str = "admin-console";
+
+/// The most accounts one page of a company's user list holds.
+pub const USER_PAGE_MAX: u32 = 100;

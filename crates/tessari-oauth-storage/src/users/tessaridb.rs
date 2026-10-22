@@ -110,4 +110,60 @@ impl UserRepository for TessaridbUserRepository {
             .await?;
         answers::single(answers, "credential")
     }
+
+    async fn page(
+        &self,
+        place: &Place,
+        after: Option<&str>,
+        count: u32,
+    ) -> Result<Vec<UserEntity>> {
+        let count = Value::from(i64::from(count));
+        let answers = match after {
+            Some(after) => {
+                self.database
+                    .run_at(
+                        place,
+                        "SELECT * FROM users AFTER users:$after LIMIT $count;",
+                        vec![
+                            ("after".to_owned(), Value::from(after)),
+                            ("count".to_owned(), count),
+                        ],
+                    )
+                    .await?
+            }
+            None => {
+                self.database
+                    .run_at(
+                        place,
+                        "SELECT * FROM users LIMIT $count;",
+                        vec![("count".to_owned(), count)],
+                    )
+                    .await?
+            }
+        };
+        answers::records(answers, "user")
+    }
+
+    async fn emails_of(&self, place: &Place, user_ids: &[String]) -> Result<Vec<EmailEntity>> {
+        // One read for the whole page, bounded by it: never one read per listed account.
+        let count = i64::try_from(user_ids.len()).map_err(|_| crate::Error::Invalid {
+            record: "user page",
+            reason: "more accounts than a count can hold",
+        })?;
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM user_emails WHERE user_id IN $ids LIMIT $count;",
+                vec![
+                    (
+                        "ids".to_owned(),
+                        Value::Array(user_ids.iter().map(|id| Value::from(id.as_str())).collect()),
+                    ),
+                    ("count".to_owned(), Value::from(count)),
+                ],
+            )
+            .await?;
+        answers::records(answers, "user email")
+    }
 }

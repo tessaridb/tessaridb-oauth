@@ -30,4 +30,11 @@ pub(crate) trait UserRepository: Send + Sync {
         place: &Place,
         user_id: &str,
     ) -> Result<Option<CredentialEntity>>;
+
+    /// At most `count` accounts after the account `after`, in id order.
+    async fn page(&self, place: &Place, after: Option<&str>, count: u32)
+    -> Result<Vec<UserEntity>>;
+
+    /// The addresses of the accounts `user_ids`.
+    async fn emails_of(&self, place: &Place, user_ids: &[String]) -> Result<Vec<EmailEntity>>;
 }
