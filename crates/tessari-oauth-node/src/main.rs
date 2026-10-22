@@ -138,6 +138,7 @@ async fn run(
         factors: Arc::clone(&storage.factors),
         signins: Arc::clone(&storage.signins),
         passkeys: Arc::clone(&storage.passkeys),
+        consents: Arc::clone(&storage.consents),
         sessions: Arc::clone(&storage.sessions),
         passwords,
         read_limit: Limit {

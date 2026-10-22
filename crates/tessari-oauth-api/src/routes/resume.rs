@@ -1,0 +1,139 @@
+//! `GET /{tenant}/oauth2/authorize/resume?interaction=<id>`: the pending authorization a finished sign-in continues.
+//!
+//! The request must still be pending, or it is refused on a page here and sent nowhere: the redirect URI it carried
+//! is no longer known to be the one to answer. A browser with no session at this issuer is sent to sign in for it.
+//! When the user's consent to this client covers every scope and resource asked for, under the consent policy in
+//! force, the request is taken, once, and answered at its redirect URI with a code bound to the client, the redirect
+//! URI, the PKCE challenge, the user and the tenant, its `state`, and the issuer (RFC 9207); otherwise the browser is
+//! sent to be asked, and the request waits.
+
+use axum::extract::rejection::QueryRejection;
+use axum::extract::{Path, Query, State};
+use axum::http::HeaderMap;
+use axum::response::Response;
+use serde::Deserialize;
+use tessari_oauth_constants::{
+    AUTHORIZATION_CODE_TTL_SECS, CONSENT_PATH, CONSENT_POLICY_VERSION, LOGIN_PATH, SESSION_COOKIE,
+};
+use tessari_oauth_core::codes::IssuedCode;
+use tessari_oauth_core::consents::{ConsentRequest, Coverage};
+use tessari_oauth_infrastructure::custody::random_secret;
+use tessari_oauth_types::{
+    AuthorizationCode, ErrorCode, SessionSecret, TenantId, Timestamp, UserId, base64url,
+};
+
+use super::authorize::{page, see_other};
+use super::login::{cookie, well_formed};
+use crate::state::PublicState;
+use crate::{Error, Result};
+
+#[derive(Deserialize)]
+pub(super) struct Resume {
+    interaction: Option<String>,
+}
+
+pub(super) async fn resume(
+    State(state): State<PublicState>,
+    Path(tenant): Path<String>,
+    headers: HeaderMap,
+    query: std::result::Result<Query<Resume>, QueryRejection>,
+) -> Result<Response> {
+    let (tenant, issuer) = state.tenant(&tenant)?;
+    let now = (state.clock)();
+    let Some(id) = query
+        .ok()
+        .and_then(|Query(resume)| resume.interaction)
+        .filter(|id| well_formed(id))
+    else {
+        return Ok(page(ErrorCode::InvalidRequest));
+    };
+    let Some(request) = state
+        .interactions
+        .find(&tenant, &id, now)
+        .await
+        .map_err(Error::Store)?
+    else {
+        return Ok(page(ErrorCode::InvalidRequest));
+    };
+    let session = match cookie(&headers, SESSION_COOKIE) {
+        Some(value) => state
+            .sessions
+            .find(&tenant, &SessionSecret::from_secret(value), now)
+            .await
+            .map_err(Error::Store)?,
+        None => None,
+    };
+    let Some(session) = session else {
+        return see_other(&format!("{issuer}{LOGIN_PATH}?interaction={id}"));
+    };
+    let asked = ConsentRequest {
+        scopes: request.scopes.clone(),
+        resources: request.resources.clone(),
+    };
+    let coverage = state
+        .consents
+        .check(
+            &tenant,
+            &session.user,
+            &request.client_id,
+            &asked,
+            CONSENT_POLICY_VERSION,
+        )
+        .await
+        .map_err(Error::Store)?;
+    match coverage {
+        Coverage::Covered => answered(&state, &tenant, issuer, &id, session.user, now).await,
+        Coverage::Prompt { .. } => see_other(&format!("{issuer}{CONSENT_PATH}?interaction={id}")),
+    }
+}
+
+/// Take the pending authorization `id` in `tenant` for `user` at `now`, once, and answer it at its redirect URI with
+/// a fresh code; refused on a page here when another request took it first.
+async fn answered(
+    state: &PublicState,
+    tenant: &TenantId,
+    issuer: &str,
+    id: &str,
+    user: UserId,
+    now: Timestamp,
+) -> Result<Response> {
+    let Some(request) = state
+        .interactions
+        .finish(tenant, id, now)
+        .await
+        .map_err(Error::Store)?
+    else {
+        return Ok(page(ErrorCode::InvalidRequest));
+    };
+    let drawn = random_secret().map_err(|_| Error::Internal)?;
+    let value = base64url::encode(&drawn);
+    let expires_at = now
+        .unix_secs()
+        .checked_add(AUTHORIZATION_CODE_TTL_SECS)
+        .ok_or(Error::Internal)?;
+    let issued = IssuedCode {
+        tenant: tenant.clone(),
+        client_id: request.client_id,
+        user,
+        redirect_uri: request.redirect_uri.clone(),
+        challenge: request.challenge,
+        scopes: request.scopes,
+        resources: request.resources,
+        expires_at: Timestamp::from_unix_secs(expires_at),
+    };
+    state
+        .codes
+        .issue(&AuthorizationCode::from_secret(value.clone()), &issued)
+        .await
+        .map_err(Error::Store)?;
+    let mut target = url::Url::parse(&request.redirect_uri).map_err(|_| Error::Internal)?;
+    {
+        let mut query = target.query_pairs_mut();
+        query.append_pair("code", &value);
+        if let Some(state) = &request.state {
+            query.append_pair("state", state);
+        }
+        query.append_pair("iss", issuer);
+    }
+    see_other(target.as_str())
+}

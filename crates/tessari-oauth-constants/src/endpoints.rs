@@ -6,6 +6,10 @@ pub const AUTHORIZATION_PATH: &str = "/oauth2/authorize";
 /// id as `interaction`.
 pub const LOGIN_PATH: &str = "/login";
 
+/// The consent page a signed-in browser is sent to when the user has not granted what a pending authorization asks,
+/// appended to the issuer with the pending authorization's id as `interaction`.
+pub const CONSENT_PATH: &str = "/consent";
+
 /// Where the sign-in page's steps are posted, appended to the issuer.
 pub const LOGIN_API_PATH: &str = "/login/api";
 

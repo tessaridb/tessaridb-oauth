@@ -6,6 +6,7 @@ mod authorize;
 mod jwks;
 mod login;
 mod metadata;
+mod resume;
 mod token;
 mod userinfo;
 
@@ -43,6 +44,7 @@ pub fn public_router(state: PublicState) -> Router {
             "/{tenant}/oauth2/authorize",
             get(authorize::query).post(authorize::form),
         )
+        .route("/{tenant}/oauth2/authorize/resume", get(resume::resume))
         .layer(DefaultBodyLimit::max(AUTHORIZE_BODY_MAX_BYTES))
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),

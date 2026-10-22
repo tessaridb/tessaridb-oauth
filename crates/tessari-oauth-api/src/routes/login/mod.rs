@@ -85,7 +85,7 @@ fn body<T>(read: std::result::Result<Json<T>, JsonRejection>) -> Result<T> {
 }
 
 /// Whether `value` could be one of this server's ids or bindings: base64url, and short.
-fn well_formed(value: &str) -> bool {
+pub(super) fn well_formed(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= BINDING_MAX_LEN
         && value
@@ -93,17 +93,22 @@ fn well_formed(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
-/// The binding the request's sign-in cookie carries, or [`Error::SigninGone`] when there is none.
-fn binding(headers: &HeaderMap) -> Result<SigninBinding> {
+/// The value of the request's cookie `name`, when it carries one that could be this server's.
+pub(super) fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     headers
         .get_all(header::COOKIE)
         .iter()
         .filter_map(|value| value.to_str().ok())
         .flat_map(|value| value.split(';'))
         .filter_map(|pair| pair.trim().split_once('='))
-        .find(|(name, _)| *name == LOGIN_COOKIE)
+        .find(|(found, _)| *found == name)
         .map(|(_, value)| value)
         .filter(|value| well_formed(value))
+}
+
+/// The binding the request's sign-in cookie carries, or [`Error::SigninGone`] when there is none.
+fn binding(headers: &HeaderMap) -> Result<SigninBinding> {
+    cookie(headers, LOGIN_COOKIE)
         .map(SigninBinding::from_secret)
         .ok_or(Error::SigninGone)
 }

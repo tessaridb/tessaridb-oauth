@@ -211,6 +211,9 @@ names the account itself, one where a password came first stands as the second f
 account, a foreign origin or a counter that did not move forward gets that same `401` and is counted. The step that
 completes a sign-in ends it and opens the user's session under a cookie of its own, `__Host-tessari-session`, drawn
 at that moment (a session lasts a working day without use and a week at most), and clears the sign-in cookie.
+The browser then continues at `<issuer>/oauth2/authorize/resume`: when the user's consent to the client covers
+every scope and resource asked for, the request is answered once at its redirect URI with a code, its `state` and
+`iss`; otherwise the browser is sent to `<issuer>/consent`, and without a session to sign in again.
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.

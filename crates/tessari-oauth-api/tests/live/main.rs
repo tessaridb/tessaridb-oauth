@@ -7,6 +7,7 @@
 
 mod authenticator;
 mod authorize;
+mod authorize_resume;
 mod login;
 mod login_complete;
 mod login_factors;

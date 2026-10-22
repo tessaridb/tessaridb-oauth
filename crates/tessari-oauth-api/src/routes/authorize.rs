@@ -178,7 +178,7 @@ async fn answer(
 }
 
 /// The page shown for a refusal that may not be sent to the client: the `error` code and nothing the request carried.
-fn page(error: ErrorCode) -> Response {
+pub(super) fn page(error: ErrorCode) -> Response {
     let body = format!(
         "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><title>Sign-in request refused</title></head>\n\
          <body><h1>This sign-in request cannot be completed</h1>\n<p>The application sent a request this server does \
@@ -196,7 +196,7 @@ fn page(error: ErrorCode) -> Response {
 }
 
 /// Send the browser to `location` (RFC 9110 §15.4.4: the next request is a GET whatever this one was).
-fn see_other(location: &str) -> crate::Result<Response> {
+pub(super) fn see_other(location: &str) -> crate::Result<Response> {
     let location = HeaderValue::from_str(location).map_err(|_| Error::Internal)?;
     Ok(no_store(
         (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response(),
