@@ -3,8 +3,9 @@
 // sign-in, and signing in comes back here. The browser holds only the session cookie, never a token.
 
 import { type Me, type Route, type Section, offered, readMe, route } from "./console-read.ts";
-import { heading, link, make, show } from "./console-dom.ts";
+import { type Screen, heading, link, make, show } from "./console-dom.ts";
 import { call, element, say } from "./dom.ts";
+import { userView, usersView } from "./users.ts";
 
 const view = element("view", HTMLElement);
 const sections = element("sections", HTMLElement);
@@ -16,6 +17,9 @@ const company = decodeURIComponent(location.pathname.split("/")[2] ?? "");
 
 /** Who is signed in, asked once per page load and forgotten on signing out. */
 let me: Me | null = null;
+
+/** Bumped by every draw, so an answer arriving for an older view paints nothing. */
+let generation = 0;
 
 /** The section a route belongs to, for marking the navigation. */
 function sectionOf(at: Route): Section | null {
@@ -48,6 +52,7 @@ function navigate(who: Me, at: Route): void {
 
 /** The signed-out state: nothing offered but the company's sign-in. */
 function signedOut(text: string): void {
+  generation += 1;
   me = null;
   sections.hidden = true;
   signOut.hidden = true;
@@ -84,9 +89,21 @@ function overview(who: Me): void {
 
 /** Draw the view the address names for `who`. */
 function draw(who: Me): void {
+  generation += 1;
+  const drawn = generation;
+  const screen: Screen = { view, live: () => drawn === generation, signedOut: () => signedOut("") };
   const at = route(location.hash);
   navigate(who, at);
-  overview(who);
+  switch (at.kind) {
+    case "users":
+      void usersView(screen, at.email, at.after);
+      return;
+    case "user":
+      void userView(screen, at.id);
+      return;
+    default:
+      overview(who);
+  }
 }
 
 /** Ask who is signed in, then draw; a refusal for want of a session offers the sign-in. */

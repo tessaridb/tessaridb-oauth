@@ -42,3 +42,19 @@ export function show(view: HTMLElement, ...children: Node[]): void {
   view.replaceChildren(...children);
   view.querySelector<HTMLHeadingElement>(".view-title")?.focus();
 }
+
+/** Where a view draws, whether its answer is still wanted, and how it hands over to signing in. */
+export interface Screen {
+  view: HTMLElement;
+  /** False once the operator has moved to another view, so a late answer paints nothing. */
+  live(): boolean;
+  signedOut(): void;
+}
+
+/** A labelled field: the label, then the input, wired together by `id`. */
+export function labelled(id: string, text: string, input: HTMLInputElement): HTMLDivElement {
+  const label = make("label", "", text);
+  label.htmlFor = id;
+  input.id = id;
+  return make("div", "field", label, input);
+}

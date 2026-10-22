@@ -82,3 +82,34 @@ export function route(hash: string): Route {
       return { kind: "overview" };
   }
 }
+
+/** What a refusal leaves the operator to do. */
+export type ConsoleRefusal =
+  | { kind: "signed_out" }
+  | { kind: "role" }
+  | { kind: "not_found" }
+  | { kind: "throttled"; seconds: number | null }
+  | { kind: "refused"; code: string }
+  | { kind: "failed" };
+
+/** Read a refusal from its `status`, `body` and `Retry-After`; anything the console cannot place is a failure. */
+export function readRefusal(status: number, body: unknown, retryAfter: string | null): ConsoleRefusal {
+  const code = field(body, "code");
+  if (status === 401) {
+    return { kind: "signed_out" };
+  }
+  if (status === 403 && code === "role_required") {
+    return { kind: "role" };
+  }
+  if (status === 404) {
+    return { kind: "not_found" };
+  }
+  if (status === 429) {
+    const seconds = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
+    return { kind: "throttled", seconds };
+  }
+  if ((status === 400 || status === 403 || status === 409) && typeof code === "string") {
+    return { kind: "refused", code };
+  }
+  return { kind: "failed" };
+}
