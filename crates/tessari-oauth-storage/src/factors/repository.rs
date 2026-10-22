@@ -28,6 +28,9 @@ pub(crate) trait FactorRepository: Send + Sync {
         created_at: i64,
     ) -> Result<()>;
 
+    /// Delete `user_id`'s one-time code factor and every recovery code of theirs, in one transaction.
+    async fn remove_totp(&self, place: &Place, user_id: &str) -> Result<()>;
+
     /// Delete `user_id`'s code under `digest`; whether there was one to delete.
     async fn delete_code(&self, place: &Place, user_id: &str, digest: &str) -> Result<bool>;
 

@@ -98,6 +98,27 @@ impl FactorService {
         }
     }
 
+    /// Remove `user`'s authenticator app in `tenant` together with every unspent recovery code, which only ever
+    /// stood in for the app's code; whether there was an app to remove.
+    ///
+    /// # Errors
+    ///
+    /// Store failures.
+    pub async fn remove_totp(&self, tenant: &TenantId, user: &UserId) -> Result<bool> {
+        let place = self.tenancy.place(tenant)?;
+        if self
+            .repository
+            .find_totp(&place, user.as_str())
+            .await?
+            .is_none()
+        {
+            return Ok(false);
+        }
+        // Two removals racing both find the app and both delete; the second deletes nothing, which is the same end.
+        self.repository.remove_totp(&place, user.as_str()).await?;
+        Ok(true)
+    }
+
     /// `user`'s one-time code factor in `tenant`, opened under `kek`, when there is one.
     ///
     /// # Errors

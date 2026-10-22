@@ -75,6 +75,19 @@ impl FactorRepository for TessaridbFactorRepository {
         Ok(())
     }
 
+    async fn remove_totp(&self, place: &Place, user_id: &str) -> Result<()> {
+        // The factor is keyed by its user; the codes are found by theirs, all of them, deliberately.
+        self.database
+            .run_at(
+                place,
+                "BEGIN; DELETE totp_factors:$user; \
+                 DELETE FROM recovery_codes WHERE user_id = $user LIMIT ALL; COMMIT;",
+                vec![("user".to_owned(), Value::from(user_id))],
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn replace_codes(
         &self,
         place: &Place,

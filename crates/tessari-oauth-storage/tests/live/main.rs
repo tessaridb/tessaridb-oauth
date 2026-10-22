@@ -13,6 +13,7 @@ mod audit;
 mod clients;
 mod codes;
 mod consents;
+mod factor_removal;
 mod factors;
 mod interactions;
 mod interactions_finish;
