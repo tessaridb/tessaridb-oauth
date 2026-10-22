@@ -30,6 +30,8 @@ pub enum ErrorCode {
     LoginRequired,
     /// The request may show no page and the user's consent does not cover it (OpenID Connect Core §3.1.2.6).
     ConsentRequired,
+    /// The request may show no page and the user must do something else first (OpenID Connect Core §3.1.2.6).
+    InteractionRequired,
     /// The access token presented to a resource is malformed, expired, revoked or not for it (RFC 6750 §3.1).
     InvalidToken,
     /// The access token is valid but does not carry the scope the resource requires (RFC 6750 §3.1).
@@ -55,6 +57,7 @@ impl ErrorCode {
             Self::UnsupportedTokenType => "unsupported_token_type",
             Self::LoginRequired => "login_required",
             Self::ConsentRequired => "consent_required",
+            Self::InteractionRequired => "interaction_required",
             Self::InvalidToken => "invalid_token",
             Self::InsufficientScope => "insufficient_scope",
             Self::AccessDenied => "access_denied",

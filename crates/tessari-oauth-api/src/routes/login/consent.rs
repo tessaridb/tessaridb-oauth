@@ -5,7 +5,9 @@
 //! never a name the client supplied. Allowing records the grant before any code exists, widening the user's standing
 //! grant to the client, and then takes the request once and answers the address of its redirect URI with a code.
 //! Denying takes the request, grants nothing and answers the redirect URI with `access_denied`, its `state` and the
-//! issuer (RFC 6749 §4.1.2.1, RFC 9207). Either answer is the address for the page to send the browser to.
+//! issuer (RFC 6749 §4.1.2.1, RFC 9207). Either answer is the address for the page to send the browser to. Where the
+//! company's two-factor policy requires a second factor the account does not hold, allowing grants nothing and answers
+//! the account page, and the request waits.
 
 use axum::Json;
 use axum::extract::rejection::{JsonRejection, QueryRejection};
@@ -13,7 +15,9 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
-use tessari_oauth_constants::{CONSENT_POLICY_VERSION, CONSENT_SHOWN_VERSION, SESSION_COOKIE};
+use tessari_oauth_constants::{
+    ACCOUNT_PATH, CONSENT_POLICY_VERSION, CONSENT_SHOWN_VERSION, SESSION_COOKIE,
+};
 use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_core::consents::{ConsentRequest, Coverage};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
@@ -22,7 +26,7 @@ use tessari_oauth_storage::sessions::Session;
 use tessari_oauth_types::{BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp};
 
 use super::super::browser::held;
-use super::super::resume::{issued, refused_at};
+use super::super::resume::{issued, must_enrol, refused_at};
 use super::{body, cookie, record, well_formed};
 use crate::state::PublicState;
 use crate::{Error, Result};
@@ -119,6 +123,9 @@ pub(in crate::routes) async fn decide(
     let session = signed_in(&state, &tenant, &headers, now).await?;
     let user = session.user.clone();
     let target = match answered.decision {
+        Decision::Allow if must_enrol(&state, &tenant, &user).await? => {
+            Some(format!("{issuer}{ACCOUNT_PATH}"))
+        }
         Decision::Allow => {
             let grant = NewGrant {
                 tenant: tenant.clone(),

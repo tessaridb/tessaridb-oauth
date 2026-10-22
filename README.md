@@ -90,7 +90,10 @@ into a forged request never receives an answer; every later refusal goes back to
 carrying only the kept request's id. A request with `prompt=none` asks for no page: without a session cookie it is
 refused with `login_required`; with one it is kept the same way and sent straight to
 `<issuer>/oauth2/authorize/resume`, which answers it from the session with a code, or at its redirect URI with
-`login_required` (no live session, or one older than `max_age`) or `consent_required`; each refusal is recorded.
+`login_required` (no live session, or one older than `max_age`), `consent_required` or `interaction_required`; each
+refusal is recorded. Where the company's two-factor policy is `required` and the account holds no second factor, no
+code is issued: the browser is sent to `<issuer>/account` to add one (a `prompt=none` request gets
+`interaction_required`), and the request waits until then.
 
 A client may instead push those parameters to `POST <issuer>/oauth2/par` (RFC 9126), authenticating exactly as at
 the token endpoint; they are judged as the authorization endpoint judges them, every refusal answered to the client,

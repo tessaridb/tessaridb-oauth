@@ -28,7 +28,7 @@ async fn session_from(server: &Server, user: &UserId, ago: u64) -> String {
 }
 
 /// Keep `interaction`'s request again with `change` applied, answering the new id.
-async fn kept_with(
+pub(crate) async fn kept_with(
     server: &Server,
     interaction: &str,
     change: impl FnOnce(&mut tessari_oauth_core::authorize::AuthorizationRequest),
@@ -51,7 +51,7 @@ async fn kept_with(
 }
 
 /// The query pairs of the address `answered` sent the browser to.
-fn pairs(answered: &crate::routes::Answer) -> Vec<(String, String)> {
+pub(crate) fn pairs(answered: &crate::routes::Answer) -> Vec<(String, String)> {
     sent_to(answered).query_pairs().into_owned().collect()
 }
 

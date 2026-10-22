@@ -38,6 +38,8 @@ pub enum Reason {
     SilentSignInTooOld,
     /// `prompt=none` asked for no page, and the user's consent does not cover what was asked.
     SilentWithoutConsent,
+    /// `prompt=none` asked for no page, and the company's policy requires a second factor the account does not hold.
+    SilentEnrolmentDue,
     /// A pushed authorization request named a `request_uri` of its own (RFC 9126 §2.1).
     RequestUriInPush,
     /// A `request_uri` names no pushed request this client may claim: malformed, unknown, lapsed, claimed already,

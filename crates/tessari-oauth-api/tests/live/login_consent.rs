@@ -64,7 +64,7 @@ async fn asked(server: &Server, interaction: &str, session: Option<&str>) -> Ans
 }
 
 /// The user's `decision` on `interaction`.
-async fn decide(
+pub(crate) async fn decide(
     server: &Server,
     interaction: &str,
     session: Option<&str>,

@@ -8,7 +8,9 @@
 //! URI, the PKCE challenge, the user and the tenant, its `state`, and the issuer (RFC 9207); otherwise the browser is
 //! sent to be asked, and the request waits. A request that asked for no page (`prompt=none`) is never shown one: where
 //! it would be, it is answered at its redirect URI with `login_required` or `consent_required`, and the refusal is
-//! recorded.
+//! recorded. Where the company's two-factor policy requires a second factor the account does not hold, no code is
+//! issued: the browser is sent to the account page to enrol one, or a request that asked for no page is answered
+//! with `interaction_required`.
 
 use axum::extract::rejection::QueryRejection;
 use axum::extract::{Path, Query, State};
@@ -16,16 +18,19 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::Deserialize;
 use tessari_oauth_constants::{
-    AUTHORIZATION_CODE_TTL_SECS, CONSENT_PATH, CONSENT_POLICY_VERSION, LOGIN_PATH, SESSION_COOKIE,
+    ACCOUNT_PATH, AUTHORIZATION_CODE_TTL_SECS, CONSENT_PATH, CONSENT_POLICY_VERSION, LOGIN_PATH,
+    SESSION_COOKIE,
 };
 use tessari_oauth_core::Reason;
 use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_core::codes::{CodeAuthentication, IssuedCode};
 use tessari_oauth_core::consents::{ConsentRequest, Coverage};
+use tessari_oauth_core::two_factor::enrolment_due;
 use tessari_oauth_infrastructure::custody::random_secret;
 use tessari_oauth_storage::sessions::Session;
 use tessari_oauth_types::{
-    AuthorizationCode, BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp, base64url,
+    AuthorizationCode, BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp, UserId,
+    base64url,
 };
 
 use super::authorize::{page, record_refused, see_other};
@@ -109,6 +114,21 @@ pub(super) async fn resume(
             see_other(&sign_in)
         };
     }
+    if must_enrol(&state, &tenant, &session.user).await? {
+        return if request.silent {
+            silently_refused(
+                &state,
+                &tenant,
+                issuer,
+                (&id, &browser),
+                (ErrorCode::InteractionRequired, Reason::SilentEnrolmentDue),
+                now,
+            )
+            .await
+        } else {
+            see_other(&format!("{issuer}{ACCOUNT_PATH}"))
+        };
+    }
     let asked = ConsentRequest {
         scopes: request.scopes.clone(),
         resources: request.resources.clone(),
@@ -144,6 +164,35 @@ pub(super) async fn resume(
         }
         Coverage::Prompt { .. } => see_other(&format!("{issuer}{CONSENT_PATH}?interaction={id}")),
     }
+}
+
+/// Whether `user` in `tenant` must enrol a second factor, under the company's policy, before a code is issued.
+pub(super) async fn must_enrol(
+    state: &PublicState,
+    tenant: &TenantId,
+    user: &UserId,
+) -> Result<bool> {
+    let policy = state
+        .policies
+        .two_factor(tenant)
+        .await
+        .map_err(Error::Store)?;
+    // Only a policy that would make an account holding nothing enrol is worth reading the factors for.
+    if !enrolment_due(policy, false) {
+        return Ok(false);
+    }
+    let app = state
+        .factors
+        .summary(tenant, user)
+        .await
+        .map_err(Error::Store)?
+        .totp;
+    let passkeys = state
+        .passkeys
+        .list(tenant, user)
+        .await
+        .map_err(Error::Store)?;
+    Ok(enrolment_due(policy, app || !passkeys.is_empty()))
 }
 
 /// Take the pending authorization `id` that `browser` brought in `tenant` at `now`, once, record its refusal for
