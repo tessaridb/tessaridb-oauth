@@ -132,7 +132,7 @@ fn credentials(headers: &HeaderMap) -> Option<(Scheme, &str)> {
 }
 
 /// The verifying keys `tenant` publishes now, under the algorithm the server signs with.
-async fn published_keys(
+pub(super) async fn published_keys(
     state: &PublicState,
     tenant: &TenantId,
     now: Timestamp,

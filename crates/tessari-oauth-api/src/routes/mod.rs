@@ -1,6 +1,7 @@
 //! The public router: per tenant, the server metadata, the key set, UserInfo and the sign-in and consent pages under
-//! the read limit, the authorization endpoint under its own, the token, revocation and pushed-request endpoints under
-//! theirs, the sign-in steps under theirs, and the account portal's requests under theirs, every body capped.
+//! the read limit, the authorization and logout endpoints under the authorization limit, the token, revocation and
+//! pushed-request endpoints under theirs, the sign-in steps under theirs, and the account portal's requests under
+//! theirs, every body capped.
 
 mod account;
 mod account_factors;
@@ -13,6 +14,7 @@ mod authorize;
 mod browser;
 mod jwks;
 mod login;
+mod logout;
 mod metadata;
 mod pages;
 mod resume;
@@ -64,6 +66,10 @@ pub fn public_router(state: PublicState) -> Router {
             get(authorize::query).post(authorize::form),
         )
         .route("/{tenant}/oauth2/authorize/resume", get(resume::resume))
+        .route(
+            "/{tenant}/oauth2/logout",
+            get(logout::query).post(logout::form),
+        )
         .layer(DefaultBodyLimit::max(AUTHORIZE_BODY_MAX_BYTES))
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),

@@ -142,6 +142,14 @@ fn cleared_binding_cookie() -> Result<HeaderValue> {
     .map_err(|_| Error::Internal)
 }
 
+/// The cookie that clears the session cookie once the session is over.
+pub(super) fn cleared_session_cookie() -> Result<HeaderValue> {
+    HeaderValue::from_str(&format!(
+        "{SESSION_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0"
+    ))
+    .map_err(|_| Error::Internal)
+}
+
 /// Answer a step that left the sign-in `binding` holds in `tenant` at `stage`. Below `Complete` that is the next
 /// step. At `Complete` the sign-in is taken, once, a session is opened for its user under a value drawn now, the
 /// sign-in is recorded, and the browser is sent on to the authorization it was begun for at `issuer`.

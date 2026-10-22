@@ -28,6 +28,8 @@ pub(crate) const NOW: u64 = 1_800_000_000;
 pub(crate) const VERIFIER: &str = "verifier-0123456789-0123456789-0123456789-abcdef";
 pub(crate) const REDIRECT: &str = "https://app.example.com/callback";
 pub(crate) const API: &str = "https://api.example.com/";
+/// Where a logout `portal` and `kiosk` ask for may return the browser.
+pub(crate) const SIGNED_OUT: &str = "https://app.example.com/signed-out";
 pub(crate) const USER: &str = "user-7";
 /// The browser cookie every test browser holds, and the binding it names.
 pub(crate) const BROWSER_COOKIE: &str = "__Host-tessari-browser=browser-a";
@@ -93,7 +95,9 @@ pub(crate) async fn server(connections: usize) -> Server {
                 grant_types: grants,
                 jwks: Vec::new(),
                 dpop_bound_access_tokens: false,
-                post_logout_redirect_uris: Vec::new(),
+                post_logout_redirect_uris: vec![
+                    RedirectUri::parse(SIGNED_OUT).expect("a post-logout URI"),
+                ],
             };
             let at = Timestamp::from_unix_secs(NOW - 100);
             storage

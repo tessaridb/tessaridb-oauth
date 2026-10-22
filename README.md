@@ -64,7 +64,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only); the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated); the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail |
 | Built, not served yet | creating accounts and enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
 | Planned | the account portal page, the admin panel, a two-factor policy per tenant, companies with their own administrators, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
@@ -157,6 +157,16 @@ over that token (`ath`, RFC 9449 §7.1) that is spent once; a bound token is ref
 token gets the same `401` with `error="invalid_token"` in `WWW-Authenticate`, a token without `openid` a `403` with
 `error="insufficient_scope"`, and none of the answers is cached. A token from the client credentials grant never
 carries `openid`, so it never reaches UserInfo. Discovery advertises the endpoint.
+
+### Logout: `GET|POST <issuer>/oauth2/logout`
+
+A client signs a user out here (OpenID Connect RP-Initiated Logout 1.0) by sending the browser with an
+`id_token_hint`: an ID token this tenant issued to it, however old. Without a hint that reads as one, or with a
+`client_id` other than the hint's own, nothing is ended and the browser stays on a refusal page. The session the
+browser's cookie holds is ended only when it is the session the hint names, the cookie is cleared, and the ending is
+recorded in the audit trail. The browser goes back only to a `post_logout_redirect_uri` the client registered, matched
+exactly, with its `state`; any other value is never followed and a signed-out page is shown here instead. A cross-site
+`POST` carries no session cookie (`SameSite=Lax`), so a client signs users out with a `GET` redirect.
 
 ### Your account: `<issuer>/account/api/me`
 
