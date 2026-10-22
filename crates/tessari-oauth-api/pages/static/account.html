@@ -29,6 +29,7 @@
 
         <section aria-labelledby="methods-title">
           <h2 id="methods-title">How you sign in</h2>
+          <p id="enrol-due" class="notice" hidden></p>
           <dl class="facts">
             <dt>Password</dt><dd id="method-password"></dd>
             <dt>Authenticator app</dt><dd id="method-totp"></dd>
@@ -38,6 +39,15 @@
             <button type="button" id="password-open" class="secondary">Change password</button>
             <button type="button" id="codes-open" class="secondary">Get new recovery codes</button>
             <button type="button" id="app-open" class="secondary" hidden>Set up an authenticator app</button>
+            <button type="button" id="app-off" class="secondary" hidden>Turn off the authenticator app</button>
+          </div>
+
+          <div id="app-off-confirm" class="confirm" hidden>
+            <p>Turning off the app also removes your unused recovery codes, and signs you out on your other devices.</p>
+            <div class="actions">
+              <button type="button" id="app-off-yes" class="danger">Turn off</button>
+              <button type="button" id="app-off-no" class="secondary">Cancel</button>
+            </div>
           </div>
 
           <form id="app-form" class="panel" hidden novalidate>

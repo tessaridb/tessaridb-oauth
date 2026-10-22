@@ -9,6 +9,8 @@ import {
   readEndBy,
   readGrants,
   readIssuedCodes,
+  appAsked,
+  enrolmentDue,
   readMe,
   readSessions,
 } from "../src/account-read.ts";
@@ -30,6 +32,7 @@ test("the account is read with its sign-in methods", () => {
       recovery_codes: 3,
       passkeys: [{ id: "cred-1", created_at: 1700000000, synced: true }],
     },
+    two_factor: "required",
   });
   assert.deepEqual(me, {
     email: "ada@example.com",
@@ -38,6 +41,7 @@ test("the account is read with its sign-in methods", () => {
     totp: false,
     recoveryCodes: 3,
     passkeys: [{ id: "cred-1", createdAt: 1700000000, synced: true }],
+    twoFactor: "required",
   });
   assert.equal(readMe({ email: "ada@example.com", email_verified: true }), null, "no factors");
   assert.equal(
@@ -45,6 +49,7 @@ test("the account is read with its sign-in methods", () => {
       email: 7,
       email_verified: true,
       factors: { password: true, totp: false, recovery_codes: 0, passkeys: [] },
+      two_factor: "optional",
     }),
     null,
     "an address of another type",
@@ -54,10 +59,23 @@ test("the account is read with its sign-in methods", () => {
       email: "ada@example.com",
       email_verified: true,
       factors: { password: true, totp: false, recovery_codes: -1, passkeys: [] },
+      two_factor: "optional",
     }),
     null,
     "a negative count",
   );
+  for (const policy of [undefined, "sometimes", "Off", 1]) {
+    assert.equal(
+      readMe({
+        email: "ada@example.com",
+        email_verified: true,
+        factors: { password: true, totp: false, recovery_codes: 0, passkeys: [] },
+        two_factor: policy,
+      }),
+      null,
+      `a policy that is not one of the three: ${String(policy)}`,
+    );
+  }
   assert.equal(readMe(null), null);
 });
 
@@ -121,4 +139,32 @@ test("a refused change names why in the page's words", () => {
   assert.equal(changeRefusal(400, { code: "password_rejected", message: "something new" }), "rejected");
   assert.equal(changeRefusal(429, { code: "rate_limited" }), "other");
   assert.equal(changeRefusal(500, null), "other");
+});
+
+/** An account under `twoFactor` holding an app when `totp`, and `passkeys` passkeys. */
+function held(twoFactor, totp, passkeys) {
+  return {
+    email: "ada@example.com",
+    emailVerified: true,
+    password: true,
+    totp,
+    recoveryCodes: 0,
+    passkeys: Array.from({ length: passkeys }, (_, at) => ({ id: `cred-${at}`, createdAt: 0, synced: true })),
+    twoFactor,
+  };
+}
+
+test("an app counts only where the policy asks for its code", () => {
+  assert.equal(appAsked(held("optional", true, 0)), true);
+  assert.equal(appAsked(held("required", true, 0)), true);
+  assert.equal(appAsked(held("off", true, 0)), false, "under off the app is never asked");
+  assert.equal(appAsked(held("optional", false, 0)), false, "no app");
+});
+
+test("a required policy wants a second factor from an account holding none", () => {
+  assert.equal(enrolmentDue(held("required", false, 0)), true);
+  assert.equal(enrolmentDue(held("required", true, 0)), false, "an app");
+  assert.equal(enrolmentDue(held("required", false, 1)), false, "a passkey");
+  assert.equal(enrolmentDue(held("optional", false, 0)), false);
+  assert.equal(enrolmentDue(held("off", false, 0)), false);
 });

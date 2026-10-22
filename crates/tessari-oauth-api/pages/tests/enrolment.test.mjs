@@ -56,6 +56,8 @@ test("a refused enrolment names why", () => {
   assert.equal(enrolRefusal(409, { code: "nothing_pending" }), "start-again");
   assert.equal(enrolRefusal(400, { code: "code_rejected" }), "code-rejected");
   assert.equal(enrolRefusal(409, { code: "last_sign_in_method" }), "last-method");
+  assert.equal(enrolRefusal(409, { code: "not_offered" }), "not-offered");
+  assert.equal(enrolRefusal(409, { code: "second_factor_required" }), "keep-one");
   assert.equal(enrolRefusal(400, { code: "invalid_request" }), "not-accepted");
   assert.equal(enrolRefusal(401, { code: "reauthentication_required" }), "reauthenticate");
   assert.equal(enrolRefusal(401, { code: "session_required" }), "signed-out");

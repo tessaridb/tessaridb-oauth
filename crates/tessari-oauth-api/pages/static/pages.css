@@ -559,6 +559,14 @@ h3 {
   color: var(--warn);
 }
 
+.notice {
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--warn);
+  border-inline-start-width: var(--s-1);
+  border-radius: var(--control-radius);
+}
+
 .confirm {
   display: grid;
   gap: var(--s-3);

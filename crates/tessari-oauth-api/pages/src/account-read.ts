@@ -11,6 +11,9 @@ export interface HeldPasskey {
   synced: boolean;
 }
 
+/** The company's two-factor policy: no second factor, each user's choice, or one held by every user. */
+export type TwoFactorPolicy = "off" | "optional" | "required";
+
 /** The signed-in user's account and how it signs in. */
 export interface Me {
   email: string;
@@ -19,6 +22,7 @@ export interface Me {
   totp: boolean;
   recoveryCodes: number;
   passkeys: HeldPasskey[];
+  twoFactor: TwoFactorPolicy;
 }
 
 /** One of the user's sessions at this issuer. */
@@ -93,17 +97,33 @@ export function readMe(answer: unknown): Me | null {
   const totp = flag(field(factors, "totp"));
   const recoveryCodes = count(field(factors, "recovery_codes"));
   const passkeys = every(field(factors, "passkeys"), readPasskey);
+  const twoFactor = policy(field(answer, "two_factor"));
   if (
     email === null ||
     emailVerified === null ||
     password === null ||
     totp === null ||
     recoveryCodes === null ||
-    passkeys === null
+    passkeys === null ||
+    twoFactor === null
   ) {
     return null;
   }
-  return { email, emailVerified, password, totp, recoveryCodes, passkeys };
+  return { email, emailVerified, password, totp, recoveryCodes, passkeys, twoFactor };
+}
+
+function policy(value: unknown): TwoFactorPolicy | null {
+  return value === "off" || value === "optional" || value === "required" ? value : null;
+}
+
+/** Whether a sign-in to `me` asks for its authenticator app's code: it holds one and the policy is not `off`. */
+export function appAsked(me: Me): boolean {
+  return me.totp && me.twoFactor !== "off";
+}
+
+/** Whether the policy requires a second factor that `me` does not hold, so no application is signed in to yet. */
+export function enrolmentDue(me: Me): boolean {
+  return me.twoFactor === "required" && !me.totp && me.passkeys.length === 0;
 }
 
 function readSession(value: unknown): ListedSession | null {

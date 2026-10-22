@@ -29,6 +29,12 @@ function refused(answer: Answer, followups: Followups): void {
     case "last-method":
       say(ACCOUNT_TEXT.lastMethod);
       break;
+    case "not-offered":
+      say(ACCOUNT_TEXT.appNotOffered);
+      break;
+    case "keep-one":
+      say(ACCOUNT_TEXT.keepOne);
+      break;
     case "not-accepted":
       say(ACCOUNT_TEXT.passkeyNotAccepted);
       break;
@@ -38,14 +44,13 @@ function refused(answer: Answer, followups: Followups): void {
   }
 }
 
-/** Wire the authenticator app's enrolment, offered only to an account that has none. */
-export function wireApp(base: string, holdsApp: boolean, followups: Followups): void {
+/** Wire the authenticator app's enrolment; whether it is offered is the account's to decide (`showAppActions`). */
+export function wireApp(base: string, followups: Followups): void {
   const open = element("app-open", HTMLButtonElement);
   const form = element("app-form", HTMLFormElement);
   const input = element("app-code", HTMLInputElement);
   const secret = element("app-secret", HTMLElement);
   const link = element("app-link", HTMLAnchorElement);
-  open.hidden = holdsApp;
   const close = (): void => {
     input.value = "";
     secret.textContent = "";
@@ -93,6 +98,39 @@ export function wireApp(base: string, holdsApp: boolean, followups: Followups): 
         return;
       }
       say(ACCOUNT_TEXT.appAdded);
+      await followups.changed();
+    })();
+  });
+}
+
+/** Wire turning the authenticator app off, confirmed in place first. */
+export function wireAppOff(base: string, followups: Followups): void {
+  const off = element("app-off", HTMLButtonElement);
+  const confirm = element("app-off-confirm", HTMLDivElement);
+  const yes = element("app-off-yes", HTMLButtonElement);
+  const no = element("app-off-no", HTMLButtonElement);
+  off.addEventListener("click", () => {
+    confirm.hidden = false;
+    off.hidden = true;
+    no.focus();
+  });
+  no.addEventListener("click", () => {
+    confirm.hidden = true;
+    off.hidden = false;
+    off.focus();
+  });
+  yes.addEventListener("click", () => {
+    void (async () => {
+      yes.disabled = true;
+      const answer = await call("POST", `${base}/totp/remove`, {});
+      yes.disabled = false;
+      confirm.hidden = true;
+      if (!answer.ok) {
+        off.hidden = false;
+        refused(answer, followups);
+        return;
+      }
+      say(ACCOUNT_TEXT.appRemoved);
       await followups.changed();
     })();
   });

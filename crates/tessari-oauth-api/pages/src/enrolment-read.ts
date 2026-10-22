@@ -27,6 +27,8 @@ export type EnrolRefusal =
   | "start-again"
   | "code-rejected"
   | "last-method"
+  | "not-offered"
+  | "keep-one"
   | "not-accepted"
   | "reauthenticate"
   | "signed-out"
@@ -102,6 +104,10 @@ export function enrolRefusal(status: number, body: unknown): EnrolRefusal {
       return "code-rejected";
     case "last_sign_in_method":
       return "last-method";
+    case "not_offered":
+      return "not-offered";
+    case "second_factor_required":
+      return "keep-one";
     case "invalid_request":
       return "not-accepted";
     case "reauthentication_required":

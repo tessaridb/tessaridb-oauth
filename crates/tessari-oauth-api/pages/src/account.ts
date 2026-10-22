@@ -7,12 +7,14 @@ import {
   type ListedSession,
   type Me,
   accountApi,
+  appAsked,
+  enrolmentDue,
   readEndBy,
   readGrants,
   readMe,
   readSessions,
 } from "./account-read.ts";
-import { removePasskey, wireApp, wirePasskeyAdd } from "./account-enrol.ts";
+import { removePasskey, wireApp, wireAppOff, wirePasskeyAdd } from "./account-enrol.ts";
 import { type Followups, wirePassword, wireRecoveryCodes } from "./account-factors.ts";
 import { ACCOUNT_TEXT, codesLeft, describeMethods, describeScope, refusalText, when } from "./copy.ts";
 import { type Answer, call, element, say } from "./dom.ts";
@@ -94,6 +96,12 @@ function showMe(base: string, me: Me, followups: Followups): void {
   element("method-password", HTMLElement).textContent = me.password ? ACCOUNT_TEXT.set : ACCOUNT_TEXT.notSet;
   element("method-totp", HTMLElement).textContent = me.totp ? ACCOUNT_TEXT.on : ACCOUNT_TEXT.off;
   element("method-recovery", HTMLElement).textContent = codesLeft(me.recoveryCodes);
+  const due = element("enrol-due", HTMLParagraphElement);
+  due.textContent = ACCOUNT_TEXT.enrolDue;
+  due.hidden = !enrolmentDue(me);
+  // The app is offered where the policy uses one and none is held; a held app may always be turned off.
+  element("app-open", HTMLButtonElement).hidden = me.totp || me.twoFactor === "off";
+  element("app-off", HTMLButtonElement).hidden = !me.totp;
   fill(
     element("passkeys", HTMLUListElement),
     me.passkeys.map((passkey) => {
@@ -193,7 +201,6 @@ async function refreshAccount(base: string, followups: Followups): Promise<void>
     return;
   }
   showMe(base, me, followups);
-  element("app-open", HTMLButtonElement).hidden = me.totp;
   await refreshSessions(base);
 }
 
@@ -250,9 +257,10 @@ async function main(): Promise<void> {
     everywhere.focus();
   });
   everywhereYes.addEventListener("click", () => void signOutEverywhere(base));
-  wirePassword(base, me.totp, followups);
+  wirePassword(base, appAsked(me), followups);
   wireRecoveryCodes(base, followups);
-  wireApp(base, me.totp, followups);
+  wireApp(base, followups);
+  wireAppOff(base, followups);
   wirePasskeyAdd(base, followups);
   account.hidden = false;
   say("");

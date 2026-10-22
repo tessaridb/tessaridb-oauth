@@ -100,10 +100,20 @@
     const totp = flag(field(factors, "totp"));
     const recoveryCodes = count(field(factors, "recovery_codes"));
     const passkeys = every(field(factors, "passkeys"), readPasskey);
-    if (email === null || emailVerified === null || password === null || totp === null || recoveryCodes === null || passkeys === null) {
+    const twoFactor = policy(field(answer, "two_factor"));
+    if (email === null || emailVerified === null || password === null || totp === null || recoveryCodes === null || passkeys === null || twoFactor === null) {
       return null;
     }
-    return { email, emailVerified, password, totp, recoveryCodes, passkeys };
+    return { email, emailVerified, password, totp, recoveryCodes, passkeys, twoFactor };
+  }
+  function policy(value) {
+    return value === "off" || value === "optional" || value === "required" ? value : null;
+  }
+  function appAsked(me) {
+    return me.totp && me.twoFactor !== "off";
+  }
+  function enrolmentDue(me) {
+    return me.twoFactor === "required" && !me.totp && me.passkeys.length === 0;
   }
   function readSession(value) {
     const sid = text(field(value, "sid"));
@@ -244,6 +254,10 @@
     appStartAgain: "That code didn't match, so the key was discarded. Set up the app again to get a new key.",
     appAdded: "Authenticator app turned on. You were signed out on your other devices.",
     lastMethod: "That's the last way to sign in to this account. Add another one before removing it.",
+    appNotOffered: "Your organization doesn't use authenticator apps, so one can't be set up here.",
+    keepOne: "Your organization requires a second way to confirm it's you. Add a passkey or an app before removing this one.",
+    enrolDue: "Your organization requires a second way to confirm it's you. Add a passkey or an authenticator app to keep signing in to its applications.",
+    appRemoved: "Authenticator app turned off. You were signed out on your other devices.",
     passkeyNotAccepted: "That passkey couldn't be added. Try again, or use a different device.",
     passkeyCancelled: "No passkey was added.",
     passkeyAdded: "Passkey added. You were signed out on your other devices.",
@@ -496,6 +510,10 @@
         return "code-rejected";
       case "last_sign_in_method":
         return "last-method";
+      case "not_offered":
+        return "not-offered";
+      case "second_factor_required":
+        return "keep-one";
       case "invalid_request":
         return "not-accepted";
       case "reauthentication_required":
@@ -528,6 +546,12 @@
       case "last-method":
         say(ACCOUNT_TEXT.lastMethod);
         break;
+      case "not-offered":
+        say(ACCOUNT_TEXT.appNotOffered);
+        break;
+      case "keep-one":
+        say(ACCOUNT_TEXT.keepOne);
+        break;
       case "not-accepted":
         say(ACCOUNT_TEXT.passkeyNotAccepted);
         break;
@@ -536,13 +560,12 @@
         break;
     }
   }
-  function wireApp(base, holdsApp, followups) {
+  function wireApp(base, followups) {
     const open = element("app-open", HTMLButtonElement);
     const form = element("app-form", HTMLFormElement);
     const input = element("app-code", HTMLInputElement);
     const secret = element("app-secret", HTMLElement);
     const link = element("app-link", HTMLAnchorElement);
-    open.hidden = holdsApp;
     const close = () => {
       input.value = "";
       secret.textContent = "";
@@ -589,6 +612,37 @@
           return;
         }
         say(ACCOUNT_TEXT.appAdded);
+        await followups.changed();
+      })();
+    });
+  }
+  function wireAppOff(base, followups) {
+    const off = element("app-off", HTMLButtonElement);
+    const confirm2 = element("app-off-confirm", HTMLDivElement);
+    const yes = element("app-off-yes", HTMLButtonElement);
+    const no = element("app-off-no", HTMLButtonElement);
+    off.addEventListener("click", () => {
+      confirm2.hidden = false;
+      off.hidden = true;
+      no.focus();
+    });
+    no.addEventListener("click", () => {
+      confirm2.hidden = true;
+      off.hidden = false;
+      off.focus();
+    });
+    yes.addEventListener("click", () => {
+      void (async () => {
+        yes.disabled = true;
+        const answer = await call("POST", `${base}/totp/remove`, {});
+        yes.disabled = false;
+        confirm2.hidden = true;
+        if (!answer.ok) {
+          off.hidden = false;
+          refused(answer, followups);
+          return;
+        }
+        say(ACCOUNT_TEXT.appRemoved);
         await followups.changed();
       })();
     });
@@ -722,6 +776,11 @@
     element("method-password", HTMLElement).textContent = me.password ? ACCOUNT_TEXT.set : ACCOUNT_TEXT.notSet;
     element("method-totp", HTMLElement).textContent = me.totp ? ACCOUNT_TEXT.on : ACCOUNT_TEXT.off;
     element("method-recovery", HTMLElement).textContent = codesLeft(me.recoveryCodes);
+    const due = element("enrol-due", HTMLParagraphElement);
+    due.textContent = ACCOUNT_TEXT.enrolDue;
+    due.hidden = !enrolmentDue(me);
+    element("app-open", HTMLButtonElement).hidden = me.totp || me.twoFactor === "off";
+    element("app-off", HTMLButtonElement).hidden = !me.totp;
     fill(
       element("passkeys", HTMLUListElement),
       me.passkeys.map((passkey) => {
@@ -814,7 +873,6 @@
       return;
     }
     showMe(base, me, followups);
-    element("app-open", HTMLButtonElement).hidden = me.totp;
     await refreshSessions(base);
   }
   async function signOutEverywhere(base) {
@@ -869,9 +927,10 @@
       everywhere.focus();
     });
     everywhereYes.addEventListener("click", () => void signOutEverywhere(base));
-    wirePassword(base, me.totp, followups);
+    wirePassword(base, appAsked(me), followups);
     wireRecoveryCodes(base, followups);
-    wireApp(base, me.totp, followups);
+    wireApp(base, followups);
+    wireAppOff(base, followups);
     wirePasskeyAdd(base, followups);
     account.hidden = false;
     say("");

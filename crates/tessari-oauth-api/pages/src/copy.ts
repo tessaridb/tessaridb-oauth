@@ -126,6 +126,13 @@ export const ACCOUNT_TEXT = {
   appStartAgain: "That code didn't match, so the key was discarded. Set up the app again to get a new key.",
   appAdded: "Authenticator app turned on. You were signed out on your other devices.",
   lastMethod: "That's the last way to sign in to this account. Add another one before removing it.",
+  appNotOffered: "Your organization doesn't use authenticator apps, so one can't be set up here.",
+  keepOne:
+    "Your organization requires a second way to confirm it's you. Add a passkey or an app before removing this one.",
+  enrolDue:
+    "Your organization requires a second way to confirm it's you. " +
+    "Add a passkey or an authenticator app to keep signing in to its applications.",
+  appRemoved: "Authenticator app turned off. You were signed out on your other devices.",
   passkeyNotAccepted: "That passkey couldn't be added. Try again, or use a different device.",
   passkeyCancelled: "No passkey was added.",
   passkeyAdded: "Passkey added. You were signed out on your other devices.",
