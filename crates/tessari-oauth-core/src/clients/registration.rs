@@ -84,6 +84,8 @@ pub struct ClientRegistration {
     pub keys: Vec<VerifyingKey>,
     /// Whether every access token issued to this client must be bound to a DPoP key (RFC 9449 §5.2).
     pub dpop_bound_access_tokens: bool,
+    /// Where a logout this client asks for may send the browser, matched exactly; none means nowhere.
+    pub post_logout_redirect_uris: Vec<RedirectUri>,
 }
 
 /// Finds a tenant's client registrations; the storage layer implements it.

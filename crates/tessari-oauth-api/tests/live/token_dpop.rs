@@ -71,6 +71,7 @@ fn client(id: &str, auth_method: AuthMethod, jwks: Vec<String>, bound: bool) -> 
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         jwks,
         dpop_bound_access_tokens: bound,
+        post_logout_redirect_uris: Vec::new(),
     }
 }
 

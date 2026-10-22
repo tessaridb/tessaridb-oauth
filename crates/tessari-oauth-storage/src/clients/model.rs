@@ -24,4 +24,6 @@ pub struct NewClient {
     pub jwks: Vec<String>,
     /// Whether every access token issued to it must be bound to a DPoP key (RFC 9449 §5.2).
     pub dpop_bound_access_tokens: bool,
+    /// Where a logout it asks for may send the browser.
+    pub post_logout_redirect_uris: Vec<RedirectUri>,
 }

@@ -42,6 +42,7 @@ async fn register_reader(server: &Server) {
         grant_types: vec![GrantType::AuthorizationCode],
         jwks: Vec::new(),
         dpop_bound_access_tokens: false,
+        post_logout_redirect_uris: Vec::new(),
     };
     server
         .storage

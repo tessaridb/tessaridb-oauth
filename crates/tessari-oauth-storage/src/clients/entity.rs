@@ -28,6 +28,8 @@ pub struct ClientEntity {
     pub dpop_bound_access_tokens: bool,
     /// Unix seconds of the registration.
     pub registered_at: i64,
+    /// Its post-logout redirect URIs; absent on a client registered before they were kept.
+    pub post_logout_redirect_uris: Option<Vec<String>>,
 }
 
 impl FromRecord for ClientEntity {
@@ -44,6 +46,7 @@ impl FromRecord for ClientEntity {
             jwks: row.take("jwks")?,
             dpop_bound_access_tokens: row.take("dpop_bound_access_tokens")?,
             registered_at: row.take("registered_at")?,
+            post_logout_redirect_uris: row.take("post_logout_redirect_uris")?,
         })
     }
 }

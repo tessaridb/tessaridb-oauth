@@ -31,6 +31,7 @@ pub(crate) async fn machine(server: &Server) -> SigningKey {
         grant_types: vec![GrantType::ClientCredentials],
         jwks: vec![key.public_jwk().expect("a JWK")],
         dpop_bound_access_tokens: false,
+        post_logout_redirect_uris: Vec::new(),
     };
     server
         .storage

@@ -31,6 +31,7 @@ fn service_client(id: &str, jwks: Vec<String>) -> NewClient {
         grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
         jwks,
         dpop_bound_access_tokens: false,
+        post_logout_redirect_uris: Vec::new(),
     }
 }
 
@@ -232,4 +233,36 @@ async fn only_a_confidential_client_registers_the_client_credentials_grant() {
         .register(&tenant("acme"), &confidential, NOW)
         .await
         .expect("a confidential client registers it");
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_clients_post_logout_redirect_uris_are_found_as_registered() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    let mut client = service_client("svc-out", vec![ED25519_JWK.to_owned()]);
+    client.post_logout_redirect_uris =
+        vec![RedirectUri::parse("https://app.example.com/signed-out").expect("a redirect URI")];
+    storage
+        .clients
+        .register(&tenant("acme"), &client, NOW)
+        .await
+        .expect("registered");
+    let none = service_client("svc-none", vec![ED25519_JWK.to_owned()]);
+    storage
+        .clients
+        .register(&tenant("acme"), &none, NOW)
+        .await
+        .expect("registered");
+    for registered in [&client, &none] {
+        let found = storage
+            .clients
+            .find(&tenant("acme"), &registered.client_id)
+            .await
+            .expect("answered")
+            .expect("found");
+        assert_eq!(
+            found.post_logout_redirect_uris,
+            registered.post_logout_redirect_uris
+        );
+    }
 }

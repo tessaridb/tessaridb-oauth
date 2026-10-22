@@ -64,6 +64,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      resources array REQUIRED, auth_method string REQUIRED, \
      assertion_alg string, grant_types array REQUIRED, jwks array REQUIRED, dpop_bound_access_tokens bool REQUIRED, \
      registered_at int REQUIRED); \
+     DEFINE FIELD IF NOT EXISTS post_logout_redirect_uris ON clients TYPE array; \
      DEFINE TABLE IF NOT EXISTS secrets (sealed string REQUIRED, created_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS users (\
      user_id string REQUIRED, tenant string REQUIRED, status string REQUIRED, created_at int REQUIRED); \

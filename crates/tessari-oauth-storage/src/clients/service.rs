@@ -86,6 +86,13 @@ fn registration(tenant: &TenantId, entity: ClientEntity) -> Result<ClientRegistr
         .map(RedirectUri::parse)
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|fault| unreadable(fault.to_string()))?;
+    let post_logout_redirect_uris = entity
+        .post_logout_redirect_uris
+        .unwrap_or_default()
+        .into_iter()
+        .map(RedirectUri::parse)
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|fault| unreadable(fault.to_string()))?;
     Ok(ClientRegistration {
         tenant: tenant.clone(),
         client_id: ClientId::parse(entity.client_id)
@@ -104,6 +111,7 @@ fn registration(tenant: &TenantId, entity: ClientEntity) -> Result<ClientRegistr
         keys: keys(auth_method, &entity.jwks)
             .ok_or_else(|| unreadable("a key that does not parse"))?,
         dpop_bound_access_tokens: entity.dpop_bound_access_tokens,
+        post_logout_redirect_uris,
     })
 }
 
@@ -167,6 +175,13 @@ impl ClientService {
             dpop_bound_access_tokens: client.dpop_bound_access_tokens,
             registered_at: i64::try_from(now.unix_secs())
                 .map_err(|_| unreadable("a time beyond i64"))?,
+            post_logout_redirect_uris: Some(
+                client
+                    .post_logout_redirect_uris
+                    .iter()
+                    .map(|uri| uri.as_str().to_owned())
+                    .collect(),
+            ),
         };
         let place = self.tenancy.place(tenant)?;
         self.repository.create(&place, &entity).await?;

@@ -37,7 +37,7 @@ impl ClientRepository for TessaridbClientRepository {
                  scope_ceiling: $scope_ceiling, resources: $resources, auth_method: $auth_method, \
                  assertion_alg: $assertion_alg, \
                  grant_types: $grant_types, jwks: $jwks, dpop_bound_access_tokens: $dpop_bound_access_tokens, \
-                 registered_at: $registered_at };",
+                 registered_at: $registered_at, post_logout_redirect_uris: $post_logout_redirect_uris };",
                 vec![
                     ("id".to_owned(), Value::from(client.client_id.as_str())),
                     ("tenant".to_owned(), Value::from(client.tenant.as_str())),
@@ -59,6 +59,13 @@ impl ClientRepository for TessaridbClientRepository {
                         Value::from(client.dpop_bound_access_tokens),
                     ),
                     ("registered_at".to_owned(), Value::from(client.registered_at)),
+                    (
+                        "post_logout_redirect_uris".to_owned(),
+                        client
+                            .post_logout_redirect_uris
+                            .as_deref()
+                            .map_or(Value::None, texts),
+                    ),
                 ],
             )
             .await?;
