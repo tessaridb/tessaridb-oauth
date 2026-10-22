@@ -32,6 +32,7 @@ fn service_client(id: &str, jwks: Vec<String>) -> NewClient {
         jwks,
         dpop_bound_access_tokens: false,
         post_logout_redirect_uris: Vec::new(),
+        backchannel_logout_uri: None,
     }
 }
 
@@ -263,6 +264,35 @@ async fn a_clients_post_logout_redirect_uris_are_found_as_registered() {
         assert_eq!(
             found.post_logout_redirect_uris,
             registered.post_logout_redirect_uris
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_clients_backchannel_logout_uri_is_found_as_registered() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    let mut told = service_client("svc-told", vec![ED25519_JWK.to_owned()]);
+    told.backchannel_logout_uri =
+        Some(RedirectUri::parse("https://app.example.com/backchannel").expect("a URI"));
+    let untold = service_client("svc-untold", vec![ED25519_JWK.to_owned()]);
+    for client in [&told, &untold] {
+        storage
+            .clients
+            .register(&tenant("acme"), client, NOW)
+            .await
+            .expect("registered");
+    }
+    for registered in [&told, &untold] {
+        let found = storage
+            .clients
+            .find(&tenant("acme"), &registered.client_id)
+            .await
+            .expect("answered")
+            .expect("found");
+        assert_eq!(
+            found.backchannel_logout_uri,
+            registered.backchannel_logout_uri
         );
     }
 }

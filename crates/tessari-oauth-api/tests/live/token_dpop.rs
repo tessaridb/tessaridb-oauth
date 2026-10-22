@@ -72,6 +72,7 @@ fn client(id: &str, auth_method: AuthMethod, jwks: Vec<String>, bound: bool) -> 
         jwks,
         dpop_bound_access_tokens: bound,
         post_logout_redirect_uris: Vec::new(),
+        backchannel_logout_uri: None,
     }
 }
 

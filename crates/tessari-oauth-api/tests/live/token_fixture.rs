@@ -98,6 +98,7 @@ pub(crate) async fn server(connections: usize) -> Server {
                 post_logout_redirect_uris: vec![
                     RedirectUri::parse(SIGNED_OUT).expect("a post-logout URI"),
                 ],
+                backchannel_logout_uri: None,
             };
             let at = Timestamp::from_unix_secs(NOW - 100);
             storage

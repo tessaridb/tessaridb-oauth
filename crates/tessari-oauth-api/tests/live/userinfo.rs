@@ -43,6 +43,7 @@ async fn register_reader(server: &Server) {
         jwks: Vec::new(),
         dpop_bound_access_tokens: false,
         post_logout_redirect_uris: Vec::new(),
+        backchannel_logout_uri: None,
     };
     server
         .storage

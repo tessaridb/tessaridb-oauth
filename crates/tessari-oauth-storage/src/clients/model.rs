@@ -26,4 +26,6 @@ pub struct NewClient {
     pub dpop_bound_access_tokens: bool,
     /// Where a logout it asks for may send the browser.
     pub post_logout_redirect_uris: Vec<RedirectUri>,
+    /// Where it is told that a session it holds ended.
+    pub backchannel_logout_uri: Option<RedirectUri>,
 }

@@ -30,6 +30,8 @@ pub struct ClientEntity {
     pub registered_at: i64,
     /// Its post-logout redirect URIs; absent on a client registered before they were kept.
     pub post_logout_redirect_uris: Option<Vec<String>>,
+    /// Its back-channel logout URI, when it registered one.
+    pub backchannel_logout_uri: Option<String>,
 }
 
 impl FromRecord for ClientEntity {
@@ -47,6 +49,7 @@ impl FromRecord for ClientEntity {
             dpop_bound_access_tokens: row.take("dpop_bound_access_tokens")?,
             registered_at: row.take("registered_at")?,
             post_logout_redirect_uris: row.take("post_logout_redirect_uris")?,
+            backchannel_logout_uri: row.take("backchannel_logout_uri")?,
         })
     }
 }

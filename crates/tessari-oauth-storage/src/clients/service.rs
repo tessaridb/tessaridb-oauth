@@ -93,6 +93,11 @@ fn registration(tenant: &TenantId, entity: ClientEntity) -> Result<ClientRegistr
         .map(RedirectUri::parse)
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|fault| unreadable(fault.to_string()))?;
+    let backchannel_logout_uri = entity
+        .backchannel_logout_uri
+        .map(RedirectUri::parse)
+        .transpose()
+        .map_err(|fault| unreadable(fault.to_string()))?;
     Ok(ClientRegistration {
         tenant: tenant.clone(),
         client_id: ClientId::parse(entity.client_id)
@@ -112,6 +117,7 @@ fn registration(tenant: &TenantId, entity: ClientEntity) -> Result<ClientRegistr
             .ok_or_else(|| unreadable("a key that does not parse"))?,
         dpop_bound_access_tokens: entity.dpop_bound_access_tokens,
         post_logout_redirect_uris,
+        backchannel_logout_uri,
     })
 }
 
@@ -182,6 +188,10 @@ impl ClientService {
                     .map(|uri| uri.as_str().to_owned())
                     .collect(),
             ),
+            backchannel_logout_uri: client
+                .backchannel_logout_uri
+                .as_ref()
+                .map(|uri| uri.as_str().to_owned()),
         };
         let place = self.tenancy.place(tenant)?;
         self.repository.create(&place, &entity).await?;

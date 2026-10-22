@@ -86,6 +86,8 @@ pub struct ClientRegistration {
     pub dpop_bound_access_tokens: bool,
     /// Where a logout this client asks for may send the browser, matched exactly; none means nowhere.
     pub post_logout_redirect_uris: Vec<RedirectUri>,
+    /// Where this client is told, server to server, that a session it holds ended; none means it is not told.
+    pub backchannel_logout_uri: Option<RedirectUri>,
 }
 
 /// Finds a tenant's client registrations; the storage layer implements it.
