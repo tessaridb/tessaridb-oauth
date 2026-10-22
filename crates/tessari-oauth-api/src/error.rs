@@ -67,6 +67,10 @@ pub enum Error {
     /// The new password breaks one of the rules for new passwords.
     #[error("the password was not accepted")]
     PasswordRejected(PasswordRefused),
+    /// The return to the admin console does not open a session: one answer for every reason, so it says nothing about
+    /// which check failed.
+    #[error("the console sign-in was refused")]
+    ConsoleRefused,
 }
 
 impl Error {
@@ -89,6 +93,7 @@ impl Error {
             }
             Self::AlreadyEnrolled | Self::NothingPending => ErrorCategory::Conflict,
             Self::CodeRejected | Self::PasswordRejected(_) => ErrorCategory::Validation,
+            Self::ConsoleRefused => ErrorCategory::Forbidden,
         }
     }
 }
@@ -182,6 +187,11 @@ impl IntoResponse for Error {
                     }
                     PasswordRefused::Guessable => "the password is too easily guessed",
                 },
+            ),
+            (Self::ConsoleRefused, _) => (
+                StatusCode::FORBIDDEN,
+                "console_refused",
+                "this sign-in does not open the admin console; start again",
             ),
             (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

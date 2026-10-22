@@ -14,30 +14,13 @@ use tessari_oauth_infrastructure::custody::random_secret;
 use tessari_oauth_types::{Challenge, SigninBinding, TenantId, base64url};
 use url::Url;
 
-use super::AdminState;
+use super::{AdminState, SIGNIN_COOKIE};
 use crate::{Error, Result};
 
-/// The sign-in cookie's name when the console is reached in the clear; over https it carries the `__Host-` prefix.
-const SIGNIN_COOKIE: &str = "tessari-admin-signin";
-
 /// 256 bits from the system's cryptographic random source, base64url.
-fn fresh() -> Result<String> {
+pub(super) fn fresh() -> Result<String> {
     let drawn = random_secret().map_err(|_| Error::Internal)?;
     Ok(base64url::encode(&drawn))
-}
-
-/// The sign-in cookie holding `binding`, as the console's scheme allows.
-fn signin_cookie(state: &AdminState, binding: &SigninBinding) -> Result<HeaderValue> {
-    let (prefix, secure) = if state.secure() {
-        ("__Host-", " Secure;")
-    } else {
-        ("", "")
-    };
-    HeaderValue::from_str(&format!(
-        "{prefix}{SIGNIN_COOKIE}={}; Path=/;{secure} HttpOnly; SameSite=Lax; Max-Age={ADMIN_SIGNIN_TTL_SECS}",
-        binding.expose()
-    ))
-    .map_err(|_| Error::Internal)
 }
 
 /// Keep a sign-in for this browser and send it to `company`'s issuer; an unknown or inactive company answers 404.
@@ -76,6 +59,14 @@ pub(super) async fn signin(
         header::LOCATION,
         HeaderValue::from_str(location.as_str()).map_err(|_| Error::Internal)?,
     );
-    headers.insert(header::SET_COOKIE, signin_cookie(&state, &binding)?);
+    headers.insert(
+        header::SET_COOKIE,
+        state.cookie(
+            SIGNIN_COOKIE,
+            binding.expose(),
+            "Lax",
+            ADMIN_SIGNIN_TTL_SECS,
+        )?,
+    );
     Ok(response)
 }

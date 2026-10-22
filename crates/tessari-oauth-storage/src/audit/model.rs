@@ -41,11 +41,13 @@ pub enum AuditKind {
     OperatorRevoked,
     /// The emergency path gave `user` operator roles outside any operator's authority; `reason` says which path.
     BreakGlass,
+    /// `user` opened an admin console session.
+    ConsoleSignedIn,
 }
 
 impl AuditKind {
     /// Every kind.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::IssuedCode,
         Self::IssuedRefresh,
         Self::IssuedClient,
@@ -63,6 +65,7 @@ impl AuditKind {
         Self::OperatorGranted,
         Self::OperatorRevoked,
         Self::BreakGlass,
+        Self::ConsoleSignedIn,
     ];
 
     /// The name the message carries.
@@ -86,6 +89,7 @@ impl AuditKind {
             Self::OperatorGranted => "operator_granted",
             Self::OperatorRevoked => "operator_revoked",
             Self::BreakGlass => "break_glass",
+            Self::ConsoleSignedIn => "console_signed_in",
         }
     }
 

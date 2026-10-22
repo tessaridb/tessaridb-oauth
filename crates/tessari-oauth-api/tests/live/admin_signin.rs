@@ -16,11 +16,15 @@ use url::Url;
 
 use crate::token_fixture::{NOW, Server, server, tenant};
 
-fn console_state(server: &Server, console: &str) -> AdminState {
+pub(crate) fn console_state(server: &Server, console: &str) -> AdminState {
     let served = Served::new("https://id.example.com");
     served.replace([tenant("acme")]);
     AdminState {
         admin: Arc::clone(&server.storage.admin),
+        codes: Arc::clone(&server.storage.codes),
+        clients: Arc::clone(&server.storage.clients),
+        operators: Arc::clone(&server.storage.operators),
+        audit: Arc::clone(&server.storage.audit),
         served: Arc::new(served),
         console: Arc::from(console),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),

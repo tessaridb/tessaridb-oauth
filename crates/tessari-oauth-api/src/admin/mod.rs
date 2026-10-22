@@ -1,21 +1,42 @@
 //! The admin console's own listener: operators sign in at their company's issuer as its client `admin-console`,
 //! and the console keeps their session on its own origin.
 
+mod callback;
 mod signin;
 
 use std::sync::Arc;
 
 use axum::Router;
+use axum::http::HeaderValue;
 use axum::routing::get;
 use tessari_oauth_storage::admin::AdminService;
+use tessari_oauth_storage::audit::AuditService;
+use tessari_oauth_storage::clients::ClientService;
+use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::Served;
+use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_types::Clock;
+
+use crate::{Error, Result};
+
+/// The sign-in cookie's name when the console is reached in the clear; over https it carries the `__Host-` prefix.
+const SIGNIN_COOKIE: &str = "tessari-admin-signin";
+/// The session cookie's name when the console is reached in the clear; over https it carries the `__Host-` prefix.
+const SESSION_COOKIE: &str = "tessari-admin";
 
 /// The state the admin router serves from; shared read-only, so no lock is ever taken.
 #[derive(Clone)]
 pub struct AdminState {
     /// Console sign-ins and sessions.
     pub admin: Arc<AdminService>,
+    /// Authorization codes, spent once by the callback.
+    pub codes: Arc<CodeService>,
+    /// Client registrations: the console's own, whose bindings a code is checked against.
+    pub clients: Arc<ClientService>,
+    /// Operator grants: a sign-in without one opens nothing.
+    pub operators: Arc<OperatorService>,
+    /// The audit trail.
+    pub audit: Arc<AuditService>,
     /// The companies this node serves and their issuers.
     pub served: Arc<Served>,
     /// The console's base URL, as `TESSARIDB_OAUTH_ADMIN_URL` gives it.
@@ -29,12 +50,38 @@ impl AdminState {
     fn secure(&self) -> bool {
         self.console.starts_with("https://")
     }
+
+    /// `name` as this console sets it: `__Host-` prefixed over https.
+    fn cookie_name(&self, name: &str) -> String {
+        if self.secure() {
+            format!("__Host-{name}")
+        } else {
+            name.to_owned()
+        }
+    }
+
+    /// The cookie `name` holding `value` for `max_age` seconds: `Secure` over https, always `HttpOnly` on `Path=/`.
+    fn cookie(
+        &self,
+        name: &str,
+        value: &str,
+        same_site: &str,
+        max_age: u64,
+    ) -> Result<HeaderValue> {
+        let secure = if self.secure() { " Secure;" } else { "" };
+        HeaderValue::from_str(&format!(
+            "{}={value}; Path=/;{secure} HttpOnly; SameSite={same_site}; Max-Age={max_age}",
+            self.cookie_name(name)
+        ))
+        .map_err(|_| Error::Internal)
+    }
 }
 
 /// The routes of the admin listener over `state`. Unknown paths answer 404.
 pub fn admin_router(state: AdminState) -> Router {
     Router::new()
         .route("/admin/{company}/signin", get(signin::signin))
+        .route("/admin/{company}/callback", get(callback::callback))
         .fallback(|| async { crate::Error::NotFound })
         .with_state(state)
         .layer(axum::middleware::map_response(|response| async {

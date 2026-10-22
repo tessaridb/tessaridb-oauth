@@ -31,6 +31,8 @@ use tessari_oauth_constants::{
 use tessari_oauth_core::clients::{ClientDirectory, ClientRegistration};
 use tessari_oauth_types::{ClientId, TenantId};
 
+pub(crate) use login::cookie;
+
 use crate::headers::{no_store, protect};
 use crate::state::PublicState;
 
