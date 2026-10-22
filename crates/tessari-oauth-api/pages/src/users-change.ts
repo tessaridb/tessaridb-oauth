@@ -58,7 +58,7 @@ export function readIssued(body: unknown): { code: string; validHours: number } 
  * after a lost answer), a new one from `fresh` as soon as what is sent changes, because the server answers a key with
  * what it answered the first time and refuses it with a different body.
  */
-export function keyring(fresh: () => string): (body: Record<string, string | number>) => string {
+export function keyring(fresh: () => string): (body: Record<string, unknown>) => string {
   let last: { sent: string; key: string } | null = null;
   return (body) => {
     const sent = JSON.stringify(body);

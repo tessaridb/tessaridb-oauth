@@ -9,7 +9,7 @@ import { type Answer, call, say } from "./dom.ts";
 import { keyring, reasonOf } from "./users-change.ts";
 
 /** A form's keyring: one key per distinct body sent. */
-export function keys(): (body: Record<string, string | number>) => string {
+export function keys(): (body: Record<string, unknown>) => string {
   return keyring(() => crypto.randomUUID());
 }
 
@@ -19,8 +19,8 @@ export function keys(): (body: Record<string, string | number>) => string {
  */
 export function change(
   path: string,
-  keyFor: (request: Record<string, string | number>) => string,
-  body: Record<string, string | number>,
+  keyFor: (request: Record<string, unknown>) => string,
+  body: Record<string, unknown>,
   method: "POST" | "PUT" = "POST",
 ): Promise<Answer> {
   return call(method, path, body, { "idempotency-key": keyFor({ ...body, "@path": path }) });

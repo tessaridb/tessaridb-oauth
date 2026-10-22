@@ -16,11 +16,12 @@ export interface Me {
 }
 
 /** A section of the console, named for the job it serves. */
-export type Section = "users" | "operators" | "policy" | "audit" | "companies";
+export type Section = "users" | "clients" | "operators" | "policy" | "audit" | "companies";
 
 /** The role a section needs; operators lists the grants of whatever roles the viewer holds, so it needs none. */
 const NEEDS: readonly [Section, Role | null][] = [
   ["users", "users"],
+  ["clients", "clients"],
   ["operators", null],
   ["policy", "policy"],
   ["audit", "audit"],
@@ -32,6 +33,7 @@ export type Route =
   | { kind: "overview" }
   | { kind: "users"; email: string | null; after: string | null }
   | { kind: "user"; id: string }
+  | { kind: "clients"; after: string | null }
   | { kind: "operators"; after: string | null }
   | { kind: "policy" }
   | { kind: "audit"; after: number | null }
@@ -69,6 +71,8 @@ export function route(hash: string): Route {
   switch (parts.length === 1 ? section : undefined) {
     case "users":
       return { kind: "users", email: query.get("email"), after: query.get("after") };
+    case "clients":
+      return { kind: "clients", after: query.get("after") };
     case "operators":
       return { kind: "operators", after: query.get("after") };
     case "policy":

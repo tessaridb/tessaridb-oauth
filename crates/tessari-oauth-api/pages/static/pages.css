@@ -298,7 +298,8 @@ label {
   font-size: var(--t-data);
 }
 
-input {
+input,
+textarea {
   width: 100%;
   min-height: var(--control-height);
   padding: 0 var(--s-3);
@@ -310,17 +311,25 @@ input {
   transition: border-color var(--dur-fast) var(--ease-out);
 }
 
-input:hover {
+input:hover,
+textarea:hover {
   border-color: var(--text-muted);
 }
 
-input:focus-visible {
+input:focus-visible,
+textarea:focus-visible {
   outline: none;
   border-color: var(--focus);
   box-shadow: var(--focus-ring);
 }
 
-input[aria-invalid="true"] {
+textarea {
+  padding-block: var(--s-2);
+  resize: vertical;
+}
+
+input[aria-invalid="true"],
+textarea[aria-invalid="true"] {
   border-color: var(--bad);
 }
 

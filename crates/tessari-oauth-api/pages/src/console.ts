@@ -7,6 +7,7 @@ import { type Screen, heading, link, make, show } from "./console-dom.ts";
 import { call, element, say } from "./dom.ts";
 import { auditView } from "./audit.ts";
 import { companiesView } from "./companies.ts";
+import { clientsView } from "./clients.ts";
 import { operatorsView } from "./operators.ts";
 import { policyView } from "./policy.ts";
 import { userView, usersView } from "./users.ts";
@@ -104,6 +105,9 @@ function draw(who: Me): void {
       return;
     case "user":
       void userView(screen, at.id);
+      return;
+    case "clients":
+      void clientsView(screen, at.after);
       return;
     case "operators":
       void operatorsView(screen, who, at.after);

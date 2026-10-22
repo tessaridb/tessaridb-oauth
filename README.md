@@ -64,7 +64,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, operators, audit trail, companies) and its pages |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, operators, audit trail, companies) and its pages |
 | Built, not served yet | enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
 | Planned | the account portal page, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
@@ -313,6 +313,16 @@ from the other status (`changed_meanwhile`), and `system` is never suspended (`s
 `GET <ADMIN_URL>/admin/<company>/api/audit?after=<position>&limit=` (role `audit`) reads the company's audit trail in
 order, at most 100 messages a page, `next` naming the position to read after; each message carries its `position`,
 `at`, `kind` and only the fields it was written with.
+
+Clients (role `clients`): `GET <ADMIN_URL>/admin/<company>/api/clients?limit=&after=` lists the company's client
+registrations in id order (at most 100 a page, cursor = the last id) and `GET .../api/clients/<id>` reads one, each
+with its kind, method, redirect URIs, scope ceiling, resources, grants and key count; the console's own client is
+listed and marked. `POST .../api/clients` with `{"client_id", "redirect_uris", "scope_ceiling", "resources",
+"auth_method", "assertion_alg", "jwks", "grant_types", "dpop_bound_access_tokens", "post_logout_redirect_uris",
+"backchannel_logout_uri", "reason"}` registers one through the same rules as every registration. Only `none` (a
+public client, always with PKCE) and `private_key_jwt` (with `EdDSA` or `ES256` and its public key) are offered, so no
+shared secret is ever made; `admin-console` is refused as `client_reserved` and a taken id as `client_taken`.
+Removing a client and changing one are not in the console yet.
 
 Operators: holding a role is what lets an operator give it. `GET <ADMIN_URL>/admin/<company>/api/operators` lists the
 current grants of the roles the viewer holds (cursor `<user>.<role>`, at most 100 a page).

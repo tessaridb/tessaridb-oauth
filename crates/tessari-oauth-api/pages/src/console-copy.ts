@@ -62,6 +62,18 @@ export function operatorRefusalText(code: string): string {
   }
 }
 
+/** The words for a client registration the server refused with `code`. */
+export function clientRefusalText(code: string): string {
+  switch (code) {
+    case "client_taken":
+      return "This company already has a client with this id. Choose another id.";
+    case "client_reserved":
+      return "This id belongs to the console's own client, which the server manages. Choose another id.";
+    default:
+      return changeRefusalText(code);
+  }
+}
+
 /** The words for a company change the server refused with `code`. */
 export function companyRefusalText(code: string): string {
   switch (code) {

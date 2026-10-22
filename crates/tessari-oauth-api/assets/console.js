@@ -16,6 +16,7 @@
   var ROLES = ["users", "clients", "policy", "audit", "companies"];
   var NEEDS = [
     ["users", "users"],
+    ["clients", "clients"],
     ["operators", null],
     ["policy", "policy"],
     ["audit", "audit"],
@@ -46,6 +47,8 @@
     switch (parts.length === 1 ? section : void 0) {
       case "users":
         return { kind: "users", email: query.get("email"), after: query.get("after") };
+      case "clients":
+        return { kind: "clients", after: query.get("after") };
       case "operators":
         return { kind: "operators", after: query.get("after") };
       case "policy":
@@ -222,6 +225,16 @@
         return "This account is disabled. Enable it before granting it a role.";
       case "not_granted":
         return "This account does not hold this role any more. Reload the view to see the current grants.";
+      default:
+        return changeRefusalText(code);
+    }
+  }
+  function clientRefusalText(code) {
+    switch (code) {
+      case "client_taken":
+        return "This company already has a client with this id. Choose another id.";
+      case "client_reserved":
+        return "This id belongs to the console's own client, which the server manages. Choose another id.";
       default:
         return changeRefusalText(code);
     }
@@ -738,6 +751,324 @@
       parts.push(paging);
     }
     parts.push(createForm(screen, redraw));
+    show(screen.view, ...parts);
+    say(message);
+  }
+
+  // src/clients-read.ts
+  var ALGORITHMS = ["EdDSA", "ES256"];
+  var GRANTS = ["authorization_code", "refresh_token", "client_credentials"];
+  function clientsPath(after) {
+    return after === null ? "api/clients" : `api/clients?${new URLSearchParams({ after }).toString()}`;
+  }
+  function readClient(value) {
+    const id = field(value, "client_id");
+    const kind = field(value, "kind");
+    const authMethod = field(value, "auth_method");
+    const assertionAlg = field(value, "assertion_alg");
+    const redirectUris = strings(field(value, "redirect_uris"));
+    const scopeCeiling = strings(field(value, "scope_ceiling"));
+    const resources = strings(field(value, "resources"));
+    const grantTypes = strings(field(value, "grant_types"));
+    const dpop = field(value, "dpop_bound_access_tokens");
+    const keys2 = field(value, "keys");
+    const console = field(value, "console");
+    if (typeof id !== "string" || id === "" || kind !== "public" && kind !== "confidential" || typeof authMethod !== "string" || assertionAlg !== null && typeof assertionAlg !== "string" || redirectUris === null || scopeCeiling === null || resources === null || grantTypes === null || typeof dpop !== "boolean" || typeof keys2 !== "number" || !Number.isSafeInteger(keys2) || keys2 < 0 || typeof console !== "boolean") {
+      return null;
+    }
+    return { id, kind, authMethod, assertionAlg, redirectUris, scopeCeiling, resources, grantTypes, dpop, keys: keys2, console };
+  }
+  function readClientsPage(body) {
+    const listed = field(body, "clients");
+    const next = field(body, "next");
+    if (!Array.isArray(listed) || next !== null && typeof next !== "string") {
+      return null;
+    }
+    const clients = [];
+    for (const value of listed) {
+      const client = readClient(value);
+      if (client === null) {
+        return null;
+      }
+      clients.push(client);
+    }
+    return { clients, next };
+  }
+  function readRegistered(body) {
+    return readClient(body);
+  }
+  function listOf(text) {
+    return text.split(/\s+/).filter((value) => value !== "");
+  }
+  function clientIdOf(id) {
+    return id.length >= 1 && id.length <= 255 && /^[\x20-\x7e]+$/.test(id);
+  }
+  function jwkOf(text) {
+    try {
+      const parsed = JSON.parse(text);
+      return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  function registrationOf(form) {
+    const id = form.id.trim();
+    if (!clientIdOf(id)) {
+      return { wrong: "id" };
+    }
+    const redirects = listOf(form.redirects);
+    const grants = GRANTS.filter((grant) => form.grants.includes(grant));
+    if (grants.length === 0 || !form.confidential && grants.includes("client_credentials")) {
+      return { wrong: "grants" };
+    }
+    if (grants.includes("authorization_code") && redirects.length === 0) {
+      return { wrong: "redirects" };
+    }
+    const shared = {
+      client_id: id,
+      redirect_uris: redirects,
+      scope_ceiling: listOf(form.scopes),
+      resources: listOf(form.resources)
+    };
+    if (!form.confidential) {
+      return {
+        body: { ...shared, auth_method: "none", grant_types: grants, dpop_bound_access_tokens: form.dpop }
+      };
+    }
+    const jwk = jwkOf(form.jwk.trim());
+    if (jwk === null) {
+      return { wrong: "jwk" };
+    }
+    if (!ALGORITHMS.some((algorithm) => algorithm === form.algorithm)) {
+      return { wrong: "algorithm" };
+    }
+    return {
+      body: {
+        ...shared,
+        auth_method: "private_key_jwt",
+        assertion_alg: form.algorithm,
+        jwks: [jwk],
+        grant_types: grants,
+        dpop_bound_access_tokens: form.dpop
+      }
+    };
+  }
+
+  // src/clients.ts
+  var WRONG = {
+    id: "Give an id of 1 to 255 visible characters.",
+    jwk: "Paste the client's public key as one JSON object (a JWK).",
+    algorithm: "Choose the algorithm the client signs with.",
+    redirects: "A client using the code flow needs at least one redirect URI.",
+    scopes: "Give the scopes as words separated by spaces.",
+    grants: "Choose at least one grant; only a confidential client may act as itself."
+  };
+  function area(id, text) {
+    const input = make("textarea", "mono");
+    input.id = id;
+    input.rows = 2;
+    input.spellcheck = false;
+    const label2 = make("label", "", text);
+    label2.htmlFor = id;
+    return { input, row: make("div", "field", label2, input) };
+  }
+  function toggles(legend, name, options, on) {
+    const group = make("fieldset", "segmented", make("legend", "", legend));
+    const inputs = [];
+    for (const option of options) {
+      const input = make("input", "");
+      input.type = "checkbox";
+      input.id = `${name}-${option}`;
+      input.value = option;
+      input.checked = on.includes(option);
+      const label2 = make("label", "", option);
+      label2.htmlFor = input.id;
+      group.append(input, label2);
+      inputs.push(input);
+    }
+    return { group, chosen: () => inputs.filter((input) => input.checked).map((input) => input.value) };
+  }
+  function registerForm(screen, registered) {
+    const keyFor = keys();
+    const id = make("input", "mono");
+    id.type = "text";
+    id.autocomplete = "off";
+    id.spellcheck = false;
+    const kind = segmented("Kind", "client-kind", ["public", "confidential"], "public");
+    const algorithm = segmented("Signs with", "client-alg", ALGORITHMS, ALGORITHMS[0]);
+    const jwk = area("client-jwk", "Public key (JWK)");
+    const signing = [algorithm.group, jwk.row];
+    for (const part of signing) {
+      part.hidden = true;
+    }
+    kind.group.addEventListener("change", () => {
+      for (const part of signing) {
+        part.hidden = kind.chosen() !== "confidential";
+      }
+    });
+    const redirects = area("client-redirects", "Redirect URIs, one per line (exact, https or loopback)");
+    const scopes = make("input", "mono");
+    scopes.type = "text";
+    scopes.autocomplete = "off";
+    scopes.spellcheck = false;
+    const resources = area("client-resources", "Resources its tokens may go to, one per line (optional)");
+    const grants = toggles("Grants", "client-grant", GRANTS, ["authorization_code"]);
+    const dpop = toggles("Token binding", "client-dpop", ["DPoP-bound tokens"], []);
+    const reason = reasonField("client-reason");
+    const said = notice();
+    const submit = make("button", "primary", "Register the client");
+    submit.type = "submit";
+    const fields = {
+      id,
+      jwk: jwk.input,
+      algorithm: algorithm.group,
+      redirects: redirects.input,
+      scopes,
+      grants: grants.group
+    };
+    const form = make(
+      "form",
+      "change-form",
+      make("h2", "", "Register a client"),
+      labelled("client-id", "Client id", id),
+      kind.group,
+      ...signing,
+      redirects.row,
+      labelled("client-scopes", "Scopes it may ask for, separated by spaces", scopes),
+      resources.row,
+      grants.group,
+      dpop.group,
+      reason.row,
+      said,
+      submit
+    );
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      said.hidden = true;
+      for (const element2 of Object.values(fields)) {
+        element2.removeAttribute("aria-invalid");
+      }
+      const made = registrationOf({
+        id: id.value,
+        confidential: kind.chosen() === "confidential",
+        algorithm: algorithm.chosen() ?? "",
+        jwk: jwk.input.value,
+        redirects: redirects.input.value,
+        scopes: scopes.value,
+        resources: resources.input.value,
+        grants: grants.chosen(),
+        dpop: dpop.chosen().length > 0
+      });
+      if ("wrong" in made) {
+        said.textContent = WRONG[made.wrong];
+        said.hidden = false;
+        fields[made.wrong].setAttribute("aria-invalid", "true");
+        fields[made.wrong].focus();
+        return;
+      }
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      submit.disabled = true;
+      void change("api/clients", keyFor, { ...made.body, reason: why }).then((answer) => {
+        submit.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        const client = answer.ok ? readRegistered(answer.body) : null;
+        if (client !== null) {
+          registered(`Client ${client.id} registered as a ${client.kind} client.`);
+          return;
+        }
+        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That client", clientRefusalText);
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    return form;
+  }
+  function values(list) {
+    if (list.length === 0) {
+      return document.createTextNode("-");
+    }
+    const cell = make("ul", "plain");
+    for (const value of list) {
+      cell.append(make("li", "", make("code", "", value)));
+    }
+    return cell;
+  }
+  function clientsTable(clients) {
+    const head = make(
+      "tr",
+      "",
+      make("th", "", "Client"),
+      make("th", "", "Kind"),
+      make("th", "", "Redirect URIs"),
+      make("th", "", "Scopes"),
+      make("th", "", "Grants")
+    );
+    for (const cell of head.children) {
+      cell.setAttribute("scope", "col");
+    }
+    const body = make("tbody", "");
+    for (const client of clients) {
+      const kind = make("span", "badge", client.kind);
+      const name = make("td", "", make("code", "", client.id));
+      if (client.console) {
+        name.append(make("div", "", make("span", "pill", "this console")));
+      }
+      const signs = client.assertionAlg === null ? kind : make("span", "", kind, ` ${client.assertionAlg}`);
+      body.append(
+        make(
+          "tr",
+          "",
+          name,
+          make("td", "", signs),
+          make("td", "", values(client.redirectUris)),
+          make("td", "", values(client.scopeCeiling)),
+          make("td", "", values(client.grantTypes))
+        )
+      );
+    }
+    return make("table", "grid", make("thead", "", head), body);
+  }
+  async function clientsView(screen, after, message = "") {
+    say("Loading the clients.");
+    const answer = await call("GET", clientsPath(after));
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Clients", answer, "That page");
+      return;
+    }
+    const page = readClientsPage(answer.body);
+    if (page === null) {
+      unreadable(screen, "Clients");
+      return;
+    }
+    const redraw = (said) => void clientsView(screen, after, said);
+    const parts = [
+      heading("Clients"),
+      make("p", "lead", "Applications that sign people in through this company. A public client always uses PKCE; a confidential one proves itself with a key it registered. No shared secrets.")
+    ];
+    parts.push(
+      page.clients.length === 0 ? make("p", "empty", after === null ? "No clients yet." : "No more clients.") : clientsTable(page.clients)
+    );
+    const paging = make("p", "paging");
+    if (after !== null) {
+      paging.append(link("#/clients", "First page"));
+    }
+    if (page.next !== null) {
+      paging.append(link(`#/clients?${new URLSearchParams({ after: page.next }).toString()}`, "Next page"));
+    }
+    if (paging.childElementCount > 0) {
+      parts.push(paging);
+    }
+    parts.push(registerForm(screen, redraw));
     show(screen.view, ...parts);
     say(message);
   }
@@ -1546,6 +1877,9 @@
         return;
       case "user":
         void userView(screen, at.id);
+        return;
+      case "clients":
+        void clientsView(screen, at.after);
         return;
       case "operators":
         void operatorsView(screen, who, at.after);
