@@ -4,6 +4,7 @@
 mod audit;
 mod callback;
 mod change;
+mod clients_read;
 mod companies;
 mod console;
 mod enrolment;
@@ -158,6 +159,11 @@ pub fn admin_router(state: AdminState) -> Router {
         .route(
             "/admin/{company}/api/companies/{id}/resume",
             post(companies::resume),
+        )
+        .route("/admin/{company}/api/clients", get(clients_read::list))
+        .route(
+            "/admin/{company}/api/clients/{client}",
+            get(clients_read::one),
         )
         .route("/admin/{company}/api/operators", get(operators::list))
         .route(

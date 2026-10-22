@@ -110,6 +110,10 @@ pub const USER_PAGE_DEFAULT: u32 = 50;
 /// The most client registrations one page of a company's client list holds.
 pub const CLIENT_PAGE_MAX: u32 = 100;
 
+/// How many client registrations one page of a company's client list holds when the console asks for no particular
+/// number.
+pub const CLIENT_PAGE_DEFAULT: u32 = 50;
+
 /// The most operator grants one page of a company's operator list holds.
 pub const OPERATOR_PAGE_MAX: u32 = 100;
 
