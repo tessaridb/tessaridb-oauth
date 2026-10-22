@@ -25,6 +25,7 @@ mod refresh_revoke;
 mod replay;
 mod signer;
 mod signin_throttle;
+mod signins;
 mod subjects;
 mod throttle;
 mod tls;

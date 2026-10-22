@@ -13,6 +13,7 @@ pub mod passkeys;
 pub mod refresh;
 pub mod replay;
 mod retry;
+pub mod signins;
 mod storage;
 pub mod subjects;
 mod tenancy;

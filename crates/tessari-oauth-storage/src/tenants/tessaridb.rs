@@ -27,7 +27,8 @@ use crate::Result;
 /// code was accepted for; `recovery_codes` holds each recovery code under its owner and digest, indexed by user so a
 /// new set replaces the old. `passkeys` holds each credential under its credential id, so an id has one owner;
 /// `passkey_challenges` holds each issued challenge under the challenge itself for the five minutes
-/// (`WEBAUTHN_CHALLENGE_TTL_SECS`) it may be answered in.
+/// (`WEBAUTHN_CHALLENGE_TTL_SECS`) it may be answered in. `signins` holds one browser's sign-in in progress under the
+/// digest of its sign-in cookie value, for the ten minutes (`INTERACTION_TTL_SECS`) its authorization request is kept.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -76,7 +77,11 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      created_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS passkey_challenges (\
      ceremony string REQUIRED, user_id string, created_at int REQUIRED) \
-     EXPIRE AFTER 5m;";
+     EXPIRE AFTER 5m; \
+     DEFINE TABLE IF NOT EXISTS signins (\
+     interaction string REQUIRED, identified bool REQUIRED, user_id string, second_factor bool REQUIRED, \
+     methods array REQUIRED, revision int REQUIRED, created_at int REQUIRED) \
+     EXPIRE AFTER 10m;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

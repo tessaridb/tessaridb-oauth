@@ -50,3 +50,7 @@ pub const FACTOR_WRITE_ATTEMPTS: u32 = 8;
 /// Attempts at a passkey write — registering a credential, advancing its counter, issuing or spending a challenge — when
 /// the store answers `retry`, counting the first. A lost compare-and-set is then read back and answered as what it is.
 pub const PASSKEY_WRITE_ATTEMPTS: u32 = 8;
+
+/// Attempts at a sign-in-progress write (beginning, advancing a step, finishing) when the store answers `retry`,
+/// counting the first. A lost step is read back and answered as stale; one browser takes one step at a time.
+pub const SIGNIN_WRITE_ATTEMPTS: u32 = 8;
