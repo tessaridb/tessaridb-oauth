@@ -1,7 +1,7 @@
 use tessari_oauth_constants::TOTP_STEP_SECS;
 use tessari_oauth_types::Timestamp;
 
-use super::{TotpRefused, code_at, verify};
+use super::{TotpRefused, base32, code_at, provisioning, verify};
 
 /// RFC 6238 Appendix B: the SHA-1 seed.
 const SEED: &[u8] = b"12345678901234567890";
@@ -87,5 +87,32 @@ fn a_code_that_is_not_six_digits_is_malformed() {
         check(&wrong, None),
         Err(TotpRefused::Wrong),
         "six digits, wrong"
+    );
+}
+
+#[test]
+fn a_secret_is_written_in_unpadded_rfc_4648_base32() {
+    // RFC 4648 §10, the padding left off as authenticator apps read it.
+    for (bytes, text) in [
+        ("", ""),
+        ("f", "MY"),
+        ("fo", "MZXQ"),
+        ("foo", "MZXW6"),
+        ("foob", "MZXW6YQ"),
+        ("fooba", "MZXW6YTB"),
+        ("foobar", "MZXW6YTBOI"),
+    ] {
+        assert_eq!(base32(bytes.as_bytes()), text, "{bytes:?}");
+    }
+}
+
+#[test]
+fn the_provisioning_uri_names_the_issuer_the_account_and_the_parameters_codes_are_checked_with() {
+    let (secret, uri) = provisioning("Acme & Co", "ada@example.com", b"12345678901234567890");
+    assert_eq!(secret, "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+    assert_eq!(
+        uri,
+        "otpauth://totp/Acme%20%26%20Co:ada%40example.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&\
+         issuer=Acme%20%26%20Co&algorithm=SHA1&digits=6&period=30"
     );
 }

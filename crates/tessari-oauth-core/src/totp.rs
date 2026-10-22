@@ -84,6 +84,65 @@ pub fn verify(
     }
 }
 
+/// The RFC 4648 base32 alphabet.
+const BASE32: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+/// The base32 character for the low five bits of `value`.
+fn base32_char(value: u32) -> char {
+    usize::try_from(value & 0x1f)
+        .ok()
+        .and_then(|index| BASE32.get(index))
+        .map_or('A', |byte| char::from(*byte))
+}
+
+/// `bytes` in RFC 4648 base32, unpadded.
+fn base32(bytes: &[u8]) -> String {
+    let mut text = String::new();
+    let mut buffer: u32 = 0;
+    let mut held: u32 = 0;
+    for &byte in bytes {
+        buffer = (buffer << 8) | u32::from(byte);
+        held = held.saturating_add(8);
+        while held >= 5 {
+            held = held.saturating_sub(5);
+            text.push(base32_char(buffer >> held));
+        }
+        // Only the bits not yet written are kept, so the buffer never grows.
+        buffer &= (1_u32 << held).saturating_sub(1);
+    }
+    if held > 0 {
+        text.push(base32_char(buffer << 5_u32.saturating_sub(held)));
+    }
+    text
+}
+
+/// `text` with everything but the RFC 3986 unreserved characters percent-encoded.
+fn escaped(text: &str) -> String {
+    let mut out = String::new();
+    for byte in text.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            out.push(char::from(byte));
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
+/// What an authenticator app is given to enrol `secret` for `account` at `issuer`: the secret in base32, to type in,
+/// and the Key URI (`otpauth://totp/...`) to scan, naming the parameters codes are checked with.
+#[must_use]
+pub fn provisioning(issuer: &str, account: &str, secret: &[u8]) -> (String, String) {
+    let secret = base32(secret);
+    let issuer = escaped(issuer);
+    let uri = format!(
+        "otpauth://totp/{issuer}:{account}?secret={secret}&issuer={issuer}&algorithm=SHA1&digits={TOTP_DIGITS}&\
+         period={TOTP_STEP_SECS}",
+        account = escaped(account),
+    );
+    (secret, uri)
+}
+
 #[cfg(test)]
 #[path = "totp_tests.rs"]
 mod tests;
