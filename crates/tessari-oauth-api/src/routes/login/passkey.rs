@@ -30,7 +30,7 @@ use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::passkeys::Ceremony;
 use tessari_oauth_types::base64url;
 
-use super::{answer, binding, body, forget, record, rejected, step, unless_held};
+use super::{binding, body, forget, record, rejected, settled, step, unless_held};
 use crate::state::PublicState;
 use crate::throttle::ClientAddress;
 use crate::{Error, Result};
@@ -208,5 +208,5 @@ pub(in crate::routes) async fn passkey(
     if let Some(account) = &signin.account {
         forget(&state, &tenant, account).await;
     }
-    Ok(answer(reached, None))
+    settled(&state, &tenant, issuer, &binding, reached).await
 }

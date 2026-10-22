@@ -23,11 +23,13 @@ pub enum AuditKind {
     Cascade,
     /// A recovery code stood in for the account's second factor at sign-in.
     RecoveryUsed,
+    /// A sign-in completed and opened a session at this issuer.
+    SignedIn,
 }
 
 impl AuditKind {
     /// Every kind.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::IssuedCode,
         Self::IssuedRefresh,
         Self::IssuedClient,
@@ -37,6 +39,7 @@ impl AuditKind {
         Self::RevokedByClient,
         Self::Cascade,
         Self::RecoveryUsed,
+        Self::SignedIn,
     ];
 
     /// The name the message carries.
@@ -52,6 +55,7 @@ impl AuditKind {
             Self::RevokedByClient => "revoked_by_client",
             Self::Cascade => "cascade",
             Self::RecoveryUsed => "recovery_used",
+            Self::SignedIn => "signed_in",
         }
     }
 

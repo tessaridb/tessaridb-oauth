@@ -16,6 +16,14 @@ pub const LOGIN_BODY_MAX_BYTES: usize = 16 * 1024;
 /// keep it only when it is Secure, has Path `/` and names no domain (RFC 6265bis §4.1.3.2).
 pub const LOGIN_COOKIE: &str = "__Host-tessari-login";
 
+/// The cookie that carries a user's session at this issuer once a sign-in completes, under the same `__Host-` rules
+/// as the sign-in cookie.
+pub const SESSION_COOKIE: &str = "__Host-tessari-session";
+
+/// Where a browser whose sign-in completed is sent to continue its pending authorization, appended to the issuer
+/// with that authorization's id as `interaction`.
+pub const AUTHORIZE_RESUME_PATH: &str = "/oauth2/authorize/resume";
+
 /// The largest authorization-request body read when the request is POSTed as a form (OpenID Connect Core
 /// §3.1.2.1), in bytes — the same handful of short parameters a query carries.
 pub const AUTHORIZE_BODY_MAX_BYTES: usize = 16 * 1024;

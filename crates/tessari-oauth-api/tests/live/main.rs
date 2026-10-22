@@ -8,6 +8,7 @@
 mod authenticator;
 mod authorize;
 mod login;
+mod login_complete;
 mod login_factors;
 mod login_factors_race;
 mod login_passkey;

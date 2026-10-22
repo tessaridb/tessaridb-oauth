@@ -6,12 +6,13 @@
 use axum::http::StatusCode;
 use serde_json::json;
 use tessari_oauth_core::authentication::Method;
-use tessari_oauth_core::ceremony::Identity;
+
 use tessari_oauth_core::signin::SigninKey;
 use tessari_oauth_types::{Timestamp, UserId};
 
 use crate::authenticator::{Authenticator, ORIGIN, UP, UV};
 use crate::login::{begun, post, refused, register, signin};
+use crate::login_complete::completed;
 use crate::login_factors::{ADA, at_second_factor, enrolled};
 use crate::login_passkey::options;
 use crate::login_password::{account, fail, identified};
@@ -60,22 +61,11 @@ async fn a_passkey_that_verified_its_user_is_a_whole_sign_in_with_or_without_an_
         (identified(&server, ADA).await, "the address identified"),
     ] {
         let answered = sign(&server, &cookie, &device, ORIGIN, UP | UV, 0).await;
-        assert_eq!(answered.status, StatusCode::OK, "{case}");
-        assert_eq!(answered.body, json!({ "next": "complete" }), "{case}");
-        let kept = signin(&server, &cookie).await;
-        assert_eq!(
-            kept.ceremony.verified_methods(),
-            &[Method::Passkey {
-                user_verified: true
-            }],
-            "{case}"
-        );
-        // Identified first, the account keeps the second factor it has; found by its passkey, it needs none.
-        let expected = Identity::Known {
-            user: user.clone(),
-            second_factor: case == "the address identified",
-        };
-        assert_eq!(kept.ceremony.identity(), Some(&expected), "{case}");
+        let methods = [Method::Passkey {
+            user_verified: true,
+        }];
+        let opened = completed(&server, &answered, &methods).await;
+        assert_eq!(opened.user, user, "{case}");
     }
 }
 
@@ -87,16 +77,13 @@ async fn a_passkey_stands_as_a_second_factor_with_presence_alone() {
     with_passkey(&server, &device).await;
     let cookie = at_second_factor(&server).await;
     let answered = sign(&server, &cookie, &device, ORIGIN, UP, 0).await;
-    assert_eq!(answered.body, json!({ "next": "complete" }));
-    assert_eq!(
-        signin(&server, &cookie).await.ceremony.verified_methods(),
-        &[
-            Method::Password,
-            Method::Passkey {
-                user_verified: false
-            }
-        ]
-    );
+    let methods = [
+        Method::Password,
+        Method::Passkey {
+            user_verified: false,
+        },
+    ];
+    completed(&server, &answered, &methods).await;
 }
 
 #[tokio::test]
@@ -296,9 +283,9 @@ async fn a_held_address_or_a_step_out_of_place_is_refused_before_any_check() {
     .await;
     refused(
         &after,
-        StatusCode::CONFLICT,
-        "step_refused",
-        "after the outcome",
+        StatusCode::GONE,
+        "signin_expired",
+        "the sign-in is finished",
     );
     let none = post(
         &server,

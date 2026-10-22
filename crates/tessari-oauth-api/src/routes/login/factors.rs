@@ -37,7 +37,7 @@ pub(in crate::routes) async fn totp(
     headers: HeaderMap,
     read: std::result::Result<Json<Code>, JsonRejection>,
 ) -> Result<Response> {
-    let (tenant, _) = state.tenant(&tenant)?;
+    let (tenant, issuer) = state.tenant(&tenant)?;
     let binding = binding(&headers)?;
     let Code { code } = body(read)?;
     let now = (state.clock)();
@@ -68,7 +68,7 @@ pub(in crate::routes) async fn totp(
     if !accepted {
         return Err(rejected(&state, &tenant, &keys, Some(user), now).await);
     }
-    verified(&state, &tenant, &binding, &account, Method::Totp).await
+    verified(&state, (&tenant, issuer), &binding, &account, Method::Totp).await
 }
 
 pub(in crate::routes) async fn recovery(
@@ -78,7 +78,7 @@ pub(in crate::routes) async fn recovery(
     headers: HeaderMap,
     read: std::result::Result<Json<Code>, JsonRejection>,
 ) -> Result<Response> {
-    let (tenant, _) = state.tenant(&tenant)?;
+    let (tenant, issuer) = state.tenant(&tenant)?;
     let binding = binding(&headers)?;
     let Code { code } = body(read)?;
     let digest = recovery_digest(&code).ok_or(Error::Invalid)?;
@@ -107,7 +107,14 @@ pub(in crate::routes) async fn recovery(
         ..AuditEvent::of(AuditKind::RecoveryUsed)
     };
     record(&state, &tenant, &event, now).await;
-    verified(&state, &tenant, &binding, &account, Method::RecoveryCode).await
+    verified(
+        &state,
+        (&tenant, issuer),
+        &binding,
+        &account,
+        Method::RecoveryCode,
+    )
+    .await
 }
 
 /// The account the sign-in `binding` holds waits on a second factor for, with its counter key; [`Error::StepRefused`]

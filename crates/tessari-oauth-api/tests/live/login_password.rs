@@ -12,6 +12,7 @@ use tessari_oauth_storage::users::StoredPassword;
 use tessari_oauth_types::{Timestamp, UserId};
 
 use crate::login::{KNOWN, begun, post, refused, register, signin};
+use crate::login_complete::completed;
 use crate::token_fixture::{NOW, Server, passwords, server, tenant};
 
 pub(crate) const RIGHT: &str = "correct horse battery staple";
@@ -198,15 +199,7 @@ async fn the_right_password_moves_the_sign_in_on_and_forgets_the_failures() {
         json!({ "password": RIGHT }),
     )
     .await;
-    assert_eq!(answered.status, StatusCode::OK);
-    assert_eq!(answered.body, json!({ "next": "complete" }));
-    let kept = signin(&server, &cookie).await;
-    assert_eq!(kept.ceremony.verified_methods(), &[Method::Password]);
-    assert_eq!(
-        kept.account,
-        Some(account(KNOWN)),
-        "the counter key is kept"
-    );
+    completed(&server, &answered, &[Method::Password]).await;
     // Six failures in the window would hold the address; after the success only one is remembered.
     let again = identified(&server, KNOWN).await;
     let wrong = post(
@@ -295,9 +288,9 @@ async fn a_password_out_of_place_is_refused() {
     .await;
     refused(
         &again,
-        StatusCode::CONFLICT,
-        "step_refused",
-        "after the outcome",
+        StatusCode::GONE,
+        "signin_expired",
+        "the sign-in is finished",
     );
     let wrong = post(
         &server,
@@ -308,9 +301,9 @@ async fn a_password_out_of_place_is_refused() {
     .await;
     refused(
         &wrong,
-        StatusCode::CONFLICT,
-        "step_refused",
-        "a wrong one after the outcome",
+        StatusCode::GONE,
+        "signin_expired",
+        "a wrong one after the sign-in is finished",
     );
     let none = post(&server, "password", None, json!({ "password": RIGHT })).await;
     refused(&none, StatusCode::GONE, "signin_expired", "no sign-in");

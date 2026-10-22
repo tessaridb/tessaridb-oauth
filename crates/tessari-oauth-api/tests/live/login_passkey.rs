@@ -98,12 +98,12 @@ async fn options_follow_the_stage_and_need_a_sign_in() {
         json!({ "code": current_code() }),
     )
     .await;
-    assert_eq!(done.body, json!({ "next": "complete" }));
+    assert_eq!(done.body["next"], "complete");
     let after = options(&server, Some(&cookie)).await;
     refused(
         &after,
-        StatusCode::CONFLICT,
-        "step_refused",
-        "after the outcome",
+        StatusCode::GONE,
+        "signin_expired",
+        "the sign-in is finished",
     );
 }

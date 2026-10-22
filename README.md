@@ -208,8 +208,10 @@ the first two); past a few failures that key is held for a
 short, growing time that ends by itself (never a lockout), and a wrong password and an address with no account get
 the same `401`. A passkey answers its sign-in's challenge once: one that verified its user is a whole sign-in and
 names the account itself, one where a password came first stands as the second factor, and a passkey of another
-account, a foreign origin or a counter that did not move forward gets that same `401` and is counted. Logs are JSON
-on standard output, filtered by
+account, a foreign origin or a counter that did not move forward gets that same `401` and is counted. The step that
+completes a sign-in ends it and opens the user's session under a cookie of its own, `__Host-tessari-session`, drawn
+at that moment (a session lasts a working day without use and a week at most), and clears the sign-in cookie.
+Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.
 

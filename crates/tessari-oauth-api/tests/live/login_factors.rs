@@ -14,6 +14,7 @@ use tessari_oauth_storage::audit::AuditKind;
 use tessari_oauth_types::{Timestamp, UserId};
 
 use crate::login::{post, post_from, refused, signin};
+use crate::login_complete::completed;
 use crate::login_password::{RIGHT, SOURCE, account, fail, identified, with_password};
 use crate::token_fixture::{NOW, Server, plenty, server, tenant};
 
@@ -73,12 +74,7 @@ async fn a_one_time_code_signs_in_once() {
         json!({ "code": current_code() }),
     )
     .await;
-    assert_eq!(answered.status, StatusCode::OK);
-    assert_eq!(answered.body, json!({ "next": "complete" }));
-    assert_eq!(
-        signin(&server, &cookie).await.ceremony.verified_methods(),
-        &[Method::Password, Method::Totp]
-    );
+    completed(&server, &answered, &[Method::Password, Method::Totp]).await;
     let again = at_second_factor(&server).await;
     let replayed = post(
         &server,
@@ -213,12 +209,12 @@ async fn a_recovery_code_is_spent_once_and_recorded() {
     // Typed back off paper: lower case, no hyphens.
     let typed = RECOVERY.replace('-', "").to_lowercase();
     let answered = post(&server, "recovery", Some(&cookie), json!({ "code": typed })).await;
-    assert_eq!(answered.status, StatusCode::OK);
-    assert_eq!(answered.body, json!({ "next": "complete" }));
-    assert_eq!(
-        signin(&server, &cookie).await.ceremony.verified_methods(),
-        &[Method::Password, Method::RecoveryCode]
-    );
+    completed(
+        &server,
+        &answered,
+        &[Method::Password, Method::RecoveryCode],
+    )
+    .await;
     let again = at_second_factor(&server).await;
     let spent = post(
         &server,

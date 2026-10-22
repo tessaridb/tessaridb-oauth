@@ -36,7 +36,7 @@ pub(in crate::routes) async fn password(
     headers: HeaderMap,
     read: std::result::Result<Json<Password>, JsonRejection>,
 ) -> Result<Response> {
-    let (tenant, _) = state.tenant(&tenant)?;
+    let (tenant, issuer) = state.tenant(&tenant)?;
     let binding = binding(&headers)?;
     let Password { password } = body(read)?;
     let now = (state.clock)();
@@ -70,7 +70,14 @@ pub(in crate::routes) async fn password(
     if !proves(&state, &tenant, user.as_ref(), &password).await? {
         return Err(rejected(&state, &tenant, &keys, user, now).await);
     }
-    verified(&state, &tenant, &binding, &account, Method::Password).await
+    verified(
+        &state,
+        (&tenant, issuer),
+        &binding,
+        &account,
+        Method::Password,
+    )
+    .await
 }
 
 /// Whether `password` is the password of `user` in `tenant`; with no user, or a user with no password, it is checked
