@@ -8,6 +8,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use tessari_oauth_api::{AdminState, admin_router};
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
+use tessari_oauth_storage::audit::AuditKind;
 use tessari_oauth_storage::clients::NewClient;
 use tessari_oauth_storage::operators::OperatorRole;
 use tessari_oauth_types::{ClientId, RedirectUri, ScopeSet, Timestamp};
@@ -143,4 +144,211 @@ async fn the_company_clients_are_read_a_page_at_a_time_and_one_by_id() {
         let answer = read(state.clone(), refused, "console-c").await;
         assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{refused}");
     }
+}
+
+const CONSOLE: &str = "https://admin.example.com";
+
+fn registering(secret: &str, key: &str, body: &str) -> Request<Body> {
+    Request::post("/admin/acme/api/clients")
+        .header(header::COOKIE, format!("__Host-tessari-admin={secret}"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::ORIGIN, CONSOLE)
+        .header("idempotency-key", key)
+        .body(Body::from(body.to_owned()))
+        .expect("a request")
+}
+
+async fn send(state: AdminState, request: Request<Body>) -> Answer {
+    answer(
+        admin_router(state)
+            .oneshot(request)
+            .await
+            .expect("an answer"),
+    )
+    .await
+}
+
+/// RFC 8037 §A.2: an Ed25519 public key.
+const ED25519_JWK: &str =
+    r#"{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}"#;
+
+const SHOP: &str = r#"{"client_id":"shop","redirect_uris":["https://shop.example/cb"],
+"scope_ceiling":["openid","orders:read"],"resources":["https://api.example/orders"],"auth_method":"none",
+"grant_types":["authorization_code","refresh_token"],"reason":"new storefront, ticket 7"}"#;
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_operator_registers_a_client_once_through_the_registration_rules() {
+    let server = server(2).await;
+    let state = signed_in_as(
+        &server,
+        "operator-c",
+        &[OperatorRole::Clients],
+        "issuer-c",
+        "console-c",
+    )
+    .await;
+    let made = send(
+        state.clone(),
+        registering("console-c", "register-shop-001", SHOP),
+    )
+    .await;
+    assert_eq!(made.status, StatusCode::CREATED, "{:?}", made.body);
+    assert_eq!(made.body["client_id"], "shop");
+    assert_eq!(made.body["kind"], "public");
+    assert_eq!(
+        made.body["redirect_uris"],
+        serde_json::json!(["https://shop.example/cb"])
+    );
+    let found = server
+        .storage
+        .clients
+        .find(
+            &tenant("acme"),
+            &ClientId::parse("shop").expect("a client id"),
+        )
+        .await
+        .expect("an answer")
+        .expect("registered");
+    assert_eq!(found.auth_method, AuthMethod::None);
+    assert_eq!(
+        found.grant_types,
+        [GrantType::AuthorizationCode, GrantType::RefreshToken]
+    );
+    let elsewhere = server
+        .storage
+        .clients
+        .find(
+            &tenant("initech"),
+            &ClientId::parse("shop").expect("a client id"),
+        )
+        .await
+        .expect("an answer");
+    assert!(
+        elsewhere.is_none(),
+        "registered in the operator's company only"
+    );
+    let trail = server
+        .storage
+        .audit
+        .read_after(&tenant("acme"), 0, 500)
+        .await
+        .expect("the trail reads");
+    assert!(trail.iter().any(|message| {
+        message.event.kind == AuditKind::AdminAction
+            && message.event.action.as_deref() == Some("clients.register")
+            && message.event.reason.as_deref() == Some("new storefront, ticket 7")
+    }));
+    let repeated = send(
+        state.clone(),
+        registering("console-c", "register-shop-001", SHOP),
+    )
+    .await;
+    assert_eq!(repeated.status, StatusCode::CREATED);
+    assert_eq!(repeated.body, made.body);
+
+    let taken = send(
+        state.clone(),
+        registering("console-c", "register-shop-002", SHOP),
+    )
+    .await;
+    assert_eq!(taken.status, StatusCode::CONFLICT, "{:?}", taken.body);
+    assert_eq!(taken.body["code"], "client_taken");
+    let console = SHOP.replace(r#""client_id":"shop""#, r#""client_id":"admin-console""#);
+    let reserved = send(
+        state.clone(),
+        registering("console-c", "register-cons-001", &console),
+    )
+    .await;
+    assert_eq!(reserved.status, StatusCode::CONFLICT, "{:?}", reserved.body);
+    assert_eq!(reserved.body["code"], "client_reserved");
+
+    let signed = format!(
+        r#"{{"client_id":"svc","redirect_uris":[],"scope_ceiling":["orders:read"],"auth_method":"private_key_jwt",
+"assertion_alg":"EdDSA","jwks":[{}],"grant_types":["client_credentials"],"reason":"billing job"}}"#,
+        ED25519_JWK
+    );
+    let confidential = send(
+        state.clone(),
+        registering("console-c", "register-svc-0001", &signed),
+    )
+    .await;
+    assert_eq!(
+        confidential.status,
+        StatusCode::CREATED,
+        "{:?}",
+        confidential.body
+    );
+    assert_eq!(confidential.body["kind"], "confidential");
+    assert_eq!(confidential.body["assertion_alg"], "EdDSA");
+    assert_eq!(confidential.body["keys"], 1);
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_registration_outside_the_rules_is_refused_and_nothing_is_written() {
+    let server = server(2).await;
+    let state = signed_in_as(
+        &server,
+        "operator-c",
+        &[OperatorRole::Clients],
+        "issuer-c",
+        "console-c",
+    )
+    .await;
+    let cases = [
+        // a shared secret this server cannot verify at its token endpoint
+        SHOP.replace(
+            r#""auth_method":"none""#,
+            r#""auth_method":"client_secret_basic""#,
+        ),
+        // a public client acting as itself
+        SHOP.replace(
+            r#""authorization_code","refresh_token""#,
+            r#""client_credentials""#,
+        ),
+        // keys for a client that does not sign
+        SHOP.replace(
+            r#""auth_method":"none""#,
+            &format!(r#""auth_method":"none","jwks":[{ED25519_JWK}]"#),
+        ),
+        // an assertion algorithm without private_key_jwt
+        SHOP.replace(
+            r#""auth_method":"none""#,
+            r#""auth_method":"none","assertion_alg":"EdDSA""#,
+        ),
+        // plain http off the loopback
+        SHOP.replace("https://shop.example/cb", "http://shop.example/cb"),
+        // a code flow with nowhere to send the code
+        SHOP.replace(r#"["https://shop.example/cb"]"#, "[]"),
+        // no grant at all
+        SHOP.replace(r#"["authorization_code","refresh_token"]"#, "[]"),
+        // a grant this server does not know
+        SHOP.replace(r#""refresh_token""#, r#""password""#),
+        // a field outside the allow-list, such as another company
+        SHOP.replace(
+            r#""client_id":"shop""#,
+            r#""client_id":"shop","tenant":"initech""#,
+        ),
+    ];
+    for (number, case) in cases.iter().enumerate() {
+        let key = format!("refused-shop-{number:04}");
+        let refused = send(state.clone(), registering("console-c", &key, case)).await;
+        assert_eq!(
+            refused.status,
+            StatusCode::BAD_REQUEST,
+            "case {number}: {:?}",
+            refused.body
+        );
+    }
+    let found = server
+        .storage
+        .clients
+        .find(
+            &tenant("acme"),
+            &ClientId::parse("shop").expect("a client id"),
+        )
+        .await
+        .expect("an answer");
+    assert!(found.is_none(), "no refused registration was written");
 }
