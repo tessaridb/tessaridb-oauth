@@ -272,12 +272,12 @@
     }
     return found;
   }
-  async function call(method, path, body) {
+  async function call(method, path, body, extra) {
     const init = {
       method,
       credentials: "same-origin",
       cache: "no-store",
-      headers: { accept: "application/json", "content-type": "application/json" }
+      headers: { accept: "application/json", "content-type": "application/json", ...extra }
     };
     if (body !== void 0) {
       init.body = JSON.stringify(body);
