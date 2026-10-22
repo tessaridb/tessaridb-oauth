@@ -16,6 +16,7 @@ mod consents;
 mod factors;
 mod interactions;
 mod keys;
+mod passkeys;
 mod refresh;
 mod refresh_cascade;
 mod refresh_grant;

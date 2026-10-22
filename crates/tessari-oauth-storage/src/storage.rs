@@ -12,6 +12,7 @@ use crate::consents::{ConsentService, TessaridbConsentRepository};
 use crate::factors::{FactorService, TessaridbFactorRepository};
 use crate::interactions::{InteractionService, TessaridbInteractionRepository};
 use crate::keys::{KeyService, TessaridbKeyRepository};
+use crate::passkeys::{PasskeyService, TessaridbPasskeyRepository};
 use crate::refresh::{RefreshService, TessaridbRefreshRepository};
 use crate::replay::{ReplayService, TessaridbReplayRepository};
 use crate::subjects::{SubjectService, TessaridbSecretRepository};
@@ -46,6 +47,8 @@ pub struct Storage {
     pub users: Arc<UserService>,
     /// Second factors.
     pub factors: Arc<FactorService>,
+    /// Passkeys and their challenges.
+    pub passkeys: Arc<PasskeyService>,
     /// The audit trail.
     pub audit: Arc<AuditService>,
 }
@@ -68,6 +71,7 @@ impl Storage {
         let audit_repository = Arc::new(TessaridbAuditRepository::new(database.clone()));
         let user_repository = Arc::new(TessaridbUserRepository::new(database.clone()));
         let factor_repository = Arc::new(TessaridbFactorRepository::new(database.clone()));
+        let passkey_repository = Arc::new(TessaridbPasskeyRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
         Self {
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
@@ -89,6 +93,7 @@ impl Storage {
             throttle: Arc::new(ThrottleService::new(throttle_repository, tenancy.clone())),
             users: Arc::new(UserService::new(user_repository, tenancy.clone())),
             factors: Arc::new(FactorService::new(factor_repository, tenancy.clone())),
+            passkeys: Arc::new(PasskeyService::new(passkey_repository, tenancy.clone())),
             audit,
         }
     }

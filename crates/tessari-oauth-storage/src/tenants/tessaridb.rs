@@ -25,7 +25,9 @@ use crate::Result;
 /// address itself, so an address belongs to one account and sign-in finds it by id; `credentials` holds an account's
 /// password hash under the account's id. `totp_factors` holds a user's one-time code secret, sealed, with the last step a
 /// code was accepted for; `recovery_codes` holds each recovery code under its owner and digest, indexed by user so a
-/// new set replaces the old.
+/// new set replaces the old. `passkeys` holds each credential under its credential id, so an id has one owner;
+/// `passkey_challenges` holds each issued challenge under the challenge itself for the five minutes
+/// (`WEBAUTHN_CHALLENGE_TTL_SECS`) it may be answered in.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -68,7 +70,13 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS totp_factors (\
      user_id string REQUIRED, sealed string REQUIRED, last_step int REQUIRED, created_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS recovery_codes (user_id string REQUIRED, created_at int REQUIRED); \
-     DEFINE INDEX IF NOT EXISTS by_user ON recovery_codes FIELDS user_id;";
+     DEFINE INDEX IF NOT EXISTS by_user ON recovery_codes FIELDS user_id; \
+     DEFINE TABLE IF NOT EXISTS passkeys (\
+     user_id string REQUIRED, public_key string REQUIRED, sign_count int REQUIRED, backup_eligible bool REQUIRED, \
+     created_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS passkey_challenges (\
+     ceremony string REQUIRED, user_id string, created_at int REQUIRED) \
+     EXPIRE AFTER 5m;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,
