@@ -179,3 +179,19 @@ async fn under_required_an_account_without_a_second_factor_enrols_before_a_code(
         "the same request is answered once a second factor is held"
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn the_account_page_is_told_the_policy() {
+    let server = server(2).await;
+    let user = with_password(&server, "meitner@example.com").await;
+    let asking = session(&server, &user, "meitner", &[Method::Password], 0).await;
+    let me = call(&server, "GET", "me", Some(&asking), None).await;
+    assert_eq!(
+        me.body["two_factor"], "optional",
+        "until a company sets one"
+    );
+    under(&server, TwoFactorPolicy::Required).await;
+    let me = call(&server, "GET", "me", Some(&asking), None).await;
+    assert_eq!(me.body["two_factor"], "required");
+}

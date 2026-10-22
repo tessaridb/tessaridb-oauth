@@ -64,6 +64,7 @@ async fn a_user_reads_their_address_and_factors_and_nobody_elses() {
             "email": "noyce@example.com",
             "email_verified": verified,
             "factors": { "password": true, "totp": false, "recovery_codes": 0, "passkeys": [] },
+            "two_factor": "optional",
         })
     );
     let at = Timestamp::from_unix_secs(NOW);

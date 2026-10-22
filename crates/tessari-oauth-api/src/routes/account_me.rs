@@ -3,8 +3,8 @@
 //! It needs the session this issuer opened for the browser and reads that session's user alone: the address they sign
 //! in with and whether it is verified, and their sign-in factors as facts: whether a password is set, whether an
 //! authenticator app is enrolled, how many recovery codes are left, and each passkey by its credential id with when it
-//! was registered and whether it may be synced. No secret, hash or key is ever part of it. No answer may be stored by
-//! a cache.
+//! was registered and whether it may be synced; and the company's two-factor policy (`off`, `optional`, `required`)
+//! the page offers factors under. No secret, hash or key is ever part of it. No answer may be stored by a cache.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -21,6 +21,7 @@ struct Me {
     email: String,
     email_verified: bool,
     factors: Factors,
+    two_factor: &'static str,
 }
 
 #[derive(Serialize)]
@@ -76,6 +77,11 @@ pub(super) async fn me(
             synced: listed.synced,
         })
         .collect();
+    let policy = state
+        .policies
+        .two_factor(&tenant)
+        .await
+        .map_err(Error::Store)?;
     let me = Me {
         email: account.email.as_str().to_owned(),
         email_verified: account.email_verified,
@@ -85,6 +91,7 @@ pub(super) async fn me(
             recovery_codes: summary.recovery_codes,
             passkeys,
         },
+        two_factor: policy.name(),
     };
     Ok((StatusCode::OK, Json(me)).into_response())
 }
