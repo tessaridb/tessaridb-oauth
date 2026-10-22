@@ -32,6 +32,8 @@ use crate::Result;
 /// digest of its sign-in cookie value, for the ten minutes (`INTERACTION_TTL_SECS`) its authorization request is kept.
 /// `sessions` holds a user's session under the digest of its session cookie value, for at most the week
 /// (`SESSION_ABSOLUTE_SECS`) a session lasts, found for its user's own list by `by_user`.
+/// `enrolments` holds a user's one live enrolment code under its digest for 72 hours, found by `by_user` when a new code
+/// replaces it.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -105,7 +107,10 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE EVENT OR REPLACE tell_clients ON sessions FOR DELETE WHEN array::len($before.clients ?? []) > 0 \
      THEN CREATE logout_deliveries:$id = { user_id: $before.user_id, sid: $before.sid, clients: $before.clients, \
      due: time::now() }; \
-     DEFINE INDEX IF NOT EXISTS by_user ON sessions FIELDS user_id;";
+     DEFINE INDEX IF NOT EXISTS by_user ON sessions FIELDS user_id; \
+     DEFINE TABLE IF NOT EXISTS enrolments (\
+     user_id string REQUIRED, created_at int REQUIRED, created_by string REQUIRED) EXPIRE AFTER 72h; \
+     DEFINE INDEX IF NOT EXISTS by_user ON enrolments FIELDS user_id;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

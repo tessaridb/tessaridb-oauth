@@ -6,6 +6,7 @@ pub mod clients;
 pub mod codes;
 pub mod companies;
 pub mod consents;
+pub mod enrolments;
 mod error;
 pub mod factors;
 pub mod interactions;

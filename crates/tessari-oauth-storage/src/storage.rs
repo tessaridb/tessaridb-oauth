@@ -10,6 +10,7 @@ use crate::clients::{ClientService, TessaridbClientRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
 use crate::companies::{CompanyService, TessaridbCompanyRepository};
 use crate::consents::{ConsentService, TessaridbConsentRepository};
+use crate::enrolments::{EnrolmentService, TessaridbEnrolmentRepository};
 use crate::factors::{FactorService, TessaridbFactorRepository};
 use crate::interactions::{InteractionService, TessaridbInteractionRepository};
 use crate::keys::{KeyService, TessaridbKeyRepository};
@@ -52,6 +53,8 @@ pub struct Storage {
     pub throttle: Arc<ThrottleService>,
     /// Accounts and their credentials.
     pub users: Arc<UserService>,
+    /// One-time codes that let a user an operator created set a first credential.
+    pub enrolments: Arc<EnrolmentService>,
     /// Second factors.
     pub factors: Arc<FactorService>,
     /// Each company's policies.
@@ -86,6 +89,7 @@ impl Storage {
         let throttle_repository = Arc::new(TessaridbThrottleRepository::new(database.clone()));
         let audit_repository = Arc::new(TessaridbAuditRepository::new(database.clone()));
         let user_repository = Arc::new(TessaridbUserRepository::new(database.clone()));
+        let enrolment_repository = Arc::new(TessaridbEnrolmentRepository::new(database.clone()));
         let factor_repository = Arc::new(TessaridbFactorRepository::new(database.clone()));
         let policy_repository = Arc::new(TessaridbPolicyRepository::new(database.clone()));
         let passkey_repository = Arc::new(TessaridbPasskeyRepository::new(database.clone()));
@@ -115,6 +119,7 @@ impl Storage {
             subjects: Arc::new(SubjectService::new(secret_repository, tenancy.clone())),
             throttle: Arc::new(ThrottleService::new(throttle_repository, tenancy.clone())),
             users: Arc::new(UserService::new(user_repository, tenancy.clone())),
+            enrolments: Arc::new(EnrolmentService::new(enrolment_repository, tenancy.clone())),
             factors: Arc::new(FactorService::new(factor_repository, tenancy.clone())),
             policies: Arc::new(PolicyService::new(policy_repository, tenancy.clone())),
             passkeys: Arc::new(PasskeyService::new(passkey_repository, tenancy.clone())),

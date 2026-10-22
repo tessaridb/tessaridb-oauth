@@ -14,6 +14,7 @@ mod clients;
 mod codes;
 mod companies;
 mod consents;
+mod enrolments;
 mod factor_removal;
 mod factors;
 mod interactions;
