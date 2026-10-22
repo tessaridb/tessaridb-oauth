@@ -1,6 +1,7 @@
 //! The audit trail: every message lands in commit order with what it said, carries no secret, and stays as written.
 
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
+use tessari_oauth_storage::operators::OperatorRole;
 use tessari_oauth_types::{ClientId, KeyThumbprint, ScopeSet, TenantId, Timestamp, UserId};
 
 use crate::fresh;
@@ -38,7 +39,20 @@ async fn messages_are_read_back_in_order_as_they_were_recorded() {
         families: Some(3),
         ..AuditEvent::of(AuditKind::Cascade)
     };
-    for (event, at) in [(&issued, 10), (&refused, 11), (&cascade, 12)] {
+    let changed = AuditEvent {
+        actor: Some("operator-1".to_owned()),
+        user: Some(UserId::parse("user-7").expect("a user id")),
+        role: Some(OperatorRole::Users),
+        action: Some("user.disable".to_owned()),
+        reason: Some("left the company".to_owned()),
+        ..AuditEvent::of(AuditKind::AdminAction)
+    };
+    for (event, at) in [
+        (&issued, 10),
+        (&refused, 11),
+        (&cascade, 12),
+        (&changed, 13),
+    ] {
         storage
             .audit
             .record(&tenant(), event, Timestamp::from_unix_secs(at))
@@ -56,13 +70,22 @@ async fn messages_are_read_back_in_order_as_they_were_recorded() {
         .collect();
     assert_eq!(
         read,
-        vec![(1, 10, issued), (2, 11, refused), (3, 12, cascade.clone())]
+        vec![
+            (1, 10, issued),
+            (2, 11, refused),
+            (3, 12, cascade.clone()),
+            (4, 13, changed.clone())
+        ]
     );
     let after = storage
         .audit
         .read_after(&tenant(), 2, 10)
         .await
         .expect("read");
-    assert_eq!(after.len(), 1, "only the third comes after the second");
-    assert_eq!(after[0].event, cascade);
+    let events: Vec<_> = after.into_iter().map(|record| record.event).collect();
+    assert_eq!(
+        events,
+        vec![cascade, changed],
+        "the third and fourth come after the second"
+    );
 }

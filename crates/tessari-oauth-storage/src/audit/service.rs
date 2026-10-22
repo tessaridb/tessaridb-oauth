@@ -58,6 +58,7 @@ fn to_entity(event: &AuditEvent, now: Timestamp) -> Result<AuditEntity> {
             })?,
         actor: event.actor.clone(),
         role_name: event.role.map(|role| role.name().to_owned()),
+        action: event.action.clone(),
         at: i64::try_from(now.unix_secs()).map_err(|_| Error::Invalid {
             record: "audit message",
             reason: "a time beyond i64",
@@ -106,6 +107,7 @@ fn to_record(message: AuditMessageEntity) -> Result<AuditRecord> {
             .role_name
             .map(|name| OperatorRole::parse(&name).ok_or_else(|| unreadable("role_name")))
             .transpose()?,
+        action: entity.action,
     };
     Ok(AuditRecord {
         position: u64::try_from(message.position).map_err(|_| unreadable("position"))?,

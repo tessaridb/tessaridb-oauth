@@ -47,7 +47,8 @@ impl AuditRepository for TessaridbAuditRepository {
                 place,
                 "CREATE audit:$id = { kind: $kind, client_id: $client_id, user_id: $user_id, subject: $subject, \
                  scopes: $scopes, audience: $audience, jti: $jti, auth_method: $auth_method, jkt: $jkt, \
-                 reason: $reason, families: $families, actor: $actor, role_name: $role, at: $at };",
+                 reason: $reason, families: $families, actor: $actor, role_name: $role, action: $action, \
+                 at: $at };",
                 vec![
                     ("id".to_owned(), Value::from(id)),
                     ("kind".to_owned(), Value::from(message.kind.as_str())),
@@ -66,6 +67,7 @@ impl AuditRepository for TessaridbAuditRepository {
                     ),
                     ("actor".to_owned(), text(message.actor.as_ref())),
                     ("role".to_owned(), text(message.role_name.as_ref())),
+                    ("action".to_owned(), text(message.action.as_ref())),
                     ("at".to_owned(), Value::from(message.at)),
                 ],
             )

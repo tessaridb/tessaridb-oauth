@@ -43,11 +43,14 @@ pub enum AuditKind {
     BreakGlass,
     /// `user` opened an admin console session.
     ConsoleSignedIn,
+    /// The operator `actor` made the console change `action` under `role`, to `user` when it concerns one; `reason`
+    /// is the operator's own.
+    AdminAction,
 }
 
 impl AuditKind {
     /// Every kind.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::IssuedCode,
         Self::IssuedRefresh,
         Self::IssuedClient,
@@ -66,6 +69,7 @@ impl AuditKind {
         Self::OperatorRevoked,
         Self::BreakGlass,
         Self::ConsoleSignedIn,
+        Self::AdminAction,
     ];
 
     /// The name the message carries.
@@ -90,6 +94,7 @@ impl AuditKind {
             Self::OperatorRevoked => "operator_revoked",
             Self::BreakGlass => "break_glass",
             Self::ConsoleSignedIn => "console_signed_in",
+            Self::AdminAction => "admin_action",
         }
     }
 
@@ -128,8 +133,10 @@ pub struct AuditEvent {
     pub families: Option<u64>,
     /// Who acted, when it was not `user`: an operator's user id, or the emergency path's name.
     pub actor: Option<String>,
-    /// The operator role given or taken.
+    /// The operator role given or taken, or the one a console change was made under.
     pub role: Option<OperatorRole>,
+    /// The console change made, by name.
+    pub action: Option<String>,
 }
 
 impl AuditEvent {
@@ -149,6 +156,7 @@ impl AuditEvent {
             reason: None,
             families: None,
             actor: None,
+            action: None,
             role: None,
         }
     }

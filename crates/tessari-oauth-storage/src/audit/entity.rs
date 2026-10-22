@@ -31,6 +31,8 @@ pub struct AuditEntity {
     pub actor: Option<String>,
     /// The operator role's name.
     pub role_name: Option<String>,
+    /// The console change made, by name.
+    pub action: Option<String>,
     /// Unix seconds of the event.
     pub at: i64,
 }
@@ -51,6 +53,7 @@ impl FromRecord for AuditEntity {
             families: row.take("families")?,
             actor: row.take("actor")?,
             role_name: row.take("role_name")?,
+            action: row.take("action")?,
             at: row.take("at")?,
         })
     }
