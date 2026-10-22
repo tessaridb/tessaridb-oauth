@@ -284,17 +284,18 @@ authorization belongs to the browser that brought it to `/oauth2/authorize`, by 
 answer its consent or receive its code.
 
 The sign-in, consent and account pages are served by the binary itself at `<issuer>/login`, `<issuer>/consent` and
-`<issuer>/account`, with their script, style and mark under `<issuer>/assets/`. The account page shows the
-signed-in user's address, how the account signs in, where it is signed in and which applications hold access; it
-signs out one session or every session after a confirmation, takes an application's access back, saying when the
-tokens it already holds stop working, changes the password, issues new recovery codes shown once, turns on an
-authenticator app from a key shown once, and adds or removes passkeys. Without a session it offers a sign-in (`<issuer>/login?return=account`) that comes back to it, and it offers the same
-sign-in when a change needs a recent one. They load nothing from anywhere else, talk only to this
-server, submit no form, cannot be framed, follow the system's light or dark theme and work from the keyboard alone;
-a passkey is offered wherever the browser supports one. Their TypeScript source is in
-`crates/tessari-oauth-api/pages/`, and its built output is committed to `crates/tessari-oauth-api/assets/`, so
-building the server needs no Node. After changing the source, `npm install` once and `npm run build` there;
-`npm run verify` type-checks, runs the page tests and fails when the committed assets differ from a rebuild.
+`<issuer>/account`, with their script, style and mark under `<issuer>/assets/`. The account page shows the signed-in
+user's address, how the account signs in, where it is signed in and which applications hold access; it signs out one
+session or every session after a confirmation, takes an application's access back, saying when the tokens it already
+holds stop working, changes the password, issues new recovery codes shown once, turns on an authenticator app from a
+key shown once, and adds or removes passkeys. Without a session it offers a sign-in
+(`<issuer>/login?return=account`) that comes back to it, and it offers the same sign-in when a change needs a recent
+one. They load nothing from anywhere else, talk only to this server, submit no form, cannot be framed, follow the
+system's light or dark theme and work from the keyboard alone; a passkey is offered wherever the browser supports
+one. Their TypeScript source is in `crates/tessari-oauth-api/pages/`, and its built output is committed to
+`crates/tessari-oauth-api/assets/`, so building the server needs no Node. After changing the source, `npm install`
+once and `npm run build` there; `npm run verify` type-checks, runs the page tests and fails when the committed
+assets differ from a rebuild.
 
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
