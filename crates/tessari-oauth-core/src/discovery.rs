@@ -1,4 +1,5 @@
-//! The authorization-server metadata (RFC 8414), rendered from the lists the request checks enforce.
+//! The authorization-server metadata (RFC 8414), which is also the OpenID Provider metadata (OpenID Connect Discovery
+//! 1.0 §3), rendered from the lists the request checks enforce.
 //!
 //! Nothing here is written by hand: each supported value is read from the constant or enum that the matching check
 //! consults, so the document cannot advertise what the server refuses. A field whose check does not exist yet is
@@ -14,6 +15,7 @@ use url::Url;
 use crate::authorize::{CHALLENGE_METHOD_S256, RESPONSE_TYPE_CODE};
 use crate::clients::GrantType;
 use crate::dpop;
+use crate::subject::SUBJECT_TYPE_PAIRWISE;
 use crate::token::VERIFIED_AUTH_METHODS;
 
 /// The issuer is not an `https` URL without query, fragment, credentials or trailing slash in its exact
@@ -41,6 +43,8 @@ pub struct Metadata {
     authorization_response_iss_parameter_supported: bool,
     pushed_authorization_request_endpoint: String,
     require_pushed_authorization_requests: bool,
+    subject_types_supported: [&'static str; 1],
+    id_token_signing_alg_values_supported: [&'static str; 1],
 }
 
 /// The `issuer` exactly as given, when it is a valid issuer identifier.
@@ -68,12 +72,12 @@ fn algorithm_names(algorithms: &[Algorithm]) -> Vec<&'static str> {
         .collect()
 }
 
-/// The metadata of the tenant whose issuer is `issuer`.
+/// The metadata of the tenant whose issuer is `issuer` and whose ID tokens are signed with `id_token_algorithm`.
 ///
 /// # Errors
 ///
 /// [`IssuerRefused`] when `issuer` is not a valid issuer identifier.
-pub fn metadata(issuer: &str) -> Result<Metadata, IssuerRefused> {
+pub fn metadata(issuer: &str, id_token_algorithm: Algorithm) -> Result<Metadata, IssuerRefused> {
     let issuer = checked(issuer)?;
     Ok(Metadata {
         issuer: issuer.to_owned(),
@@ -95,6 +99,9 @@ pub fn metadata(issuer: &str) -> Result<Metadata, IssuerRefused> {
         // A client may push its request (RFC 9126); none is made to, so the browser's URL still works.
         pushed_authorization_request_endpoint: format!("{issuer}{PAR_PATH}"),
         require_pushed_authorization_requests: false,
+        // Every client knows a user by a pairwise identifier (OpenID Connect Core §8.1).
+        subject_types_supported: [SUBJECT_TYPE_PAIRWISE],
+        id_token_signing_alg_values_supported: [id_token_algorithm.name()],
     })
 }
 

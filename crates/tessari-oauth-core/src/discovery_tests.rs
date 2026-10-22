@@ -8,7 +8,7 @@ use crate::token::{Endpoint, PresentedAuth, authenticate_client, require_grant};
 use crate::{Params, Reason};
 
 fn document() -> Value {
-    let rendered = metadata(ACME_ISSUER).expect("a valid issuer");
+    let rendered = metadata(ACME_ISSUER, Algorithm::Es256).expect("a valid issuer");
     serde_json::to_value(&rendered).expect("serialisable")
 }
 
@@ -52,7 +52,11 @@ fn an_issuer_that_is_not_a_plain_https_url_is_refused() {
         "https://id.example.com/x/../acme",
         "not a url",
     ] {
-        assert_eq!(metadata(issuer).err(), Some(IssuerRefused), "{issuer}");
+        assert_eq!(
+            metadata(issuer, Algorithm::Es256).err(),
+            Some(IssuerRefused),
+            "{issuer}"
+        );
     }
 }
 
@@ -192,11 +196,24 @@ fn userinfo_is_advertised_under_the_issuer() {
 #[test]
 fn nothing_the_server_does_not_enforce_yet_is_advertised() {
     let document = document();
-    for field in [
-        "id_token_signing_alg_values_supported",
-        "subject_types_supported",
-        "scopes_supported",
-    ] {
-        assert!(document.get(field).is_none(), "{field}");
-    }
+    // The ID token's subject type and algorithm are advertised now that ID tokens are issued; scopes are not yet.
+    assert!(document.get("scopes_supported").is_none());
+}
+
+#[test]
+fn the_openid_fields_name_the_one_subject_type_and_the_signing_algorithm() {
+    let document = document();
+    assert_eq!(names(&document, "subject_types_supported"), ["pairwise"]);
+    assert_eq!(
+        names(&document, "id_token_signing_alg_values_supported"),
+        ["ES256"]
+    );
+    let other =
+        serde_json::to_value(metadata(ACME_ISSUER, Algorithm::EdDsa).expect("a valid issuer"))
+            .expect("serialisable");
+    assert_eq!(
+        names(&other, "id_token_signing_alg_values_supported"),
+        [Algorithm::EdDsa.name()],
+        "the configured algorithm, whichever it is"
+    );
 }

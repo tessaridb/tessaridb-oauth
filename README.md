@@ -21,12 +21,13 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 
 > [!NOTE]
 > **Users can sign in through it, but nobody can create an account through it yet.**
-> The binary serves each tenant's server metadata (RFC 8414) and key set (RFC 7517) over TLS, its authorization,
-> pushed authorization request, token, revocation and UserInfo endpoints, the sign-in and consent pages, ID tokens,
-> and the account API a signed-in user reads and manages their own sessions and grants with, and it rotates the
-> tenants' signing keys. Accounts and their factors are not yet created or changed through any served surface; the
-> account portal page and the admin panel come next. No release has been cut. Apart from the [Status](#status)
-> section and the endpoints described below, this page describes what the project is for, not a working system.
+> The binary serves each tenant's server metadata (RFC 8414, also served as the OpenID Provider configuration) and key
+> set (RFC 7517) over TLS, its authorization, pushed authorization request, token, revocation and UserInfo endpoints,
+> the sign-in and consent pages, ID tokens, and the account API a signed-in user reads and manages their own sessions
+> and grants with, and it rotates the tenants' signing keys. Accounts and their factors are not yet created or changed
+> through any served surface; the account portal page and the admin panel come next. No release has been cut. Apart from
+> the [Status](#status) section and the endpoints described below, this page describes what the project is for, not a
+> working system.
 
 ## What it is for
 

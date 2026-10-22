@@ -7,6 +7,9 @@
 use ring::hmac;
 use tessari_oauth_types::{ClientId, UserId, base64url};
 
+/// The one subject type this server issues (OpenID Connect Core §8).
+pub const SUBJECT_TYPE_PAIRWISE: &str = "pairwise";
+
 /// The subject `sector` knows `user` by, under `salt`: base64url of HMAC-SHA-256 over the sector's length (eight
 /// bytes, big-endian), the sector and the user — the length keeps the boundary between the two part of the input.
 #[must_use]

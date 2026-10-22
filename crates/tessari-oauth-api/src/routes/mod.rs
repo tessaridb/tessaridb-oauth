@@ -45,6 +45,10 @@ pub fn public_router(state: PublicState) -> Router {
             "/{tenant}/.well-known/oauth-authorization-server",
             get(metadata::metadata),
         )
+        .route(
+            "/{tenant}/.well-known/openid-configuration",
+            get(metadata::metadata),
+        )
         .route("/{tenant}/oauth2/jwks", get(jwks::jwks))
         .route(
             "/{tenant}/oauth2/userinfo",

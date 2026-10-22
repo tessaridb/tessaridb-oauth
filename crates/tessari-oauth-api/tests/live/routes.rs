@@ -8,7 +8,7 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::response::Response;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tessari_oauth_api::{PublicState, public_router};
 use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
 use tessari_oauth_infrastructure::tessaridb::StoreConfig;
@@ -154,6 +154,19 @@ async fn the_metadata_names_the_tenants_issuer_and_is_cacheable() {
     assert_eq!(answer.body["jwks_uri"], format!("{ISSUER}/oauth2/jwks"));
     assert_eq!(header(&answer, "cache-control"), "public, max-age=300");
     protected(&answer);
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn the_openid_configuration_is_the_same_document_at_the_issuers_own_path() {
+    let storage = live_storage().await;
+    let openid = get(&storage, "/acme/.well-known/openid-configuration").await;
+    assert_eq!(openid.status, StatusCode::OK);
+    let oauth = get(&storage, "/acme/.well-known/oauth-authorization-server").await;
+    assert_eq!(openid.body, oauth.body);
+    assert_eq!(openid.body["subject_types_supported"], json!(["pairwise"]));
+    assert_eq!(header(&openid, "cache-control"), "public, max-age=300");
+    protected(&openid);
 }
 
 #[tokio::test]

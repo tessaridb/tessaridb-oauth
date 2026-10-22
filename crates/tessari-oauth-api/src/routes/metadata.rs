@@ -1,4 +1,5 @@
-//! `GET /{tenant}/.well-known/oauth-authorization-server` (RFC 8414 §3).
+//! `GET /{tenant}/.well-known/oauth-authorization-server` (RFC 8414 §3) and
+//! `GET /{tenant}/.well-known/openid-configuration` (OpenID Connect Discovery 1.0 §4): one document under both names.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -16,7 +17,8 @@ pub(super) async fn metadata(
 ) -> Result<Response> {
     let (_, issuer) = state.tenant(&tenant)?;
     // The issuer was validated when the configuration was read, so a refusal here is a defect.
-    let document = discovery::metadata(issuer).map_err(|_| Error::Internal)?;
+    let document =
+        discovery::metadata(issuer, state.signing_algorithm).map_err(|_| Error::Internal)?;
     let cache = format!("public, max-age={JWKS_MAX_AGE_SECS}");
     Ok(([(header::CACHE_CONTROL, cache)], Json(document)).into_response())
 }

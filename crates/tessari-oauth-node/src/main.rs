@@ -75,7 +75,8 @@ fn start() -> Result<(), Failure> {
     let mut issuers = HashMap::new();
     for tenant in &config.tenants {
         let issuer = format!("{}/{}", config.public.url, tenant.as_str());
-        discovery::metadata(&issuer).map_err(|_| format!("{issuer} is not a valid issuer"))?;
+        discovery::metadata(&issuer, SIGNING_ALGORITHM)
+            .map_err(|_| format!("{issuer} is not a valid issuer"))?;
         issuers.insert(tenant.clone(), issuer);
     }
     let database = Database::new(store, config.store.connections.get())?;
