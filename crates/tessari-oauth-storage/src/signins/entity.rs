@@ -13,6 +13,8 @@ pub struct SigninEntity {
     pub user_id: Option<String>,
     /// Whether the identified account has a second factor enrolled.
     pub second_factor: bool,
+    /// The key the identified address's sign-in failures are counted under; absent before identification.
+    pub account: Option<String>,
     /// The methods verified so far, in order.
     pub methods: Vec<String>,
     /// Counts the steps taken; each step is written only over the revision it was taken from.
@@ -28,6 +30,7 @@ impl FromRecord for SigninEntity {
             identified: row.take("identified")?,
             user_id: row.take("user_id")?,
             second_factor: row.take("second_factor")?,
+            account: row.take("account")?,
             methods: row.take("methods")?,
             revision: row.take("revision")?,
             created_at: row.take("created_at")?,

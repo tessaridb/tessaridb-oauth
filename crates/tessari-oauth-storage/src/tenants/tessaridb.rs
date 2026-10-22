@@ -82,7 +82,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      EXPIRE AFTER 5m; \
      DEFINE TABLE IF NOT EXISTS signins (\
      interaction string REQUIRED, identified bool REQUIRED, user_id string, second_factor bool REQUIRED, \
-     methods array REQUIRED, revision int REQUIRED, created_at int REQUIRED) \
+     account string, methods array REQUIRED, revision int REQUIRED, created_at int REQUIRED) \
      EXPIRE AFTER 10m; \
      DEFINE TABLE IF NOT EXISTS sessions (\
      user_id string REQUIRED, methods array REQUIRED, auth_time int REQUIRED, seen_at int REQUIRED) \

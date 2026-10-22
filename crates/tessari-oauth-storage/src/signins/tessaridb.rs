@@ -26,6 +26,10 @@ fn progress(signin: &SigninEntity) -> Vec<(String, Value)> {
         ),
         ("second".to_owned(), Value::from(signin.second_factor)),
         (
+            "account".to_owned(),
+            signin.account.as_deref().map_or(Value::None, Value::from),
+        ),
+        (
             "methods".to_owned(),
             Value::Array(
                 signin
@@ -55,7 +59,7 @@ impl SigninRepository for TessaridbSigninRepository {
             .run_at(
                 place,
                 "CREATE signins:$id = { interaction: $interaction, identified: $identified, user_id: $user, \
-                 second_factor: $second, methods: $methods, revision: $revision, created_at: $at };",
+                 second_factor: $second, account: $account, methods: $methods, revision: $revision, created_at: $at };",
                 values,
             )
             .await?;
@@ -91,7 +95,7 @@ impl SigninRepository for TessaridbSigninRepository {
             .run_at(
                 place,
                 "UPDATE signins:$id SET identified = $identified, user_id = $user, second_factor = $second, \
-                 methods = $methods, revision = $next WHERE revision = $revision;",
+                 account = $account, methods = $methods, revision = $next WHERE revision = $revision;",
                 values,
             )
             .await?;

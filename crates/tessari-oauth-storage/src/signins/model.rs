@@ -9,6 +9,8 @@ pub struct Signin {
     pub interaction: String,
     /// How far it has come.
     pub ceremony: Ceremony,
+    /// The key the identified address's sign-in failures are counted under, once somebody is identified.
+    pub account: Option<String>,
     /// The revision the next step is written over.
     pub revision: i64,
 }

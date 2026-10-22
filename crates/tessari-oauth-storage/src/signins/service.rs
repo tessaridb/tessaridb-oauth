@@ -34,7 +34,13 @@ fn unreadable(reason: &str) -> Error {
 }
 
 /// The row `ceremony` is kept as, at `revision`, for `interaction`, begun at `created_at`.
-fn kept(ceremony: &Ceremony, interaction: &str, revision: i64, created_at: i64) -> SigninEntity {
+fn kept(
+    ceremony: &Ceremony,
+    account: Option<&str>,
+    interaction: &str,
+    revision: i64,
+    created_at: i64,
+) -> SigninEntity {
     let (identified, user_id, second_factor) = match ceremony.identity() {
         None => (false, None, false),
         Some(Identity::Unknown) => (true, None, false),
@@ -48,6 +54,7 @@ fn kept(ceremony: &Ceremony, interaction: &str, revision: i64, created_at: i64) 
         identified,
         user_id,
         second_factor,
+        account: account.map(str::to_owned),
         methods: ceremony
             .verified_methods()
             .iter()
@@ -87,6 +94,7 @@ fn held(row: SigninEntity, now: Timestamp) -> Result<Option<Signin>> {
     Ok(Some(Signin {
         interaction: row.interaction,
         ceremony,
+        account: row.account,
         revision: row.revision,
     }))
 }
@@ -115,7 +123,7 @@ impl SigninService {
         let place = self.tenancy.place(tenant)?;
         let id = binding.digest();
         let created_at = i64::try_from(now.unix_secs()).map_err(|_| unreadable("now"))?;
-        let row = kept(&Ceremony::new(), interaction, 0, created_at);
+        let row = kept(&Ceremony::new(), None, interaction, 0, created_at);
         let created = retry::bounded(SIGNIN_WRITE_ATTEMPTS, retry::on_store_retry, || {
             self.repository.create(&place, &id, &row)
         })
@@ -150,8 +158,8 @@ impl SigninService {
         }
     }
 
-    /// Write `ceremony` as the next step of the browser's sign-in, taken from `revision`; `false` when the sign-in
-    /// has moved on since, or is gone.
+    /// Write `ceremony`, counted under `account`, as the next step of the browser's sign-in, taken from `revision`;
+    /// `false` when the sign-in has moved on since, or is gone.
     ///
     /// # Errors
     ///
@@ -162,6 +170,7 @@ impl SigninService {
         binding: &SigninBinding,
         revision: i64,
         ceremony: &Ceremony,
+        account: Option<&str>,
     ) -> Result<bool> {
         let place = self.tenancy.place(tenant)?;
         let id = binding.digest();
@@ -169,7 +178,7 @@ impl SigninService {
             .checked_add(1)
             .ok_or_else(|| unreadable("revision"))?;
         // The interaction and the start are not rewritten; the update names only the progress fields.
-        let row = kept(ceremony, "", next, 0);
+        let row = kept(ceremony, account, "", next, 0);
         let advanced = retry::bounded(SIGNIN_WRITE_ATTEMPTS, retry::on_store_retry, || {
             self.repository.advance(&place, &id, revision, &row)
         })

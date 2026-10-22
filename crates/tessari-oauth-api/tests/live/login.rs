@@ -14,6 +14,7 @@ use serde_json::json;
 use tessari_oauth_api::public_router;
 use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_core::ceremony::Identity;
+use tessari_oauth_storage::signins::Signin;
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_storage::users::Registered;
 use tessari_oauth_types::{
@@ -22,7 +23,9 @@ use tessari_oauth_types::{
 use tower::ServiceExt;
 
 use crate::routes::{Answer, answer, header, protected};
-use crate::token_fixture::{API, NOW, REDIRECT, Server, plenty, server, state, tenant, uncached};
+use crate::token_fixture::{
+    API, NOW, REDIRECT, Server, passwords, plenty, server, state, tenant, uncached,
+};
 
 const KNOWN: &str = "ada@example.com";
 const COOKIE: &str = "__Host-tessari-login";
@@ -115,7 +118,12 @@ async fn begun(server: &Server) -> String {
 
 /// Where the sign-in under `cookie` stands, read straight from the store.
 async fn identity(server: &Server, cookie: &str) -> Option<Identity> {
-    let signin = server
+    signin(server, cookie).await.ceremony.identity().cloned()
+}
+
+/// The sign-in under `cookie`, read straight from the store.
+async fn signin(server: &Server, cookie: &str) -> Signin {
+    server
         .storage
         .signins
         .resume(
@@ -125,8 +133,7 @@ async fn identity(server: &Server, cookie: &str) -> Option<Identity> {
         )
         .await
         .expect("the store answers")
-        .expect("the sign-in is there");
-    signin.ceremony.identity().cloned()
+        .expect("the sign-in is there")
 }
 
 async fn register(server: &Server, email: &str) -> UserId {
@@ -283,7 +290,13 @@ async fn identify_answers_a_known_and_an_unknown_address_alike() {
             json!({ "email": email }),
         )
         .await;
-        assert_eq!(identity(&server, &cookie).await, Some(expected), "{email}");
+        let kept = signin(&server, &cookie).await;
+        assert_eq!(kept.ceremony.identity().cloned(), Some(expected), "{email}");
+        assert_eq!(
+            kept.account,
+            Some(passwords().signin_keys().account("acme", email)),
+            "{email}: counted under the identified address's key, which names no address"
+        );
         answers.push((answered.status, answered.body));
     }
     assert!(

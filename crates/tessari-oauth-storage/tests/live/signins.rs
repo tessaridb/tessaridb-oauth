@@ -72,13 +72,25 @@ async fn a_sign_in_is_found_by_its_browser_moved_on_from_where_it_was_read_and_f
     let step = identified();
     assert_eq!(
         signins
-            .advance(&acme, &binding("browser-1"), started.revision, &step)
+            .advance(
+                &acme,
+                &binding("browser-1"),
+                started.revision,
+                &step,
+                Some("key-1")
+            )
             .await,
         Ok(true)
     );
     assert_eq!(
         signins
-            .advance(&acme, &binding("browser-1"), started.revision, &step)
+            .advance(
+                &acme,
+                &binding("browser-1"),
+                started.revision,
+                &step,
+                Some("key-1")
+            )
             .await,
         Ok(false),
         "a step from a place already left"
@@ -89,11 +101,22 @@ async fn a_sign_in_is_found_by_its_browser_moved_on_from_where_it_was_read_and_f
         .expect("read")
         .expect("a sign-in");
     assert_eq!(moved.ceremony, step);
+    assert_eq!(
+        moved.account.as_deref(),
+        Some("key-1"),
+        "counted under the identified key"
+    );
     assert_ne!(moved.revision, started.revision);
     let second = step.verified(Method::Password).expect("first factor");
     assert_eq!(
         signins
-            .advance(&acme, &binding("browser-1"), moved.revision, &second)
+            .advance(
+                &acme,
+                &binding("browser-1"),
+                moved.revision,
+                &second,
+                moved.account.as_deref()
+            )
             .await,
         Ok(true)
     );
@@ -103,6 +126,7 @@ async fn a_sign_in_is_found_by_its_browser_moved_on_from_where_it_was_read_and_f
         .expect("finished")
         .expect("a sign-in");
     assert_eq!(finished.ceremony, second, "the methods are kept in order");
+    assert_eq!(finished.account.as_deref(), Some("key-1"));
     assert_eq!(finished.interaction, "interaction-1");
     assert_eq!(
         signins.finish(&acme, &binding("browser-1"), NOW).await,
@@ -135,7 +159,13 @@ async fn of_simultaneous_steps_from_one_place_exactly_one_is_kept() {
             barrier.wait().await;
             storage
                 .signins
-                .advance(&tenant("acme"), &binding("browser-1"), start, &identified())
+                .advance(
+                    &tenant("acme"),
+                    &binding("browser-1"),
+                    start,
+                    &identified(),
+                    None,
+                )
                 .await
         });
     }

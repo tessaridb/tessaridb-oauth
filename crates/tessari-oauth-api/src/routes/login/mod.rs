@@ -92,11 +92,13 @@ fn binding_cookie(binding: &SigninBinding) -> Result<HeaderValue> {
 }
 
 /// Take one step of the sign-in `binding` holds in `tenant`: `transition` applied to where it stands, written back
-/// only if nothing moved it since it was read. Answers the stage it reached.
+/// only if nothing moved it since it was read, counted under `account` when given and under the key it already
+/// holds otherwise. Answers the stage it reached.
 async fn step(
     state: &PublicState,
     tenant: &TenantId,
     binding: &SigninBinding,
+    account: Option<String>,
     transition: impl FnOnce(Ceremony) -> std::result::Result<Ceremony, CeremonyRefused>,
 ) -> Result<Stage> {
     let now = (state.clock)();
@@ -109,7 +111,13 @@ async fn step(
     let moved = transition(signin.ceremony).map_err(|_| Error::StepRefused)?;
     let written = state
         .signins
-        .advance(tenant, binding, signin.revision, &moved)
+        .advance(
+            tenant,
+            binding,
+            signin.revision,
+            &moved,
+            account.or(signin.account).as_deref(),
+        )
         .await
         .map_err(Error::Store)?;
     if !written {

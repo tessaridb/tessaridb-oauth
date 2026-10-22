@@ -34,7 +34,12 @@ pub(in crate::routes) async fn identify(
     let Identify { email } = body(read)?;
     let email = EmailAddress::parse(&email).map_err(|_| Error::Invalid)?;
     let identity = identity(&state, &tenant, &email).await?;
-    let stage = step(&state, &tenant, &binding, |ceremony| {
+    // Failures are counted under the address identified here, whatever a later step sends.
+    let account = state
+        .passwords
+        .signin_keys()
+        .account(tenant.as_str(), email.as_str());
+    let stage = step(&state, &tenant, &binding, Some(account), |ceremony| {
         ceremony.identify(identity)
     })
     .await?;
