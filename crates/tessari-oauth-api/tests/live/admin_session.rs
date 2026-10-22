@@ -39,15 +39,36 @@ pub(crate) async fn signed_in_as(
     issuer_secret: &str,
     console_secret: &str,
 ) -> AdminState {
+    signed_in_at(
+        server,
+        "acme",
+        operator,
+        roles,
+        issuer_secret,
+        console_secret,
+    )
+    .await
+}
+
+/// `operator` holding `roles` at `company`, signed in at its issuer under `issuer_secret` and at its console under
+/// `console_secret`.
+pub(crate) async fn signed_in_at(
+    server: &Server,
+    company: &str,
+    operator: &str,
+    roles: &[OperatorRole],
+    issuer_secret: &str,
+    console_secret: &str,
+) -> AdminState {
     let now = Timestamp::from_unix_secs(NOW);
-    let acme = tenant("acme");
+    let home = tenant(company);
     let user = UserId::parse(operator).expect("a user id");
     for role in roles.iter().copied() {
         server
             .storage
             .operators
             .grant(
-                &acme,
+                &home,
                 &OperatorGrant {
                     user: user.clone(),
                     role,
@@ -65,13 +86,13 @@ pub(crate) async fn signed_in_as(
     server
         .storage
         .sessions
-        .create(&acme, &issuer_secret, &user, &methods, now)
+        .create(&home, &issuer_secret, &user, &methods, now)
         .await
         .expect("an issuer session");
     let sid = server
         .storage
         .sessions
-        .find(&acme, &issuer_secret, now)
+        .find(&home, &issuer_secret, now)
         .await
         .expect("an answer")
         .expect("the issuer session")
@@ -80,7 +101,7 @@ pub(crate) async fn signed_in_as(
         .storage
         .admin
         .open(
-            &acme,
+            &home,
             &SessionSecret::from_secret(console_secret),
             &user,
             &sid,

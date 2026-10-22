@@ -286,6 +286,12 @@ hours, shown in that answer only and kept only as its digest; the same request s
 a new code replaces the earlier one. A code is refused for an account that already has a password
 (`already_enrolled`: an enrolment never replaces a password) or is disabled (`account_disabled`).
 
+Companies are made in the `system` console, by an operator holding `companies` (a role only `system` users can hold).
+`GET <ADMIN_URL>/admin/system/api/companies` lists them, at most 100 a page; `POST` there with `{"id", "name",
+"reason"}` creates a company, makes its database and its console's client, and serves its issuer at once (`201`); an
+id already in use is refused as `company_taken`, except a company whose creation stopped before it was served, which
+the same request completes.
+
 `GET <ADMIN_URL>/admin/<company>/api/audit?after=<position>&limit=` (role `audit`) reads the company's audit trail in
 order, at most 100 messages a page, `next` naming the position to read after; each message carries its `position`,
 `at`, `kind` and only the fields it was written with.

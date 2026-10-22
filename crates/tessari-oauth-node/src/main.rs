@@ -211,6 +211,9 @@ async fn run(
         users: Arc::clone(&storage.users),
         refresh: Arc::clone(&storage.refresh),
         enrolments: Arc::clone(&storage.enrolments),
+        companies: Arc::clone(&storage.companies),
+        tenants: Arc::clone(&storage.tenants),
+        public: Arc::from(config.public.url.as_str()),
         throttle: Arc::clone(&storage.throttle),
         limit: Limit {
             requests: config.login_limit.requests,

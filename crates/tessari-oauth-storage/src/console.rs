@@ -14,7 +14,8 @@ use tessari_oauth_types::{
     ClientId, ErrorCategory, RedirectUri, Resource, ScopeSet, TenantId, Timestamp,
 };
 
-use crate::clients::NewClient;
+use crate::clients::{ClientService, NewClient};
+use crate::tenants::TenantService;
 use crate::{Error, Result, Storage};
 
 /// The admin console's client registration for `company`, whose issuer is under `public` and whose console is served
@@ -62,15 +63,37 @@ impl Storage {
         console: &str,
         now: Timestamp,
     ) -> Result<()> {
-        self.tenants.provision(company).await?;
-        match self
-            .clients
-            .register(company, &admin_console(company, public, console)?, now)
-            .await
-        {
-            // Registered by an earlier provisioning.
-            Err(failure) if failure.category() == ErrorCategory::Conflict => Ok(()),
-            registered => registered.map(|_| ()),
-        }
+        provision(
+            &self.tenants,
+            &self.clients,
+            company,
+            (public, console),
+            now,
+        )
+        .await
+    }
+}
+
+/// [`Storage::provision_company`] over the two services it needs, for a caller that holds them rather than the
+/// whole storage.
+///
+/// # Errors
+///
+/// Store failures, and [`Error::Invalid`] when `console` does not make a callback URL.
+pub async fn provision(
+    tenants: &TenantService,
+    clients: &ClientService,
+    company: &TenantId,
+    (public, console): (&str, &str),
+    now: Timestamp,
+) -> Result<()> {
+    tenants.provision(company).await?;
+    match clients
+        .register(company, &admin_console(company, public, console)?, now)
+        .await
+    {
+        // Registered by an earlier provisioning.
+        Err(failure) if failure.category() == ErrorCategory::Conflict => Ok(()),
+        registered => registered.map(|_| ()),
     }
 }

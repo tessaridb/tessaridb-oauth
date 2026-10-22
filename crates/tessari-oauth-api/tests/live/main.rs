@@ -13,6 +13,7 @@ mod account_password;
 mod account_sessions;
 mod admin_audit;
 mod admin_callback;
+mod admin_companies;
 mod admin_operators;
 mod admin_policy;
 mod admin_session;

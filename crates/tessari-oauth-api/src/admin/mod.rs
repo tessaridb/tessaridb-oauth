@@ -4,6 +4,7 @@
 mod audit;
 mod callback;
 mod change;
+mod companies;
 mod enrolment;
 mod operator;
 mod operators;
@@ -23,12 +24,13 @@ use tessari_oauth_storage::audit::AuditEvent;
 use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
-use tessari_oauth_storage::companies::Served;
+use tessari_oauth_storage::companies::{CompanyService, Served};
 use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::refresh::RefreshService;
 use tessari_oauth_storage::sessions::SessionService;
+use tessari_oauth_storage::tenants::TenantService;
 use tessari_oauth_storage::throttle::{Limit, ThrottleService};
 use tessari_oauth_storage::users::UserService;
 use tessari_oauth_types::{Clock, TenantId};
@@ -63,6 +65,12 @@ pub struct AdminState {
     pub refresh: Arc<RefreshService>,
     /// Enrolment codes, issued to accounts that have never set a password.
     pub enrolments: Arc<EnrolmentService>,
+    /// The company directory the `system` console creates companies in.
+    pub companies: Arc<CompanyService>,
+    /// Company databases, made when a company is created.
+    pub tenants: Arc<TenantService>,
+    /// The public base URL every company's issuer is under, as `TESSARIDB_OAUTH_PUBLIC_URL` gives it.
+    pub public: Arc<str>,
     /// The request counters every admin route is counted in.
     pub throttle: Arc<ThrottleService>,
     /// How many requests a client address may make to the console per window.
@@ -136,6 +144,10 @@ pub fn admin_router(state: AdminState) -> Router {
         )
         .route("/admin/{company}/api/users/{user}", get(users_read::one))
         .route("/admin/{company}/api/audit", get(audit::trail))
+        .route(
+            "/admin/{company}/api/companies",
+            get(companies::list).post(companies::create),
+        )
         .route("/admin/{company}/api/operators", get(operators::list))
         .route(
             "/admin/{company}/api/operators/{user}/grants/{role}",

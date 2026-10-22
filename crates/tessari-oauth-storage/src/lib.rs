@@ -9,6 +9,7 @@ pub mod codes;
 pub mod companies;
 pub mod consents;
 mod console;
+pub use console::provision;
 pub mod enrolments;
 mod error;
 pub mod factors;
