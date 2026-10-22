@@ -25,6 +25,7 @@ pub mod signin;
 pub mod subject;
 pub mod token;
 pub mod totp;
+pub mod two_factor;
 pub mod userinfo;
 pub mod webauthn;
 
