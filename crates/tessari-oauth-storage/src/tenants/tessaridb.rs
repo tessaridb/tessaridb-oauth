@@ -26,8 +26,8 @@ use crate::Result;
 /// password hash under the account's id. `totp_factors` holds a user's one-time code secret, sealed, with the last step a
 /// code was accepted for, and `totp_pending` the secret a session is enrolling, sealed, under the session's public id
 /// for the ten minutes enrolment may take; `recovery_codes` holds each recovery code under its owner and digest,
-/// indexed by user so a new set replaces the old. `passkeys` holds each credential under its credential id, so an id has one owner;
-/// `passkey_challenges` holds each issued challenge under the challenge itself for the five minutes
+/// indexed by user so a new set replaces the old. `passkeys` holds each credential under its credential id, so an id
+/// has one owner; `passkey_challenges` holds each issued challenge under the challenge itself for the five minutes
 /// (`WEBAUTHN_CHALLENGE_TTL_SECS`) it may be answered in. `signins` holds one browser's sign-in in progress under the
 /// digest of its sign-in cookie value, for the ten minutes (`INTERACTION_TTL_SECS`) its authorization request is kept.
 /// `sessions` holds a user's session under the digest of its session cookie value, for at most the week
