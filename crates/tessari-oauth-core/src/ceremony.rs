@@ -72,6 +72,37 @@ impl Ceremony {
         }
     }
 
+    /// The ceremony that `identity` and `verified`, as kept between requests, describe, rebuilt through the same
+    /// steps, so kept parts no step could have produced are refused.
+    ///
+    /// # Errors
+    ///
+    /// The refusal of the first step the parts could not have taken.
+    pub fn resume(
+        identity: Option<Identity>,
+        verified: Vec<Method>,
+    ) -> Result<Self, CeremonyRefused> {
+        let started = match identity {
+            Some(identity) => Self::new().identify(identity)?,
+            None => Self::new(),
+        };
+        verified
+            .into_iter()
+            .try_fold(started, |ceremony, method| ceremony.verified(method))
+    }
+
+    /// Who the ceremony is about, once identified.
+    #[must_use]
+    pub const fn identity(&self) -> Option<&Identity> {
+        self.identity.as_ref()
+    }
+
+    /// The methods verified so far, in order.
+    #[must_use]
+    pub fn verified_methods(&self) -> &[Method] {
+        &self.verified
+    }
+
     /// The stage this ceremony is at.
     #[must_use]
     pub fn stage(&self) -> Stage {

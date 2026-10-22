@@ -137,6 +137,36 @@ fn a_passkey_that_verified_its_user_is_a_whole_sign_in_and_may_identify() {
 }
 
 #[test]
+fn a_ceremony_is_rebuilt_from_its_parts_only_through_its_own_steps() {
+    let partway = Ceremony::new()
+        .identify(known("u1", true))
+        .and_then(|ceremony| ceremony.verified(Method::Password))
+        .expect("first factor");
+    let rebuilt = Ceremony::resume(
+        partway.identity().cloned(),
+        partway.verified_methods().to_vec(),
+    )
+    .expect("rebuilt");
+    assert_eq!(rebuilt, partway);
+    assert_eq!(rebuilt.stage(), Stage::SecondFactor);
+    assert_eq!(
+        Ceremony::resume(None, vec![Method::Password]),
+        Err(CeremonyRefused::OutOfOrder),
+        "a factor nobody was identified for"
+    );
+    assert_eq!(
+        Ceremony::resume(Some(known("u1", true)), vec![Method::Totp]),
+        Err(CeremonyRefused::MethodNotAccepted),
+        "a one-time code stored as the first factor"
+    );
+    assert_eq!(
+        Ceremony::resume(Some(Identity::Unknown), vec![Method::Password]),
+        Err(CeremonyRefused::OutOfOrder),
+        "a factor stored for nobody"
+    );
+}
+
+#[test]
 fn a_passkey_without_user_verification_is_no_first_factor() {
     let identified = Ceremony::new()
         .identify(known("u1", false))
