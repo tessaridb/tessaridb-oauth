@@ -270,6 +270,12 @@ the operator, the role, the change and the reason. `GET` and `PUT <ADMIN_URL>/ad
 (role `policy`) read and change the company's two-factor policy; a change names the policy it replaces in `expected`,
 and when another change came first it is refused as `changed_meanwhile` and changes nothing.
 
+`GET <ADMIN_URL>/admin/<company>/api/users?limit=&after=` (role `users`) lists the company's accounts in id order, at
+most 100 a page (50 unless `limit` says), with `next` naming the cursor of the following page while one may follow
+and no total; `?email=<address>` instead finds the one account that exact address signs in with, and
+`GET .../api/users/<user>` reads one account. Every address in these answers is masked to its first character and
+domain (`k***@acme.example`).
+
 `POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` and `.../enable` (role `users`) move an account between
 `active` and `disabled`, each only from the other status (`changed_meanwhile` otherwise, `user_not_found` for an account
 the company does not have). Disabling ends every session of the account, telling its clients through the back

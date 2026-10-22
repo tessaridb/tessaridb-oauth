@@ -103,3 +103,6 @@ pub const ADMIN_CONSOLE_CLIENT: &str = "admin-console";
 
 /// The most accounts one page of a company's user list holds.
 pub const USER_PAGE_MAX: u32 = 100;
+
+/// How many accounts one page of a company's user list holds when the console asks for no particular number.
+pub const USER_PAGE_DEFAULT: u32 = 50;

@@ -8,6 +8,7 @@ mod policy;
 mod session;
 mod signin;
 mod users;
+mod users_read;
 
 use std::sync::Arc;
 
@@ -123,6 +124,8 @@ pub fn admin_router(state: AdminState) -> Router {
             "/admin/{company}/api/policy/two-factor",
             get(policy::two_factor).put(policy::set_two_factor),
         )
+        .route("/admin/{company}/api/users", get(users_read::list))
+        .route("/admin/{company}/api/users/{user}", get(users_read::one))
         .route(
             "/admin/{company}/api/users/{user}/disable",
             post(users::disable),
