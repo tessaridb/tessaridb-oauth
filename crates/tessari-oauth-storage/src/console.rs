@@ -51,7 +51,7 @@ fn admin_console(company: &TenantId, public: &str, console: &str) -> Result<NewC
 
 impl Storage {
     /// Make `company`'s database and tables exist and register its admin console, served at `console`, as a client
-    /// of its issuer under `public` at `now`; running it again changes nothing.
+    /// of its issuer under `public` at `now`; running it again only moves the console to the addresses given.
     ///
     /// # Errors
     ///
@@ -88,12 +88,13 @@ pub async fn provision(
     now: Timestamp,
 ) -> Result<()> {
     tenants.provision(company).await?;
-    match clients
-        .register(company, &admin_console(company, public, console)?, now)
-        .await
-    {
-        // Registered by an earlier provisioning.
-        Err(failure) if failure.category() == ErrorCategory::Conflict => Ok(()),
+    let client = admin_console(company, public, console)?;
+    match clients.register(company, &client, now).await {
+        // Registered by an earlier provisioning, perhaps under other addresses: it follows the ones the server runs
+        // with now, so its callback and the resource its consent names are ones this server serves.
+        Err(failure) if failure.category() == ErrorCategory::Conflict => {
+            clients.retarget(company, &client).await
+        }
         registered => registered.map(|_| ()),
     }
 }

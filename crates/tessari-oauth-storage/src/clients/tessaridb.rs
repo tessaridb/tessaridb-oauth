@@ -80,6 +80,28 @@ impl ClientRepository for TessaridbClientRepository {
         Ok(())
     }
 
+    async fn retarget(
+        &self,
+        place: &Place,
+        client_id: &str,
+        redirect_uris: &[String],
+        resources: &[String],
+    ) -> Result<()> {
+        // `UPDATE` never invents a record, and `SET` leaves every field it does not name as registered.
+        self.database
+            .run_at(
+                place,
+                "UPDATE clients:$id SET redirect_uris = $redirect_uris, resources = $resources;",
+                vec![
+                    ("id".to_owned(), Value::from(client_id)),
+                    ("redirect_uris".to_owned(), texts(redirect_uris)),
+                    ("resources".to_owned(), texts(resources)),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn find(&self, place: &Place, client_id: &str) -> Result<Option<ClientEntity>> {
         let answers = self
             .database

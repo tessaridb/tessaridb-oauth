@@ -251,7 +251,10 @@ trail, and the same rules as the grant list apply: the session cookie, JSON only
 
 An operator opens a company's console at `<ADMIN_URL>/admin/<company>/signin`, which sends the browser to that
 company's own sign-in as the client `admin-console`, with PKCE, a `state` and a `nonce`. Every company has this client
-registered, with no grant type, so nothing outside the server can redeem its codes. The return to
+registered, with no grant type, so nothing outside the server can redeem its codes. Each start points the client's
+callback and resource at the `ADMIN_URL` and `PUBLIC_URL` the server runs with, so after a move operators consent
+once more, to the new address. The consent page is always shown for this client, because what it grants is
+administrative authority. The return to
 `<ADMIN_URL>/admin/<company>/callback` opens a console session only when the `state`, the issuer, the code and its
 `nonce` all check out, the operator signed in with two factors, and they hold at least one current operator role. Any
 other return gets one and the same refusal and is recorded in the audit trail.

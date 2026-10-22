@@ -1,4 +1,5 @@
-//! The client service: register a client once, and find a registration in its own tenant.
+//! The client service: register a client once, move the server's own console to its current addresses, and find a
+//! registration in its own tenant.
 //!
 //! A registration is checked before it is written — every key a public signing key under the client's algorithm,
 //! keys present exactly when the client authenticates with them — so what `find` reads back is what was accepted.
@@ -196,6 +197,35 @@ impl ClientService {
         let place = self.tenancy.place(tenant)?;
         self.repository.create(&place, &entity).await?;
         registration(tenant, entity)
+    }
+
+    /// Point the client `client` names in `tenant` at `client`'s redirect URIs and resources, leaving everything else
+    /// it was registered with. Crate-only: the server moves its own console when its addresses change, and no caller
+    /// outside may change what a registration redirects to or is addressed to.
+    ///
+    /// # Errors
+    ///
+    /// When the client is not registered, and the store's failures.
+    pub(crate) async fn retarget(&self, tenant: &TenantId, client: &NewClient) -> Result<()> {
+        let redirect_uris: Vec<String> = client
+            .redirect_uris
+            .iter()
+            .map(|uri| uri.as_str().to_owned())
+            .collect();
+        let resources: Vec<String> = client
+            .resources
+            .iter()
+            .map(|resource| resource.as_str().to_owned())
+            .collect();
+        let place = self.tenancy.place(tenant)?;
+        self.repository
+            .retarget(
+                &place,
+                client.client_id.as_str(),
+                &redirect_uris,
+                &resources,
+            )
+            .await
     }
 
     /// The registration of `client_id` in `tenant`, when there is one.
