@@ -53,3 +53,60 @@ export const TEXT = {
   allowed: "Access allowed. Taking you back to the application.",
   denied: "Access denied. Taking you back to the application.",
 } as const;
+
+const METHODS: Readonly<Record<string, string>> = {
+  pwd: "Password",
+  totp: "Authenticator app",
+  recovery: "Recovery code",
+  passkey: "Passkey",
+  "passkey-uv": "Passkey",
+};
+
+/** How a session signed in, in the user's terms, each way named once. */
+export function describeMethods(methods: readonly string[]): string {
+  const named = methods.map((method) => (Object.hasOwn(METHODS, method) ? (METHODS[method] ?? method) : method));
+  return new Intl.ListFormat("en", { type: "conjunction" }).format([...new Set(named)]);
+}
+
+const moment = /* @__PURE__ */ new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
+
+/** A Unix time in seconds as the user's local date and time. */
+export function when(unixSeconds: number): string {
+  return moment.format(new Date(unixSeconds * 1000));
+}
+
+const codes = /* @__PURE__ */ new Intl.PluralRules("en");
+
+/** How many recovery codes are left, by the language's plural rules. */
+export function codesLeft(count: number): string {
+  if (count === 0) {
+    return "None left";
+  }
+  return codes.select(count) === "one" ? "1 code left" : `${count} codes left`;
+}
+
+/** The words the account page shows, by place. */
+export const ACCOUNT_TEXT = {
+  loading: "Loading your account.",
+  missing: "This page could not find its account. Check the address and try again.",
+  unreadable: "Your account could not be loaded. Try again in a moment.",
+  signedOut: "You're not signed in here. Sign in to an application that uses this account, then come back.",
+  verified: "Verified",
+  unverified: "Not verified",
+  set: "Set",
+  notSet: "Not set",
+  on: "On",
+  off: "Off",
+  noPasskeys: "No passkeys yet.",
+  noSessions: "No other sessions.",
+  noGrants: "No applications have access.",
+  thisSession: "this session",
+  ended: "Signed out on that session.",
+  everywhereConfirm:
+    "This signs you out on every device, this one included. " +
+    "Applications keep access only until their current tokens expire.",
+  everywhereDone: "Signed out everywhere.",
+  revoked: (client: string, endBy: number) =>
+    `Removed ${client}'s access. Anything it already holds stops working by ${when(endBy)}.`,
+  notRevoked: "That access was already removed.",
+} as const;

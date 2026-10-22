@@ -63,7 +63,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only); the sign-in page with password, TOTP, recovery-code and passkey steps, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only); the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail |
 | Built, not served yet | creating accounts and enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
 | Planned | the account portal page, the admin panel, a two-factor policy per tenant, companies with their own administrators, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
@@ -283,8 +283,11 @@ authorization belongs to the browser that brought it to `/oauth2/authorize`, by 
 (kept when the browser has one, drawn otherwise): another browser holding the request's id cannot sign in for it,
 answer its consent or receive its code.
 
-The sign-in and consent pages are served by the binary itself at `<issuer>/login` and `<issuer>/consent`, with
-their script, style and mark under `<issuer>/assets/`. They load nothing from anywhere else, talk only to this
+The sign-in, consent and account pages are served by the binary itself at `<issuer>/login`, `<issuer>/consent` and
+`<issuer>/account`, with their script, style and mark under `<issuer>/assets/`. The account page shows the
+signed-in user's address, how the account signs in, where it is signed in and which applications hold access; it
+signs out one session or every session after a confirmation, and takes an application's access back, saying when
+the tokens it already holds stop working. Without a session it says so; it does not yet start a sign-in itself. They load nothing from anywhere else, talk only to this
 server, submit no form, cannot be framed, follow the system's light or dark theme and work from the keyboard alone;
 a passkey is offered wherever the browser supports one. Their TypeScript source is in
 `crates/tessari-oauth-api/pages/`, and its built output is committed to `crates/tessari-oauth-api/assets/`, so

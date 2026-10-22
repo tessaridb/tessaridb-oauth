@@ -1,6 +1,6 @@
-//! The sign-in and consent pages and their assets: each is served per tenant with its type, byte for byte what the
-//! build committed, under a policy that lets it load only its own script, style and image, talk only to this
-//! origin, submit no form anywhere and never be framed; anything else under the pages answers 404.
+//! The sign-in, consent and account pages and their assets: each is served per tenant with its type, byte for byte
+//! what the build committed, under a policy that lets it load only its own script, style and image, talk only to
+//! this origin, submit no form anywhere and never be framed; anything else under the pages answers 404.
 
 use std::net::SocketAddr;
 
@@ -16,9 +16,10 @@ use crate::routes::{live_storage, state};
 const PAGE_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
                            connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'";
 
-const SERVED: [(&str, &str, &str); 6] = [
+const SERVED: [(&str, &str, &str); 8] = [
     ("/acme/login", "text/html; charset=utf-8", "login.html"),
     ("/acme/consent", "text/html; charset=utf-8", "consent.html"),
+    ("/acme/account", "text/html; charset=utf-8", "account.html"),
     (
         "/acme/assets/login.js",
         "text/javascript; charset=utf-8",
@@ -28,6 +29,11 @@ const SERVED: [(&str, &str, &str); 6] = [
         "/acme/assets/consent.js",
         "text/javascript; charset=utf-8",
         "consent.js",
+    ),
+    (
+        "/acme/assets/account.js",
+        "text/javascript; charset=utf-8",
+        "account.js",
     ),
     (
         "/acme/assets/pages.css",
@@ -107,6 +113,7 @@ async fn the_pages_load_only_their_own_assets() {
     for (path, script) in [
         ("/acme/login", "assets/login.js"),
         ("/acme/consent", "assets/consent.js"),
+        ("/acme/account", "assets/account.js"),
     ] {
         let (_, _, body) = fetch(path).await;
         assert!(body.contains(&format!("src=\"{script}\"")), "{path}");

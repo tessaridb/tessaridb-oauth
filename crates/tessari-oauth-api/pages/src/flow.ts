@@ -22,7 +22,7 @@ export interface Delta {
 }
 
 /** The field `key` of `value`, when `value` is an object that has one. */
-function field(value: unknown, key: string): unknown {
+export function field(value: unknown, key: string): unknown {
   if (typeof value !== "object" || value === null) {
     return undefined;
   }
@@ -30,7 +30,7 @@ function field(value: unknown, key: string): unknown {
   return fields.find(([name]) => name === key)?.[1];
 }
 
-function strings(value: unknown): string[] | null {
+export function strings(value: unknown): string[] | null {
   return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : null;
 }
 

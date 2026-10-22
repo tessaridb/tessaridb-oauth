@@ -1,8 +1,10 @@
-//! `GET /{tenant}/login`, `GET /{tenant}/consent` and `GET /{tenant}/assets/*`: the sign-in and consent pages.
+//! `GET /{tenant}/login`, `GET /{tenant}/consent`, `GET /{tenant}/account` and `GET /{tenant}/assets/*`: the
+//! sign-in, consent and account pages.
 //!
-//! They carry no data and need no session: everything a page shows it asks of the sign-in API from the browser that
-//! holds the sign-in. Each answer carries a policy that lets the page run only its own script and style, show only
-//! its own image, talk only to this origin, submit no form anywhere, rewrite no base address and never be framed.
+//! They carry no data and need no session: everything a page shows it asks of the sign-in or account API from the
+//! browser that holds the sign-in or the session. Each answer carries a policy that lets the page run only its own
+//! script and style, show only its own image, talk only to this origin, submit no form anywhere, rewrite no base
+//! address and never be framed.
 //! The pages link their assets relatively, so a page served under a tenant loads that tenant's copy.
 //!
 //! The bytes are the committed output of `pages/` (`npm run build`), embedded so that building the server never
@@ -23,7 +25,7 @@ const POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; i
 /// One served file: the path under the tenant, its type, its bytes.
 type Asset = (&'static str, &'static str, &'static str);
 
-pub(super) const ASSETS: [Asset; 6] = [
+pub(super) const ASSETS: [Asset; 8] = [
     (
         "/login",
         "text/html; charset=utf-8",
@@ -35,6 +37,11 @@ pub(super) const ASSETS: [Asset; 6] = [
         include_str!("../../assets/consent.html"),
     ),
     (
+        "/account",
+        "text/html; charset=utf-8",
+        include_str!("../../assets/account.html"),
+    ),
+    (
         "/assets/login.js",
         "text/javascript; charset=utf-8",
         include_str!("../../assets/login.js"),
@@ -43,6 +50,11 @@ pub(super) const ASSETS: [Asset; 6] = [
         "/assets/consent.js",
         "text/javascript; charset=utf-8",
         include_str!("../../assets/consent.js"),
+    ),
+    (
+        "/assets/account.js",
+        "text/javascript; charset=utf-8",
+        include_str!("../../assets/account.js"),
     ),
     (
         "/assets/pages.css",

@@ -163,6 +163,7 @@
   --control-radius: var(--radius-md);
   --card-inset: var(--s-6);
   --card-max: 26rem;
+  --card-max-wide: 40rem;
   --page-inset: var(--s-7);
   --field-gap: var(--s-2);
   --stack: var(--s-5);
@@ -451,4 +452,126 @@ code {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-3);
+}
+
+/* ───────────────────────────────────────────────────────── 5. ACCOUNT PAGE ── */
+
+.card.wide {
+  max-width: var(--card-max-wide);
+}
+
+h1:focus,
+h2:focus {
+  outline: none;
+}
+
+.sections {
+  display: grid;
+  gap: var(--s-6);
+}
+
+.sections section {
+  display: grid;
+  gap: var(--s-3);
+}
+
+h2 {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: 650;
+}
+
+h3 {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-data);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--s-2) var(--s-4);
+  margin: 0;
+  font-size: var(--t-data);
+}
+
+.facts dt {
+  color: var(--text-muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+}
+
+.rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  overflow-wrap: anywhere;
+}
+
+.rows li + li {
+  border-block-start: 1px solid var(--border);
+}
+
+.row-main,
+.row-detail {
+  margin: 0;
+}
+
+.row-main {
+  font-weight: 600;
+}
+
+.row-detail,
+.row-empty {
+  color: var(--text-muted);
+  font-size: var(--t-data);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0 var(--s-2);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--t-caption);
+  font-weight: 600;
+}
+
+.badge[data-state="ok"] {
+  color: var(--ok);
+}
+
+.badge[data-state="warn"] {
+  color: var(--warn);
+}
+
+.confirm {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--bad);
+  border-radius: var(--control-radius);
+}
+
+.confirm p {
+  margin: 0;
+}
+
+.danger {
+  background: var(--bad);
+  color: var(--on-bad);
 }
