@@ -180,6 +180,11 @@ answers a registration challenge issued to that user alone, with the user's own 
 verification it requires, and `POST <issuer>/account/api/passkeys/register` with the browser's `client_data_json`
 and `attestation_object` spends that challenge once, checks the response against this issuer's relying party and
 origin, stores the passkey and signs out the other sessions.
+`POST <issuer>/account/api/password` with `{"password": "<new password>"}` sets a new password under the same rule
+and with the same sign-outs. It must be at least fifteen characters, or eight when the account has an authenticator
+app (a sign-in then always asks for its code), and must not be the account's own address, its local part or the
+tenant's name; otherwise `400 password_rejected` with the rule it broke. The value is never echoed, logged or
+recorded. Screening against a list of compromised passwords is not done yet.
 
 ### Your grants: `<issuer>/account/api/grants`
 

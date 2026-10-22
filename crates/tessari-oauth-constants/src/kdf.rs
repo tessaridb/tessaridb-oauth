@@ -18,3 +18,7 @@ pub const PASSWORD_SALT_BYTES: usize = 16;
 
 /// The fewest bytes a pepper file may hold: 256 bits, the strength of the HMAC-SHA-256 it keys.
 pub const PEPPER_MIN_BYTES: usize = 32;
+
+/// The version of the pepper a node holds, stored beside every password hash it writes. A node holds one pepper,
+/// so this is the only version written until a second one exists.
+pub const CURRENT_PEPPER: u32 = 1;

@@ -5,6 +5,7 @@ use axum::Json;
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use tessari_oauth_core::password::PasswordRefused;
 use tessari_oauth_types::ErrorCategory;
 
 /// A failure of this crate.
@@ -57,6 +58,9 @@ pub enum Error {
     /// The code does not come from the secret being enrolled.
     #[error("the code was not accepted")]
     CodeRejected,
+    /// The new password breaks one of the rules for new passwords.
+    #[error("the password was not accepted")]
+    PasswordRejected(PasswordRefused),
 }
 
 impl Error {
@@ -76,7 +80,7 @@ impl Error {
             Self::ReauthenticationRequired => ErrorCategory::Unauthorized,
             Self::LastSignInMethod => ErrorCategory::Conflict,
             Self::AlreadyEnrolled | Self::NothingPending => ErrorCategory::Conflict,
-            Self::CodeRejected => ErrorCategory::Validation,
+            Self::CodeRejected | Self::PasswordRejected(_) => ErrorCategory::Validation,
         }
     }
 }
@@ -148,6 +152,18 @@ impl IntoResponse for Error {
                 StatusCode::BAD_REQUEST,
                 "code_rejected",
                 "the code was not accepted; start again",
+            ),
+            (Self::PasswordRejected(rule), _) => (
+                StatusCode::BAD_REQUEST,
+                "password_rejected",
+                match rule {
+                    PasswordRefused::TooShort => "the password is too short",
+                    PasswordRefused::TooLong => "the password is too long",
+                    PasswordRefused::NotPrintable => {
+                        "the password holds a character that is not printable"
+                    }
+                    PasswordRefused::Guessable => "the password is too easily guessed",
+                },
             ),
             (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

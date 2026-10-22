@@ -8,6 +8,7 @@
 mod account_factors;
 mod account_grants;
 mod account_me;
+mod account_password;
 mod account_sessions;
 mod authenticator;
 mod authorize;
