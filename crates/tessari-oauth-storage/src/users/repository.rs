@@ -37,4 +37,7 @@ pub(crate) trait UserRepository: Send + Sync {
 
     /// The addresses of the accounts `user_ids`.
     async fn emails_of(&self, place: &Place, user_ids: &[String]) -> Result<Vec<EmailEntity>>;
+
+    /// Move the account `user_id` from status `from` to `to`, refused unless it is in `from`.
+    async fn set_status(&self, place: &Place, user_id: &str, from: &str, to: &str) -> Result<()>;
 }

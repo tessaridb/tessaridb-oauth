@@ -166,4 +166,20 @@ impl UserRepository for TessaridbUserRepository {
             .await?;
         answers::records(answers, "user email")
     }
+
+    async fn set_status(&self, place: &Place, user_id: &str, from: &str, to: &str) -> Result<()> {
+        // A condition on an edit is a compare-and-set: the store refuses it when the status moved.
+        self.database
+            .run_at(
+                place,
+                "UPDATE users:$id SET status = $to WHERE status = $from;",
+                vec![
+                    ("id".to_owned(), Value::from(user_id)),
+                    ("from".to_owned(), Value::from(from)),
+                    ("to".to_owned(), Value::from(to)),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
 }

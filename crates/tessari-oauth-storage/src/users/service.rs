@@ -237,6 +237,32 @@ impl UserService {
             })
             .collect()
     }
+
+    /// Move `user` of `tenant` from status `from` to `to`; `false`, changing nothing, when the account is not in `from`
+    /// (already moved, or no such account).
+    ///
+    /// # Errors
+    ///
+    /// Store failures.
+    pub async fn set_status(
+        &self,
+        tenant: &TenantId,
+        user: &UserId,
+        from: UserStatus,
+        to: UserStatus,
+    ) -> Result<bool> {
+        let place = self.tenancy.place(tenant)?;
+        match self
+            .repository
+            .set_status(&place, user.as_str(), from.name(), to.name())
+            .await
+        {
+            Ok(()) => Ok(true),
+            // Not in `from` any more, or never there: the store refuses both as a conflict, and nothing changed.
+            Err(refused) if refused.category() == ErrorCategory::Conflict => Ok(false),
+            Err(failure) => Err(failure),
+        }
+    }
 }
 
 /// The account `account` signing in with `address`, as the service hands it out.

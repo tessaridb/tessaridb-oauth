@@ -264,3 +264,58 @@ async fn accounts_are_listed_page_by_page_in_id_order_with_their_addresses() {
         "an oversized request is served up to the cap"
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_account_is_disabled_and_enabled_only_from_the_status_it_has() {
+    let acme = tenant("acme");
+    let storage = fresh(&acme, 2).await;
+    let user = created(
+        storage
+            .users
+            .register(
+                &acme,
+                &email("leaver@example.com"),
+                Timestamp::from_unix_secs(100),
+            )
+            .await
+            .expect("registered"),
+    );
+    let users = &storage.users;
+    let status = |found: Option<UserAccount>| found.expect("the account").status;
+    assert_eq!(
+        users
+            .set_status(&acme, &user, UserStatus::Active, UserStatus::Disabled)
+            .await,
+        Ok(true)
+    );
+    assert_eq!(
+        status(users.find(&acme, &user).await.expect("an answer")),
+        UserStatus::Disabled
+    );
+    assert_eq!(
+        users
+            .set_status(&acme, &user, UserStatus::Active, UserStatus::Disabled)
+            .await,
+        Ok(false),
+        "already disabled: nothing changes"
+    );
+    assert_eq!(
+        users
+            .set_status(&acme, &user, UserStatus::Disabled, UserStatus::Active)
+            .await,
+        Ok(true)
+    );
+    assert_eq!(
+        status(users.find(&acme, &user).await.expect("an answer")),
+        UserStatus::Active
+    );
+    let nobody = UserId::parse("nobody-at-all").expect("a user id");
+    assert_eq!(
+        users
+            .set_status(&acme, &nobody, UserStatus::Active, UserStatus::Disabled)
+            .await,
+        Ok(false),
+        "no such account: nothing changes"
+    );
+}
