@@ -136,15 +136,17 @@ async fn run(
     poster: Poster,
 ) -> Result<(), Failure> {
     let clock = system_clock();
-    // The companies the configuration names are served from the start: created when new, provisioned, and made
-    // active unless an operator suspended one, which the configuration does not override.
+    // The companies the configuration names are served from the start: created when new, provisioned with their admin
+    // console, and made active unless an operator suspended one, which the configuration does not override.
     storage.companies.prepare().await?;
     for tenant in &config.tenants {
         storage
             .companies
             .create(tenant, tenant.as_str(), "configuration", clock())
             .await?;
-        storage.tenants.provision(tenant).await?;
+        storage
+            .provision_company(tenant, &config.public.url, &config.admin.url, clock())
+            .await?;
         storage
             .companies
             .transition(tenant, CompanyStatus::Provisioning, CompanyStatus::Active)

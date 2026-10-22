@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 use std::fmt;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -13,7 +13,7 @@ use tessari_oauth_constants::{
     PASSWORD_HASH_ITERATIONS_FLOOR, PASSWORD_HASH_MEMORY_KIB_FLOOR, PASSWORD_HASH_PARALLELISM_FLOOR,
 };
 use tessari_oauth_types::TenantId;
-use url::Url;
+use url::{Host, Url};
 
 use crate::custody::PasswordCost;
 use crate::{Error, Result};
@@ -29,6 +29,27 @@ pub struct PublicConfig {
     pub tls_cert: PathBuf,
     /// The listener's private key, PEM.
     pub tls_key: PathBuf,
+}
+
+/// Where the admin console's own listener serves and the URL operators reach it by.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminConfig {
+    /// The admin console's base URL, an origin apart from the public one; a company's console is this followed by
+    /// `/admin/` and the company id.
+    pub url: String,
+    /// The socket address the admin listener binds.
+    pub address: SocketAddr,
+    /// The admin listener's certificate chain and private key, PEM; without them it serves in the clear.
+    pub tls: Option<AdminTls>,
+}
+
+/// The admin listener's certificate, given both or neither.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminTls {
+    /// The certificate chain, PEM.
+    pub cert: PathBuf,
+    /// The private key, PEM.
+    pub key: PathBuf,
 }
 
 /// How to reach the store.
@@ -74,6 +95,8 @@ pub struct ReadLimit {
 pub struct NodeConfig {
     /// The public listener.
     pub public: PublicConfig,
+    /// The admin console's listener.
+    pub admin: AdminConfig,
     /// The store.
     pub store: StoreSettings,
     /// The key-encryption key file (32 bytes, readable by the owner only).
@@ -124,14 +147,7 @@ impl<Lookup: Fn(&str) -> Option<String>> Variables<Lookup> {
 
 /// `value` as a public base URL: https, nothing after the path, no trailing slash, no credentials.
 fn public_url(value: String) -> Result<String> {
-    let fits = Url::parse(&value).is_ok_and(|url| {
-        url.scheme() == "https"
-            && url.query().is_none()
-            && url.fragment().is_none()
-            && url.username().is_empty()
-            && url.password().is_none()
-    }) && !value.ends_with('/');
-    if fits {
+    if base_url(&value, |_| false).is_some() {
         Ok(value)
     } else {
         Err(Error::Invalid {
@@ -140,6 +156,48 @@ fn public_url(value: String) -> Result<String> {
             reason: "an https URL with no query, fragment, credentials or trailing slash",
         })
     }
+}
+
+/// `value` as the admin console's base URL: a base URL as [`public_url`] reads one, or `http` on a loopback IP
+/// literal for a console served in the clear to this machine alone, at an origin other than `public`'s, so the
+/// console's cookies and pages share nothing with the issuer's.
+fn admin_url(value: String, public: &str) -> Result<String> {
+    // The console's callback is a redirect URI, which takes `http` only on 127.0.0.1 or [::1]: the code it carries
+    // then never crosses a network in the clear.
+    let loopback = |url: &Url| {
+        url.scheme() == "http"
+            && match url.host() {
+                Some(Host::Ipv4(ip)) => ip == Ipv4Addr::LOCALHOST,
+                Some(Host::Ipv6(ip)) => ip == Ipv6Addr::LOCALHOST,
+                _ => false,
+            }
+    };
+    let apart = base_url(&value, loopback)
+        .zip(Url::parse(public).ok())
+        .is_some_and(|(admin, public)| admin.origin() != public.origin());
+    if apart {
+        Ok(value)
+    } else {
+        Err(Error::Invalid {
+            key: "TESSARIDB_OAUTH_ADMIN_URL",
+            value,
+            reason: "an https URL, or http on 127.0.0.1 or [::1], with no query, fragment, credentials or trailing \
+                     slash, at an origin other than the public URL's",
+        })
+    }
+}
+
+/// `value` parsed, when it is an https URL (or one `also` admits) with nothing after the path, no trailing slash and
+/// no credentials.
+fn base_url(value: &str, also: impl Fn(&Url) -> bool) -> Option<Url> {
+    Url::parse(value).ok().filter(|url| {
+        (url.scheme() == "https" || also(url))
+            && url.query().is_none()
+            && url.fragment().is_none()
+            && url.username().is_empty()
+            && url.password().is_none()
+            && !value.ends_with('/')
+    })
 }
 
 /// `value` as a comma-separated list of distinct tenant ids.
@@ -162,6 +220,25 @@ fn tenants(value: String) -> Result<Vec<TenantId>> {
         });
     }
     Ok(tenants)
+}
+
+/// The admin listener's certificate and key, both or neither; neither serves the console in the clear.
+fn admin_tls(variables: &Variables<impl Fn(&str) -> Option<String>>) -> Result<Option<AdminTls>> {
+    let cert = variables.optional("TESSARIDB_OAUTH_ADMIN_TLS_CERT");
+    let key = variables.optional("TESSARIDB_OAUTH_ADMIN_TLS_KEY");
+    match (cert, key) {
+        (Some(cert), Some(key)) => Ok(Some(AdminTls {
+            cert: cert.into(),
+            key: key.into(),
+        })),
+        (None, None) => Ok(None),
+        (Some(_), None) => Err(Error::Unset {
+            key: "TESSARIDB_OAUTH_ADMIN_TLS_KEY",
+        }),
+        (None, Some(_)) => Err(Error::Unset {
+            key: "TESSARIDB_OAUTH_ADMIN_TLS_CERT",
+        }),
+    }
 }
 
 impl NodeConfig {
@@ -192,6 +269,18 @@ impl NodeConfig {
             )?,
             tls_cert: variables.required("TESSARIDB_OAUTH_TLS_CERT")?.into(),
             tls_key: variables.required("TESSARIDB_OAUTH_TLS_KEY")?.into(),
+        };
+        let admin = AdminConfig {
+            url: admin_url(
+                variables.required("TESSARIDB_OAUTH_ADMIN_URL")?,
+                &public.url,
+            )?,
+            address: variables.parsed(
+                "TESSARIDB_OAUTH_ADMIN_ADDRESS",
+                SocketAddr::from(([0, 0, 0, 0], 9443)),
+                "a socket address such as 0.0.0.0:9443",
+            )?,
+            tls: admin_tls(&variables)?,
         };
         let store = StoreSettings {
             address: variables.required("TESSARIDB_OAUTH_STORE")?,
@@ -273,6 +362,7 @@ impl NodeConfig {
         )?;
         Ok(Self {
             public,
+            admin,
             store,
             kek: variables.required("TESSARIDB_OAUTH_KEK")?.into(),
             region: variables.required("TESSARIDB_OAUTH_REGION")?,

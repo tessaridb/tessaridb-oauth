@@ -11,6 +11,10 @@ use tessari_oauth_types::{EmailAddress, EnrolmentCode, TenantId, Timestamp};
 
 use crate::fresh_on;
 
+const PUBLIC: &str = "https://id.example.com";
+
+const CONSOLE: &str = "https://admin.example.com";
+
 const NOW: Timestamp = Timestamp::from_unix_secs(1_800_000_000);
 
 fn system() -> TenantId {
@@ -55,7 +59,7 @@ async fn the_first_operator_is_made_in_an_active_system_company() {
     let storage = storage();
     let code = EnrolmentCode::from_secret("code-1");
     let done = storage
-        .bootstrap_operator(&email(), &code, NOW)
+        .bootstrap_operator(&email(), &code, PUBLIC, CONSOLE, NOW)
         .await
         .expect("bootstrapped");
     assert!(done.code_issued);
@@ -105,11 +109,11 @@ async fn running_it_again_reaches_the_same_account_with_a_new_code() {
     let first = EnrolmentCode::from_secret("code-1");
     let second = EnrolmentCode::from_secret("code-2");
     let once = storage
-        .bootstrap_operator(&email(), &first, NOW)
+        .bootstrap_operator(&email(), &first, PUBLIC, CONSOLE, NOW)
         .await
         .expect("bootstrapped");
     let twice = storage
-        .bootstrap_operator(&email(), &second, NOW)
+        .bootstrap_operator(&email(), &second, PUBLIC, CONSOLE, NOW)
         .await
         .expect("bootstrapped again");
     assert_eq!(once.user, twice.user, "one account");
@@ -135,7 +139,13 @@ async fn running_it_again_reaches_the_same_account_with_a_new_code() {
 async fn an_account_that_has_a_password_is_given_no_code() {
     let storage = storage();
     let done = storage
-        .bootstrap_operator(&email(), &EnrolmentCode::from_secret("code-1"), NOW)
+        .bootstrap_operator(
+            &email(),
+            &EnrolmentCode::from_secret("code-1"),
+            PUBLIC,
+            CONSOLE,
+            NOW,
+        )
         .await
         .expect("bootstrapped");
     let password = StoredPassword {
@@ -149,7 +159,7 @@ async fn an_account_that_has_a_password_is_given_no_code() {
         .expect("set");
     let code = EnrolmentCode::from_secret("code-2");
     let again = storage
-        .bootstrap_operator(&email(), &code, NOW)
+        .bootstrap_operator(&email(), &code, PUBLIC, CONSOLE, NOW)
         .await
         .expect("bootstrapped again");
     assert!(!again.code_issued);

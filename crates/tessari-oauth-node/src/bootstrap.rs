@@ -37,8 +37,17 @@ pub(crate) fn run(arguments: &[String]) -> Result<(), Failure> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    let done =
-        runtime.block_on(async { storage.bootstrap_operator(&email, &code, clock()).await })?;
+    let done = runtime.block_on(async {
+        storage
+            .bootstrap_operator(
+                &email,
+                &code,
+                &config.public.url,
+                &config.admin.url,
+                clock(),
+            )
+            .await
+    })?;
     tracing::error!(
         event = "break_glass",
         user = done.user.as_str(),

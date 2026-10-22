@@ -42,7 +42,9 @@ fn system() -> Result<TenantId> {
 }
 
 impl Storage {
-    /// Make the platform operator signing in with `email` at `now`, issuing `code` when the account has no password.
+    /// Make the platform operator signing in with `email` at `now`, issuing `code` when the account has no
+    /// password; the system company is provisioned with its issuer under `public` and its admin console served at
+    /// `console`.
     ///
     /// # Errors
     ///
@@ -51,6 +53,8 @@ impl Storage {
         &self,
         email: &EmailAddress,
         code: &EnrolmentCode,
+        public: &str,
+        console: &str,
         now: Timestamp,
     ) -> Result<Bootstrapped> {
         let system = system()?;
@@ -58,7 +62,8 @@ impl Storage {
         self.companies
             .create(&system, "Platform operators", BREAK_GLASS, now)
             .await?;
-        self.tenants.provision(&system).await?;
+        self.provision_company(&system, public, console, now)
+            .await?;
         // Already active is fine; a suspended system company stays suspended, as any other would.
         self.companies
             .transition(&system, CompanyStatus::Provisioning, CompanyStatus::Active)

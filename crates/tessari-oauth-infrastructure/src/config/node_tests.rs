@@ -4,8 +4,9 @@ use super::NodeConfig;
 use crate::Error;
 use crate::custody::PasswordCost;
 
-const REQUIRED: [&str; 10] = [
+const REQUIRED: [&str; 11] = [
     "TESSARIDB_OAUTH_PUBLIC_URL",
+    "TESSARIDB_OAUTH_ADMIN_URL",
     "TESSARIDB_OAUTH_TLS_CERT",
     "TESSARIDB_OAUTH_TLS_KEY",
     "TESSARIDB_OAUTH_KEK",
@@ -22,6 +23,10 @@ fn environment() -> HashMap<&'static str, String> {
         (
             "TESSARIDB_OAUTH_PUBLIC_URL",
             "https://id.example.com".to_owned(),
+        ),
+        (
+            "TESSARIDB_OAUTH_ADMIN_URL",
+            "https://admin.example.com".to_owned(),
         ),
         ("TESSARIDB_OAUTH_TLS_CERT", "/run/tls/cert.pem".to_owned()),
         ("TESSARIDB_OAUTH_TLS_KEY", "/run/tls/key.pem".to_owned()),
@@ -166,4 +171,112 @@ fn the_store_password_never_appears_in_debug_output() {
     let printed = format!("{config:?}");
     assert!(!printed.contains("s3cret-value"), "{printed}");
     assert!(printed.contains("127.0.0.1:7000"), "{printed}");
+}
+
+#[test]
+fn the_admin_console_is_read_with_its_own_listener() {
+    let config = read(&environment()).expect("a valid environment");
+    assert_eq!(config.admin.url, "https://admin.example.com");
+    assert_eq!(config.admin.address.to_string(), "0.0.0.0:9443");
+    let mut moved = environment();
+    moved.insert("TESSARIDB_OAUTH_ADMIN_ADDRESS", "127.0.0.1:9500".to_owned());
+    assert_eq!(
+        read(&moved)
+            .expect("a valid environment")
+            .admin
+            .address
+            .to_string(),
+        "127.0.0.1:9500"
+    );
+}
+
+#[test]
+fn the_admin_console_needs_an_https_origin_apart_from_the_public_one() {
+    for refused in [
+        "https://id.example.com",
+        "https://id.example.com/admin",
+        "http://admin.example.com",
+        "https://admin.example.com/",
+        "https://admin.example.com?x=1",
+    ] {
+        let mut environment = environment();
+        environment.insert("TESSARIDB_OAUTH_ADMIN_URL", refused.to_owned());
+        assert!(
+            matches!(
+                read(&environment),
+                Err(Error::Invalid {
+                    key: "TESSARIDB_OAUTH_ADMIN_URL",
+                    ..
+                })
+            ),
+            "{refused} is refused"
+        );
+    }
+}
+
+#[test]
+fn the_admin_console_serves_in_the_clear_until_given_a_certificate() {
+    let plain = read(&environment()).expect("a valid environment");
+    assert_eq!(plain.admin.tls, None);
+    let mut secured = environment();
+    secured.insert(
+        "TESSARIDB_OAUTH_ADMIN_TLS_CERT",
+        "/run/admin/cert.pem".to_owned(),
+    );
+    secured.insert(
+        "TESSARIDB_OAUTH_ADMIN_TLS_KEY",
+        "/run/admin/key.pem".to_owned(),
+    );
+    let tls = read(&secured)
+        .expect("a valid environment")
+        .admin
+        .tls
+        .expect("a certificate");
+    assert_eq!(
+        (tls.cert.to_str(), tls.key.to_str()),
+        (Some("/run/admin/cert.pem"), Some("/run/admin/key.pem"))
+    );
+    for (given, missing) in [
+        (
+            "TESSARIDB_OAUTH_ADMIN_TLS_CERT",
+            "TESSARIDB_OAUTH_ADMIN_TLS_KEY",
+        ),
+        (
+            "TESSARIDB_OAUTH_ADMIN_TLS_KEY",
+            "TESSARIDB_OAUTH_ADMIN_TLS_CERT",
+        ),
+    ] {
+        let mut half = environment();
+        half.insert(given, "/run/admin/file.pem".to_owned());
+        assert!(
+            matches!(read(&half), Err(Error::Unset { key }) if key == missing),
+            "{given} alone names {missing}"
+        );
+    }
+}
+
+#[test]
+fn a_console_in_the_clear_is_reached_only_on_a_loopback_address() {
+    for accepted in ["http://127.0.0.1:9443", "http://[::1]:9443"] {
+        let mut environment = environment();
+        environment.insert("TESSARIDB_OAUTH_ADMIN_URL", accepted.to_owned());
+        assert_eq!(
+            read(&environment).expect("a valid environment").admin.url,
+            accepted
+        );
+    }
+    for refused in ["http://localhost:9443", "http://10.0.0.5:9443"] {
+        let mut environment = environment();
+        environment.insert("TESSARIDB_OAUTH_ADMIN_URL", refused.to_owned());
+        assert!(
+            matches!(
+                read(&environment),
+                Err(Error::Invalid {
+                    key: "TESSARIDB_OAUTH_ADMIN_URL",
+                    ..
+                })
+            ),
+            "{refused} is refused"
+        );
+    }
 }

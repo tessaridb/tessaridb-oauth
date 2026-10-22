@@ -97,3 +97,6 @@ pub const DIRECTORY_REFRESH_TIMEOUT_SECS: u64 = 4;
 
 /// The company platform operators belong to: the only one whose users may hold the `companies` role.
 pub const SYSTEM_COMPANY: &str = "system";
+
+/// The client every company registers for its own admin console, which signs operators in at the company's issuer.
+pub const ADMIN_CONSOLE_CLIENT: &str = "admin-console";

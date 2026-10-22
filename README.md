@@ -280,6 +280,9 @@ first, for development only.
 |---|---|---|
 | `PUBLIC_URL` | the https base URL; tenant `acme`'s issuer is `<PUBLIC_URL>/acme`; its host is the passkey relying party, so changing the host retires every enrolled passkey | required |
 | `PUBLIC_ADDRESS` | where the public listener binds | `0.0.0.0:8443` |
+| `ADMIN_URL` | the admin console's base URL, at an origin other than `PUBLIC_URL`'s: https, or http on `127.0.0.1` or `[::1]` only; company `acme`'s console is `<ADMIN_URL>/admin/acme` | required |
+| `ADMIN_ADDRESS` | where the admin console's listener binds | `0.0.0.0:9443` |
+| `ADMIN_TLS_CERT`, `ADMIN_TLS_KEY` | the admin console over TLS: its certificate chain and private key, PEM, both or neither. Without them the console is served in the clear, so keep it on a loopback address or behind a TLS terminator | unset (plain) |
 | `TLS_CERT`, `TLS_KEY` | the listener's certificate chain and private key, PEM | required |
 | `KEK` | the 32-byte key-encryption key file, mode 600 or 400; signing keys are stored sealed under it | required |
 | `PEPPER` | the password pepper file, at least 32 bytes, mode 600 or 400; passwords are hashed under it and the sign-in counters named by keys derived from it | required |
@@ -300,7 +303,10 @@ cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary
 curl --cacert cert.pem https://localhost:8443/acme/.well-known/oauth-authorization-server
 ```
 
-At start the server records each configured company in the region's directory, provisions its database and makes it
+At start the server records each configured company in the region's directory, provisions its database, registers
+its admin console as the client `admin-console` of the company's issuer (redirected only to the console's own
+callback, asking for nothing past `openid`, addressed to `<PUBLIC_URL>/<company>/admin`, and with no grant the token
+endpoint will redeem) and makes it
 active, makes a signing key for any company without one and then checks every five minutes for keys due to rotate.
 Every node re-reads which companies are active every five seconds and serves exactly those: a company that is not
 active answers `404`, like a name that was never a company.

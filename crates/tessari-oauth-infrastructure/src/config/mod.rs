@@ -2,7 +2,7 @@
 
 mod node;
 
-pub use node::{NodeConfig, PublicConfig, ReadLimit, StoreSettings};
+pub use node::{AdminConfig, AdminTls, NodeConfig, PublicConfig, ReadLimit, StoreSettings};
 
 #[cfg(test)]
 #[path = "node_tests.rs"]

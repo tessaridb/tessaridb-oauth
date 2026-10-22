@@ -8,6 +8,7 @@ pub mod clients;
 pub mod codes;
 pub mod companies;
 pub mod consents;
+mod console;
 pub mod enrolments;
 mod error;
 pub mod factors;
