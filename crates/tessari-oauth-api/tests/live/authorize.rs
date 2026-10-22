@@ -1,7 +1,8 @@
 //! The authorization endpoint (RFC 6749 §4.1.1, OpenID Connect Core §3.1.2): a request that cannot be tied to a
 //! redirect URI its client registered is refused on a page at the server and sent nowhere; a later refusal goes back
-//! to that URI with `state` and the issuer (RFC 9207); a request asking for no page is refused rather than shown one;
-//! a valid request is kept and the browser handed to sign-in with its id alone. Every refusal is recorded.
+//! to that URI with `state` and the issuer (RFC 9207); a request asking for no page with no session cookie is refused
+//! rather than shown one; a valid request is kept and the browser handed to sign-in with its id alone, or, when it
+//! asked for no page and carries a session cookie, to be answered from that session. Every refusal is recorded.
 
 use std::collections::{BTreeSet, HashMap};
 use std::num::NonZeroU64;
@@ -273,6 +274,50 @@ async fn a_valid_request_is_kept_and_handed_to_sign_in_by_its_id_alone() {
         ids.insert(id.clone());
     }
     assert_eq!(ids.len(), 2, "each request is kept on its own");
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_request_that_asks_for_no_page_with_a_session_is_kept_and_sent_to_be_answered_from_it() {
+    let server = server(2).await;
+    let uri = format!("/acme/oauth2/authorize?{}", encode(&with("prompt", "none")));
+    let page = send(
+        state(&server, plenty()),
+        Request::get(uri)
+            .header(
+                "cookie",
+                "__Host-tessari-session=a-session-the-resume-step-looks-up",
+            )
+            .body(Body::empty())
+            .expect("a request"),
+    )
+    .await;
+    assert_eq!(page.answer.status, StatusCode::SEE_OTHER);
+    uncached(&page.answer);
+    let location = url::Url::parse(header(&page.answer, "location")).expect("a URL");
+    assert_eq!(
+        &location[..url::Position::AfterPath],
+        format!("{}/oauth2/authorize/resume", issuer("acme")),
+        "no sign-in page: the session answers"
+    );
+    let pairs: Vec<(String, String)> = location.query_pairs().into_owned().collect();
+    let [(name, id)] = pairs.as_slice() else {
+        panic!("the interaction id alone travels: {pairs:?}");
+    };
+    assert_eq!(name, "interaction");
+    let kept = server
+        .storage
+        .interactions
+        .find(
+            &tenant("acme"),
+            id,
+            &browser_set(&page.answer),
+            Timestamp::from_unix_secs(NOW),
+        )
+        .await
+        .expect("the store answers")
+        .expect("the request was kept");
+    assert!(kept.silent, "kept as a request that asked for no page");
 }
 
 #[tokio::test]

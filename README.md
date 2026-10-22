@@ -85,9 +85,11 @@ accompany is bound to that key's RFC 7638 thumbprint.
 The authorization endpoint (RFC 6749 §4.1.1) judges a request in a fixed order. Until the client is known and the
 redirect URI is one it registered, a refusal is shown on a page at the server and sent nowhere, so a URI written
 into a forged request never receives an answer; every later refusal goes back to the registered URI with `error`,
-`state` and `iss` (RFC 9207). A request with `prompt=none` asks for no page and is refused with `login_required`. A
-valid request is kept for ten minutes and the browser is sent to `<issuer>/login` carrying only the kept request's
-id.
+`state` and `iss` (RFC 9207). A valid request is kept for ten minutes and the browser is sent to `<issuer>/login`
+carrying only the kept request's id. A request with `prompt=none` asks for no page: without a session cookie it is
+refused with `login_required`; with one it is kept the same way and sent straight to
+`<issuer>/oauth2/authorize/resume`, which answers it from the session with a code, or at its redirect URI with
+`login_required` (no live session, or one older than `max_age`) or `consent_required`; each refusal is recorded.
 
 A client may instead push those parameters to `POST <issuer>/oauth2/par` (RFC 9126), authenticating exactly as at
 the token endpoint; they are judged as the authorization endpoint judges them, every refusal answered to the client,

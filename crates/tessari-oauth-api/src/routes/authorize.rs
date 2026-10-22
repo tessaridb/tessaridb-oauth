@@ -5,10 +5,11 @@
 //! shown on a page here and sent nowhere, so a URI an attacker wrote into the request never receives an answer from
 //! this domain; a later refusal goes back to that URI with `state` and the issuer (RFC 9207). A `request_uri` brings a
 //! request its client pushed (RFC 9126): claimed once by that client, it is the request, and nothing else in the
-//! query is read; one that cannot be claimed is refused at the server. A request that asks for
-//! no page is refused with `login_required`, because no session can answer it yet. A valid request is kept as a
+//! query is read; one that cannot be claimed is refused at the server. A valid request is kept as a
 //! pending authorization bound to the browser that brought it, by a browser cookie the browser keeps or this server
-//! draws, and the browser is sent to sign in carrying that record's id and nothing else. Every refusal
+//! draws, and the browser is sent to sign in carrying that record's id and nothing else. A request that asks for no
+//! page (`prompt=none`) is refused with `login_required` when no session cookie came with it; with one it is sent to
+//! the resume step instead, which answers it from that session or refuses it there. Every refusal
 //! is appended to the tenant's audit trail — identifiers and the reason, never the request's values — and is answered
 //! whether or not its record lands. No answer may be stored by a cache.
 
@@ -16,7 +17,7 @@ use axum::extract::rejection::{FormRejection, QueryRejection};
 use axum::extract::{Form, Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use tessari_oauth_constants::LOGIN_PATH;
+use tessari_oauth_constants::{AUTHORIZE_RESUME_PATH, LOGIN_PATH, SESSION_COOKIE};
 use tessari_oauth_core::Reason;
 use tessari_oauth_core::authorize::{self, Refusal};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
@@ -24,6 +25,7 @@ use tessari_oauth_types::{ClientId, ErrorCode, TenantId, Timestamp};
 
 use super::Found;
 use super::browser::{browser_cookie, held_or_drawn};
+use super::login::cookie;
 use crate::Error;
 use crate::headers::no_store;
 use crate::state::PublicState;
@@ -119,8 +121,9 @@ async fn respond(
         }
         Err(refused) => return answer(state, &tenant, client_id.as_ref(), refused, now).await,
     };
-    if request.silent {
-        // No session exists to answer from, and a silent request may never be shown a page.
+    if request.silent && cookie(headers, SESSION_COOKIE).is_none() {
+        // No session cookie reached this request (none exists, or the browser withholds it here, as in a cross-site
+        // frame), so no session can answer it, and a silent request may never be shown a page.
         let refused = Refusal::RedirectToClient {
             redirect_uri: request.redirect_uri,
             error: ErrorCode::LoginRequired,
@@ -138,7 +141,13 @@ async fn respond(
             .await
             .map_err(Error::Store)?,
     };
-    let mut response = see_other(&format!("{issuer}{LOGIN_PATH}?interaction={id}"))?;
+    // A request that asked for no page is answered from the session at resume, never shown the sign-in page.
+    let next = if request.silent {
+        AUTHORIZE_RESUME_PATH
+    } else {
+        LOGIN_PATH
+    };
+    let mut response = see_other(&format!("{issuer}{next}?interaction={id}"))?;
     response
         .headers_mut()
         .insert(header::SET_COOKIE, browser_cookie(&browser)?);
@@ -155,27 +164,7 @@ async fn answer(
 ) -> crate::Result<Response> {
     let (Refusal::RenderAtServer { error, reason }
     | Refusal::RedirectToClient { error, reason, .. }) = &refused;
-    tracing::warn!(
-        event = "authorization_refused",
-        tenant = tenant.as_str(),
-        client = client_id.map(ClientId::as_str),
-        reason = ?reason,
-        error = error.as_str(),
-        "an authorization request was refused"
-    );
-    let event = AuditEvent {
-        client_id: client_id.cloned(),
-        reason: Some(format!("{reason:?}")),
-        ..AuditEvent::of(AuditKind::Refused)
-    };
-    if let Err(failure) = state.audit.record(tenant, &event, now).await {
-        tracing::error!(
-            event = "audit_unrecorded",
-            tenant = tenant.as_str(),
-            category = ?failure.category(),
-            "a refusal could not be appended to the audit trail"
-        );
-    }
+    record_refused(state, tenant, client_id, (*error, *reason), now).await;
     match refused {
         Refusal::RenderAtServer { error, .. } => Ok(page(error)),
         Refusal::RedirectToClient {
@@ -196,6 +185,39 @@ async fn answer(
             }
             see_other(target.as_str())
         }
+    }
+}
+
+/// Log and append to `tenant`'s audit trail that a request of `client_id` was refused with `error` for `reason`: the
+/// identifiers and the reason, never the request's values. A trail that cannot take the record does not hold the
+/// answer.
+pub(super) async fn record_refused(
+    state: &PublicState,
+    tenant: &TenantId,
+    client_id: Option<&ClientId>,
+    (error, reason): (ErrorCode, Reason),
+    now: Timestamp,
+) {
+    tracing::warn!(
+        event = "authorization_refused",
+        tenant = tenant.as_str(),
+        client = client_id.map(ClientId::as_str),
+        reason = ?reason,
+        error = error.as_str(),
+        "an authorization request was refused"
+    );
+    let event = AuditEvent {
+        client_id: client_id.cloned(),
+        reason: Some(format!("{reason:?}")),
+        ..AuditEvent::of(AuditKind::Refused)
+    };
+    if let Err(failure) = state.audit.record(tenant, &event, now).await {
+        tracing::error!(
+            event = "audit_unrecorded",
+            tenant = tenant.as_str(),
+            category = ?failure.category(),
+            "a refusal could not be appended to the audit trail"
+        );
     }
 }
 

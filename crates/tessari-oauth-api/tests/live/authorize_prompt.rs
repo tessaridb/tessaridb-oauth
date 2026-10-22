@@ -1,8 +1,9 @@
 //! `max_age`, `prompt=login` and `prompt=none` at the resume step (OpenID Connect Core §3.1.2.1, §3.1.2.6): a sign-in
 //! older than the request allows is done again, and a request that asked for no page is answered at its redirect URI
-//! with `login_required` or `consent_required` rather than shown one.
+//! with `login_required` or `consent_required` rather than shown one, each refusal recorded with its reason.
 
 use tessari_oauth_core::authentication::Method;
+use tessari_oauth_storage::audit::AuditKind;
 use tessari_oauth_types::{SessionSecret, Timestamp, UserId};
 
 use crate::authorize_resume::{consented, get, resume_path, sent_to, signed_in};
@@ -117,4 +118,30 @@ async fn a_request_that_asked_for_no_page_is_answered_at_its_redirect_uri() {
     .await;
     let answered = get(&server, &resume_path(&too_old), Some(&hour_old)).await;
     assert_eq!(pairs(&answered)[0].1, "login_required");
+    let refusals: Vec<(Option<String>, Option<String>)> = server
+        .storage
+        .audit
+        .read_after(&tenant("acme"), 0, 100)
+        .await
+        .expect("the trail reads")
+        .into_iter()
+        .map(|record| record.event)
+        .filter(|event| event.kind == AuditKind::Refused)
+        .map(|event| {
+            (
+                event.client_id.map(|id| id.as_str().to_owned()),
+                event.reason,
+            )
+        })
+        .collect();
+    let portal = |reason: &str| (Some("portal".to_owned()), Some(reason.to_owned()));
+    assert_eq!(
+        refusals,
+        [
+            portal("SilentWithoutSession"),
+            portal("SilentWithoutConsent"),
+            portal("SilentSignInTooOld"),
+        ],
+        "each silent refusal is recorded with its own reason"
+    );
 }

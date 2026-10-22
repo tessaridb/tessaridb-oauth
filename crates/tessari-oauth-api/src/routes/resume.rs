@@ -6,7 +6,9 @@
 //! When the user's consent to this client covers every scope and resource asked for, under the consent policy in
 //! force, the request is taken, once, and answered at its redirect URI with a code bound to the client, the redirect
 //! URI, the PKCE challenge, the user and the tenant, its `state`, and the issuer (RFC 9207); otherwise the browser is
-//! sent to be asked, and the request waits.
+//! sent to be asked, and the request waits. A request that asked for no page (`prompt=none`) is never shown one: where
+//! it would be, it is answered at its redirect URI with `login_required` or `consent_required`, and the refusal is
+//! recorded.
 
 use axum::extract::rejection::QueryRejection;
 use axum::extract::{Path, Query, State};
@@ -16,6 +18,7 @@ use serde::Deserialize;
 use tessari_oauth_constants::{
     AUTHORIZATION_CODE_TTL_SECS, CONSENT_PATH, CONSENT_POLICY_VERSION, LOGIN_PATH, SESSION_COOKIE,
 };
+use tessari_oauth_core::Reason;
 use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_core::codes::{CodeAuthentication, IssuedCode};
 use tessari_oauth_core::consents::{ConsentRequest, Coverage};
@@ -25,7 +28,7 @@ use tessari_oauth_types::{
     AuthorizationCode, BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp, base64url,
 };
 
-use super::authorize::{page, see_other};
+use super::authorize::{page, record_refused, see_other};
 use super::browser::held;
 use super::login::{cookie, well_formed};
 use crate::state::PublicState;
@@ -77,7 +80,7 @@ pub(super) async fn resume(
                 &tenant,
                 issuer,
                 (&id, &browser),
-                ErrorCode::LoginRequired,
+                (ErrorCode::LoginRequired, Reason::SilentWithoutSession),
                 now,
             )
             .await
@@ -98,7 +101,7 @@ pub(super) async fn resume(
                 &tenant,
                 issuer,
                 (&id, &browser),
-                ErrorCode::LoginRequired,
+                (ErrorCode::LoginRequired, Reason::SilentSignInTooOld),
                 now,
             )
             .await
@@ -134,7 +137,7 @@ pub(super) async fn resume(
                 &tenant,
                 issuer,
                 (&id, &browser),
-                ErrorCode::ConsentRequired,
+                (ErrorCode::ConsentRequired, Reason::SilentWithoutConsent),
                 now,
             )
             .await
@@ -143,14 +146,15 @@ pub(super) async fn resume(
     }
 }
 
-/// Take the pending authorization `id` that `browser` brought in `tenant` at `now`, once, and send the browser to its
-/// redirect URI with `error`: a request that asked for no page is answered rather than shown one.
+/// Take the pending authorization `id` that `browser` brought in `tenant` at `now`, once, record its refusal for
+/// `reason`, and send the browser to its redirect URI with `error`: a request that asked for no page is answered
+/// rather than shown one.
 async fn silently_refused(
     state: &PublicState,
     tenant: &TenantId,
     issuer: &str,
     (id, browser): (&str, &BrowserBinding),
-    error: ErrorCode,
+    (error, reason): (ErrorCode, Reason),
     now: Timestamp,
 ) -> Result<Response> {
     let taken = state
@@ -159,7 +163,17 @@ async fn silently_refused(
         .await
         .map_err(Error::Store)?;
     match taken {
-        Some(request) => see_other(&refused_at(&request, issuer, error)?),
+        Some(request) => {
+            record_refused(
+                state,
+                tenant,
+                Some(&request.client_id),
+                (error, reason),
+                now,
+            )
+            .await;
+            see_other(&refused_at(&request, issuer, error)?)
+        }
         None => Ok(page(ErrorCode::InvalidRequest)),
     }
 }

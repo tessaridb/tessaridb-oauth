@@ -34,6 +34,10 @@ pub enum Reason {
     MaxAgeInvalid,
     /// `prompt=none` asked for no page, and there is no session to answer it from.
     SilentWithoutSession,
+    /// `prompt=none` asked for no page, and the session's sign-in is older than `max_age` allows.
+    SilentSignInTooOld,
+    /// `prompt=none` asked for no page, and the user's consent does not cover what was asked.
+    SilentWithoutConsent,
     /// A pushed authorization request named a `request_uri` of its own (RFC 9126 §2.1).
     RequestUriInPush,
     /// A `request_uri` names no pushed request this client may claim: malformed, unknown, lapsed, claimed already,
