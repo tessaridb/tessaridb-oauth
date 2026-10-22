@@ -11,6 +11,7 @@ mod account_grants;
 mod account_me;
 mod account_password;
 mod account_sessions;
+mod admin_audit;
 mod admin_callback;
 mod admin_operators;
 mod admin_policy;

@@ -286,6 +286,10 @@ hours, shown in that answer only and kept only as its digest; the same request s
 a new code replaces the earlier one. A code is refused for an account that already has a password
 (`already_enrolled`: an enrolment never replaces a password) or is disabled (`account_disabled`).
 
+`GET <ADMIN_URL>/admin/<company>/api/audit?after=<position>&limit=` (role `audit`) reads the company's audit trail in
+order, at most 100 messages a page, `next` naming the position to read after; each message carries its `position`,
+`at`, `kind` and only the fields it was written with.
+
 Operators: holding a role is what lets an operator give it. `GET <ADMIN_URL>/admin/<company>/api/operators` lists the
 current grants of the roles the viewer holds (cursor `<user>.<role>`, at most 100 a page).
 `POST .../api/operators/<user>/grants/<role>` with `{"reason", "valid_days"}` grants a role the operator holds to an

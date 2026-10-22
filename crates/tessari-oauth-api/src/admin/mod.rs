@@ -1,6 +1,7 @@
 //! The admin console's own listener: operators sign in at their company's issuer as its client `admin-console`,
 //! and the console keeps their session on its own origin.
 
+mod audit;
 mod callback;
 mod change;
 mod enrolment;
@@ -134,6 +135,7 @@ pub fn admin_router(state: AdminState) -> Router {
             get(users_read::list).post(users::create),
         )
         .route("/admin/{company}/api/users/{user}", get(users_read::one))
+        .route("/admin/{company}/api/audit", get(audit::trail))
         .route("/admin/{company}/api/operators", get(operators::list))
         .route(
             "/admin/{company}/api/operators/{user}/grants/{role}",
