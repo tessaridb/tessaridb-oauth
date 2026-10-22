@@ -31,6 +31,9 @@ const AUTHORIZE_GROUP: &str = "authorize";
 /// The route group of the sign-in steps.
 const LOGIN_GROUP: &str = "login";
 
+/// The route group of the account portal's requests.
+const ACCOUNT_GROUP: &str = "account";
+
 /// The counted name of a request with no peer address.
 const NO_ADDRESS: &str = "no-address";
 
@@ -97,6 +100,17 @@ pub(crate) async fn logins(
 ) -> Result<Response> {
     let limit = state.login_limit;
     count(&state, LOGIN_GROUP, limit, request, next).await
+}
+
+/// Count the request under the sign-in limit's numbers in a count of its own, and refuse it past the limit or when
+/// the store cannot count.
+pub(crate) async fn accounts(
+    State(state): State<PublicState>,
+    request: Request,
+    next: Next,
+) -> Result<Response> {
+    let limit = state.login_limit;
+    count(&state, ACCOUNT_GROUP, limit, request, next).await
 }
 
 /// Count the request in `group` under `limit`, then serve or refuse it.

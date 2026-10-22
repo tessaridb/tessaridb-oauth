@@ -5,6 +5,7 @@
 
 #![cfg(test)]
 
+mod account_grants;
 mod authenticator;
 mod authorize;
 mod authorize_prompt;

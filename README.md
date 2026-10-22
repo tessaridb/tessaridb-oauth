@@ -153,6 +153,16 @@ token gets the same `401` with `error="invalid_token"` in `WWW-Authenticate`, a 
 `error="insufficient_scope"`, and none of the answers is cached. A token from the client credentials grant never
 carries `openid`, so it never reaches UserInfo. Discovery advertises the endpoint.
 
+### Your grants: `<issuer>/account/api/grants`
+
+A signed-in user reads the grants they gave with `GET <issuer>/account/api/grants`: for each client still holding
+one, the scopes, the resources and when it was given. `POST <issuer>/account/api/grants/revoke` with
+`{"client_id": "<client>"}` ends that grant: the consent is withdrawn, which is recorded, and every refresh family
+of that user at that client is revoked, so the client must ask again. The answer says how many families ended and
+the time by which the access tokens it already holds stop working, at most five minutes on, because an access token
+is never recalled. Both act for the session's own user and nobody else, need the session cookie (`401 session_required`
+without it), take JSON only, are counted under their own limit and are never cached.
+
 ### The audit trail
 
 Every outcome at the token and revocation endpoints, and every refusal at the authorization and UserInfo endpoints,

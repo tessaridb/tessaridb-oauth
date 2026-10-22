@@ -20,7 +20,7 @@ mod passkey;
 mod password;
 
 pub(super) use begin::begin;
-pub(super) use consent::{consent, decide};
+pub(super) use consent::{consent, decide, signed_in};
 pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
 pub(super) use passkey::{passkey, passkey_options};
@@ -82,7 +82,7 @@ fn answer(stage: Stage, cookie: Option<HeaderValue>) -> Response {
 }
 
 /// The body of a step, or [`Error::Invalid`] when it is not the JSON the step reads.
-fn body<T>(read: std::result::Result<Json<T>, JsonRejection>) -> Result<T> {
+pub(super) fn body<T>(read: std::result::Result<Json<T>, JsonRejection>) -> Result<T> {
     read.map(|Json(body)| body).map_err(|_| Error::Invalid)
 }
 
@@ -278,7 +278,12 @@ async fn rejected(
 }
 
 /// Append `event` to `tenant`'s trail; a trail that cannot take it is logged, never the reason a step fails.
-async fn record(state: &PublicState, tenant: &TenantId, event: &AuditEvent, now: Timestamp) {
+pub(super) async fn record(
+    state: &PublicState,
+    tenant: &TenantId,
+    event: &AuditEvent,
+    now: Timestamp,
+) {
     if let Err(failure) = state.audit.record(tenant, event, now).await {
         tracing::error!(
             event = "audit_unrecorded",

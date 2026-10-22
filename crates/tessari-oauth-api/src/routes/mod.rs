@@ -1,7 +1,8 @@
 //! The public router: per tenant, the server metadata, the key set, UserInfo and the sign-in and consent pages under
 //! the read limit, the authorization endpoint under its own, the token, revocation and pushed-request endpoints under
-//! theirs, and the sign-in steps under theirs, every body capped.
+//! theirs, the sign-in steps under theirs, and the account portal's requests under theirs, every body capped.
 
+mod account;
 mod authorize;
 mod browser;
 mod jwks;
@@ -16,7 +17,8 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use tessari_oauth_constants::{
-    AUTHORIZE_BODY_MAX_BYTES, LOGIN_API_PATH, LOGIN_BODY_MAX_BYTES, TOKEN_BODY_MAX_BYTES,
+    ACCOUNT_API_PATH, AUTHORIZE_BODY_MAX_BYTES, LOGIN_API_PATH, LOGIN_BODY_MAX_BYTES,
+    TOKEN_BODY_MAX_BYTES,
 };
 use tessari_oauth_core::clients::{ClientDirectory, ClientRegistration};
 use tessari_oauth_types::{ClientId, TenantId};
@@ -105,10 +107,29 @@ pub fn public_router(state: PublicState) -> Router {
         .layer(axum::middleware::map_response(|response| async {
             no_store(response)
         }));
+    let accounts = Router::new()
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/grants"),
+            get(account::grants),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/grants/revoke"),
+            post(account::revoke),
+        )
+        .layer(DefaultBodyLimit::max(LOGIN_BODY_MAX_BYTES))
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::throttle::accounts,
+        ))
+        // What a user's own account holds belongs to that user's browser alone.
+        .layer(axum::middleware::map_response(|response| async {
+            no_store(response)
+        }));
     reads
         .merge(authorizations)
         .merge(tokens)
         .merge(logins)
+        .merge(accounts)
         .fallback(|| async { crate::Error::NotFound })
         .with_state(state)
         .layer(axum::middleware::map_response(|response| async {

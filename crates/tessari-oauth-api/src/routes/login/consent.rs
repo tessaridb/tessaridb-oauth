@@ -182,7 +182,7 @@ async fn pending(
 }
 
 /// The session the request's cookie names in `tenant` at `now`.
-async fn signed_in(
+pub(in crate::routes) async fn signed_in(
     state: &PublicState,
     tenant: &TenantId,
     headers: &HeaderMap,

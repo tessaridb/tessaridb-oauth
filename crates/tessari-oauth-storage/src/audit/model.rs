@@ -27,11 +27,13 @@ pub enum AuditKind {
     SignedIn,
     /// A user granted a client the scopes and resources it asked for.
     Consented,
+    /// A grant was ended; `reason` names who ended it.
+    ConsentRevoked,
 }
 
 impl AuditKind {
     /// Every kind.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::IssuedCode,
         Self::IssuedRefresh,
         Self::IssuedClient,
@@ -43,6 +45,7 @@ impl AuditKind {
         Self::RecoveryUsed,
         Self::SignedIn,
         Self::Consented,
+        Self::ConsentRevoked,
     ];
 
     /// The name the message carries.
@@ -60,6 +63,7 @@ impl AuditKind {
             Self::RecoveryUsed => "recovery_used",
             Self::SignedIn => "signed_in",
             Self::Consented => "consented",
+            Self::ConsentRevoked => "consent_revoked",
         }
     }
 
