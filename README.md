@@ -26,7 +26,7 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 > the sign-in and consent pages, ID tokens, and the account API a signed-in user reads and manages their own sessions
 > and grants with, it rotates the tenants' signing keys and tells clients when a session ends. Operators open,
 > enrol, disable and enable accounts, grant operator roles, set the two-factor policy, read the audit trail and make
-> companies through the admin console's API; the account portal page and the admin panel's pages come next. No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
+> companies through the admin console; the account portal page comes next. No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
 > page describes what the project is for, not a working system.
 
 ## What it is for
@@ -64,9 +64,9 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, operators, audit trail, companies) |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, operators, audit trail, companies) and its pages |
 | Built, not served yet | enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
-| Planned | the account portal page, the admin panel's pages, more regions |
+| Planned | the account portal page, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
 ## How it behaves
@@ -261,6 +261,19 @@ The session is kept in an `HttpOnly`, `SameSite=Strict` cookie (`__Host-` and `S
 last role is taken away. `GET <ADMIN_URL>/admin/<company>/api/me` names the operator and their roles, and
 `POST <ADMIN_URL>/admin/<company>/signout` ends the session, accepted only from the console's own origin. Console
 requests are counted per client address under the `LOGIN_LIMIT` and `LOGIN_WINDOW_SECS` numbers.
+
+The console itself is the page at `<ADMIN_URL>/admin/<company>/`, served by the binary with its script, style and mark
+under `.../assets/`, for an active company only, under the same policy as the sign-in pages and never cached. It holds
+no token, only the session cookie, and asks the API for everything it shows. It offers the sections the operator's
+roles can use (Users, Operators, Sign-in policy, Audit trail, and Companies in the `system` console); the API refuses
+the rest whatever is offered. Every change asks for a reason and is sent once under its own `Idempotency-Key`.
+Disabling an account names it and says what ends; a two-factor policy change or a company's suspension says what it
+does to every account and asks for the company's id typed out. Lists page behind the server's cursor with no total,
+and an address is shown masked until it is revealed with a reason.
+
+What the console does not do yet, stated as limits rather than promised: a change that reaches a whole company is
+made by one operator (no second approval); the roles given by `bootstrap-operator` do not expire; and a company made
+in the `system` console has no way yet to get its first operator.
 
 Every console route needs one operator role, and a refusal for a missing role is recorded. A change comes from the
 console's own origin as JSON carrying the operator's `reason` (1 to 500 characters) and an `Idempotency-Key` header (16
