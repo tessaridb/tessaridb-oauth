@@ -87,3 +87,10 @@ pub const COMPANY_NAME_MAX_CHARS: usize = 100;
 
 /// The most companies one directory page holds.
 pub const COMPANY_PAGE_MAX: u32 = 100;
+
+/// How often a node re-reads which companies are active, in seconds: a company created, suspended or resumed on any
+/// node is served or refused everywhere within this long.
+pub const DIRECTORY_REFRESH_SECS: u64 = 5;
+
+/// The most one directory refresh may take, in seconds.
+pub const DIRECTORY_REFRESH_TIMEOUT_SECS: u64 = 4;

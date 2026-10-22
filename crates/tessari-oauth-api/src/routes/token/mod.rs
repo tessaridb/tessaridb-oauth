@@ -109,6 +109,7 @@ async fn respond(
     operation: Operation,
 ) -> crate::Result<Response> {
     let (tenant, issuer) = state.tenant(tenant)?;
+    let issuer = &*issuer;
     let endpoint = Endpoint {
         tenant,
         issuer: issuer.to_owned(),

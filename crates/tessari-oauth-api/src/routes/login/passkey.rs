@@ -50,6 +50,7 @@ pub(in crate::routes) async fn passkey_options(
     headers: HeaderMap,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let rp_id = relying_party(issuer)?.0;
     let binding = binding(&headers)?;
     let now = (state.clock)();
@@ -106,6 +107,7 @@ pub(in crate::routes) async fn passkey(
     read: std::result::Result<Json<Assertion>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let (rp_id, origin) = relying_party(issuer)?;
     let binding = binding(&headers)?;
     let assertion = body(read)?;

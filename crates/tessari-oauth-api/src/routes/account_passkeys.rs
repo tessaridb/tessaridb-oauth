@@ -71,6 +71,7 @@ pub(super) async fn options(
     read: std::result::Result<Json<Nothing>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     body(read)?;
     let now = (state.clock)();
     let asking = signed_in(&state, &tenant, &headers, now).await?;
@@ -118,6 +119,7 @@ pub(super) async fn register(
     read: std::result::Result<Json<Created>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let created = body(read)?;
     let now = (state.clock)();
     let asking = signed_in(&state, &tenant, &headers, now).await?;

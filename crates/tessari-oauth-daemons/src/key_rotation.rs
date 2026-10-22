@@ -12,6 +12,7 @@ use std::time::Duration;
 use tessari_oauth_constants::KEY_ROTATION_CONCURRENCY;
 use tessari_oauth_core::keys::{self, KeyRecord};
 use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
+use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::keys::{KeyService, StoredKey};
 use tessari_oauth_types::{Algorithm, Clock, ErrorCategory, TenantId, Timestamp};
 use tokio::task::JoinSet;
@@ -25,8 +26,8 @@ pub struct KeyRotation {
     pub keys: Arc<KeyService>,
     /// The key-encryption key new keys are sealed under.
     pub kek: Arc<Kek>,
-    /// The tenants this server signs for.
-    pub tenants: Vec<TenantId>,
+    /// The companies this node serves, whose keys it keeps.
+    pub served: Arc<Served>,
     /// The algorithm new keys sign with.
     pub algorithm: Algorithm,
     /// The run's clock.
@@ -125,7 +126,8 @@ impl KeyRotation {
             kek: Arc::clone(&self.kek),
             algorithm: self.algorithm,
         };
-        let mut pending = self.tenants.iter().cloned();
+        let companies = self.served.companies();
+        let mut pending = companies.iter().cloned();
         let mut tasks = JoinSet::new();
         let (mut generated, mut retired) = (0_usize, 0_usize);
         let mut failures: Vec<String> = Vec::new();
@@ -152,7 +154,7 @@ impl KeyRotation {
                 Err(join) => failures.push(format!("a tenant's task ended abnormally: {join}")),
             }
         }
-        let tenants = self.tenants.len();
+        let tenants = companies.len();
         if failures.is_empty() {
             Ok(DaemonReport {
                 message: format!("tenants={tenants} generated={generated} retired={retired}"),

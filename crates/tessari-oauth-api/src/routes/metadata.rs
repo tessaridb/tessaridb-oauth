@@ -16,6 +16,7 @@ pub(super) async fn metadata(
     Path(tenant): Path<String>,
 ) -> Result<Response> {
     let (_, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     // The issuer was validated when the configuration was read, so a refusal here is a defect.
     let document =
         discovery::metadata(issuer, state.signing_algorithm).map_err(|_| Error::Internal)?;

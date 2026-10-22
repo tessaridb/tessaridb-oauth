@@ -165,3 +165,43 @@ async fn the_directory_pages_in_id_order_from_an_anchor() {
         .expect("a page");
     assert!(last.is_empty());
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn only_active_companies_are_served() {
+    let storage = directory().await;
+    for raw in ["alpha", "bravo", "charlie", "delta"] {
+        storage
+            .companies
+            .create(&id(raw), raw, "user-1", Timestamp::from_unix_secs(AT))
+            .await
+            .expect("created");
+    }
+    for raw in ["alpha", "bravo", "delta"] {
+        assert!(
+            storage
+                .companies
+                .transition(&id(raw), CompanyStatus::Provisioning, CompanyStatus::Active)
+                .await
+                .expect("activated")
+        );
+    }
+    assert!(
+        storage
+            .companies
+            .transition(
+                &id("bravo"),
+                CompanyStatus::Active,
+                CompanyStatus::Suspended
+            )
+            .await
+            .expect("suspended")
+    );
+    let mut active = storage
+        .companies
+        .active()
+        .await
+        .expect("the active companies");
+    active.sort_by(|left, right| left.as_str().cmp(right.as_str()));
+    assert_eq!(active, [id("alpha"), id("delta")]);
+}

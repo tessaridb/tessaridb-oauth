@@ -37,6 +37,7 @@ pub(in crate::routes) async fn password(
     read: std::result::Result<Json<Password>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let binding = binding(&headers)?;
     let Password { password } = body(read)?;
     let now = (state.clock)();

@@ -70,6 +70,7 @@ async fn respond(
     pairs: Option<Pairs>,
 ) -> crate::Result<Response> {
     let (tenant, issuer) = state.tenant(tenant)?;
+    let issuer = &*issuer;
     let now = (state.clock)();
     let browser = held_or_drawn(headers)?;
     let Some(pairs) = pairs else {

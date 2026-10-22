@@ -7,6 +7,7 @@
 
 #![cfg(test)]
 
+mod directory_refresh;
 mod key_rotation;
 mod logout_delivery;
 

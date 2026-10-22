@@ -116,6 +116,7 @@ pub(in crate::routes) async fn decide(
     read: std::result::Result<Json<Answered>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let answered = body(read)?;
     let now = (state.clock)();
     let browser = held(&headers).ok_or(Error::SigninGone)?;

@@ -38,6 +38,7 @@ pub(in crate::routes) async fn totp(
     read: std::result::Result<Json<Code>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let binding = binding(&headers)?;
     let Code { code } = body(read)?;
     let now = (state.clock)();
@@ -79,6 +80,7 @@ pub(in crate::routes) async fn recovery(
     read: std::result::Result<Json<Code>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let binding = binding(&headers)?;
     let Code { code } = body(read)?;
     let digest = recovery_digest(&code).ok_or(Error::Invalid)?;

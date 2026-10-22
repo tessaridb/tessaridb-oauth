@@ -9,6 +9,7 @@ use tessari_oauth_constants::{JWKS_MAX_AGE_SECS, SIGNING_KEY_LIFETIME_SECS};
 use tessari_oauth_daemons::{Daemon, KeyRotation};
 use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
 use tessari_oauth_storage::Storage;
+use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_types::{Algorithm, TenantId, Timestamp};
 
@@ -31,7 +32,11 @@ fn daemon(
     KeyRotation {
         keys: Arc::clone(&storage.keys),
         kek: Arc::clone(kek),
-        tenants: tenants.to_vec(),
+        served: {
+            let served = Served::new("https://id.example.com");
+            served.replace(tenants.iter().cloned());
+            Arc::new(served)
+        },
         algorithm: Algorithm::Es256,
         clock: Arc::new(move || Timestamp::from_unix_secs(clock.load(Ordering::Relaxed))),
         interval: Duration::from_secs(60),

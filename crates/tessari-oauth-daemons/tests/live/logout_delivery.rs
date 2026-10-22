@@ -18,6 +18,7 @@ use tessari_oauth_daemons::{Daemon, LogoutDelivery, LogoutSender};
 use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
 use tessari_oauth_storage::Storage;
 use tessari_oauth_storage::clients::NewClient;
+use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_types::{
     Algorithm, ClientId, RedirectUri, ScopeSet, SessionSecret, TenantId, Timestamp, UserId,
@@ -32,6 +33,13 @@ const REFUSING: &str = "https://kiosk.example.com/backchannel";
 
 fn acme() -> TenantId {
     TenantId::parse("acme").expect("a tenant id")
+}
+
+/// The node serving `acme` alone, under the issuer `ISSUER`.
+fn served() -> Arc<Served> {
+    let served = Served::new(ISSUER.trim_end_matches("/acme"));
+    served.replace([acme()]);
+    Arc::new(served)
 }
 
 fn client(id: &str) -> ClientId {
@@ -145,7 +153,7 @@ async fn each_client_is_told_by_its_own_token_and_an_untold_one_is_kept() {
         subjects: Arc::clone(&storage.subjects),
         keys: Arc::clone(&storage.keys),
         kek: Arc::clone(&kek),
-        tenants: vec![(acme(), ISSUER.to_owned())],
+        served: served(),
         sender: Arc::clone(&sender) as Arc<dyn LogoutSender>,
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
         interval: Duration::from_secs(5),
@@ -233,7 +241,7 @@ async fn every_tell_of_a_run_is_under_way_at_once() {
         subjects: Arc::clone(&storage.subjects),
         keys: Arc::clone(&storage.keys),
         kek: Arc::clone(&kek),
-        tenants: vec![(acme(), ISSUER.to_owned())],
+        served: served(),
         sender: Arc::new(Gathering {
             all_started: Barrier::new(4),
         }),
@@ -283,7 +291,7 @@ async fn a_client_that_never_answers_is_given_up_on_for_this_run() {
         subjects: Arc::clone(&storage.subjects),
         keys: Arc::clone(&storage.keys),
         kek: Arc::clone(&kek),
-        tenants: vec![(acme(), ISSUER.to_owned())],
+        served: served(),
         sender: Arc::new(Silent),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
         interval: Duration::from_secs(5),

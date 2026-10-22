@@ -20,6 +20,7 @@ use tessari_oauth_core::logout::{Ended, LOGOUT_TOKEN_TYPE, logout_claims};
 use tessari_oauth_infrastructure::backchannel::Poster;
 use tessari_oauth_infrastructure::custody::{Kek, token_id};
 use tessari_oauth_storage::clients::ClientService;
+use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::keys::KeyService;
 use tessari_oauth_storage::logouts::{Delivery, LogoutService};
 use tessari_oauth_storage::subjects::SubjectService;
@@ -71,8 +72,8 @@ pub struct LogoutDelivery {
     pub keys: Arc<KeyService>,
     /// The key-encryption key signing keys and salts are sealed under.
     pub kek: Arc<Kek>,
-    /// The tenants this server serves, each with its issuer.
-    pub tenants: Vec<(TenantId, String)>,
+    /// The companies this node serves, each with its issuer.
+    pub served: Arc<Served>,
     /// Where tokens go.
     pub sender: Arc<dyn LogoutSender>,
     /// The run's clock.
@@ -116,13 +117,14 @@ fn backoff(attempts: u32) -> u64 {
 impl LogoutDelivery {
     async fn run(&self) -> Result<DaemonReport> {
         let mut tally = Tally::default();
-        for (tenant, issuer) in &self.tenants {
+        let companies = self.served.issuers();
+        for (tenant, issuer) in &companies {
             self.deliver_tenant(tenant, issuer, &mut tally).await?;
         }
         Ok(DaemonReport {
             message: format!(
                 "tenants={} sessions={} told={} untold={} finished={} retried={}",
-                self.tenants.len(),
+                companies.len(),
                 tally.sessions,
                 tally.told,
                 tally.untold,

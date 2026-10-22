@@ -68,6 +68,7 @@ async fn respond(
     pairs: Option<Pairs>,
 ) -> crate::Result<Response> {
     let (tenant, issuer) = state.tenant(tenant)?;
+    let issuer = &*issuer;
     let now = (state.clock)();
     let Some(params) = pairs.and_then(|pairs| Params::from_pairs(pairs).ok()) else {
         return Ok(refused(state, &tenant, "logout_unreadable", now).await);

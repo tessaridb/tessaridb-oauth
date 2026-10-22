@@ -4,7 +4,6 @@
 //! Every file is read and every value checked before the runtime starts, so a server that starts is one that can
 //! serve, and one that cannot says why and exits non-zero.
 
-use std::collections::HashMap;
 use std::error::Error;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -12,16 +11,18 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tessari_oauth_api::{PublicState, public_router, serve};
 use tessari_oauth_constants::{
-    KEY_ROTATION_CHECK_SECS, KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS,
-    LOGOUT_DELIVERY_RUN_TIMEOUT_SECS, LOGOUT_SEND_TIMEOUT_SECS, SHUTDOWN_DRAIN_SECS,
+    DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS,
+    KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS,
+    LOGOUT_SEND_TIMEOUT_SECS, SHUTDOWN_DRAIN_SECS,
 };
 use tessari_oauth_core::discovery;
-use tessari_oauth_daemons::{KeyRotation, LogoutDelivery};
+use tessari_oauth_daemons::{DirectoryRefresh, KeyRotation, LogoutDelivery};
 use tessari_oauth_infrastructure::backchannel::Poster;
 use tessari_oauth_infrastructure::config::NodeConfig;
 use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_infrastructure::tessaridb::{Database, StoreConfig};
 use tessari_oauth_infrastructure::{ListenerTls, listener_config};
+use tessari_oauth_storage::companies::{CompanyStatus, Served};
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_storage::{Storage, Tenancy};
 use tessari_oauth_types::{Algorithm, Clock, Timestamp};
@@ -74,20 +75,19 @@ fn start() -> Result<(), Failure> {
             .map(std::fs::read)
             .transpose()?,
     };
-    let mut issuers = HashMap::new();
     for tenant in &config.tenants {
         let issuer = format!("{}/{}", config.public.url, tenant.as_str());
         discovery::metadata(&issuer, SIGNING_ALGORITHM)
             .map_err(|_| format!("{issuer} is not a valid issuer"))?;
-        issuers.insert(tenant.clone(), issuer);
     }
+    let served = Arc::new(Served::new(&config.public.url));
     let poster = Poster::with_native_roots(Duration::from_secs(LOGOUT_SEND_TIMEOUT_SECS))?;
     let database = Database::new(store, config.store.connections.get())?;
     let storage = Storage::new(&database, &Tenancy::for_region(&config.region)?);
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    runtime.block_on(run(config, storage, issuers, kek, passwords, tls, poster))
+    runtime.block_on(run(config, storage, served, kek, passwords, tls, poster))
 }
 
 /// The system clock as the core's clock port; a clock before the epoch reads as the epoch.
@@ -105,22 +105,34 @@ fn system_clock() -> Clock {
 async fn run(
     config: NodeConfig,
     storage: Storage,
-    issuers: HashMap<tessari_oauth_types::TenantId, String>,
+    served: Arc<Served>,
     kek: Arc<Kek>,
     passwords: Arc<Passwords>,
     tls: Arc<rustls::ServerConfig>,
     poster: Poster,
 ) -> Result<(), Failure> {
-    for tenant in &config.tenants {
-        storage.tenants.provision(tenant).await?;
-    }
-    storage.throttle.prepare().await?;
     let clock = system_clock();
+    // The companies the configuration names are served from the start: created when new, provisioned, and made
+    // active unless an operator suspended one, which the configuration does not override.
+    storage.companies.prepare().await?;
+    for tenant in &config.tenants {
+        storage
+            .companies
+            .create(tenant, tenant.as_str(), "configuration", clock())
+            .await?;
+        storage.tenants.provision(tenant).await?;
+        storage
+            .companies
+            .transition(tenant, CompanyStatus::Provisioning, CompanyStatus::Active)
+            .await?;
+    }
+    served.replace(storage.companies.active().await?);
+    storage.throttle.prepare().await?;
     let (stop, stopped) = watch::channel(false);
     let rotation = Arc::new(KeyRotation {
         keys: Arc::clone(&storage.keys),
         kek: Arc::clone(&kek),
-        tenants: config.tenants.clone(),
+        served: Arc::clone(&served),
         algorithm: SIGNING_ALGORITHM,
         clock: Arc::clone(&clock),
         interval: Duration::from_secs(KEY_ROTATION_CHECK_SECS),
@@ -133,17 +145,20 @@ async fn run(
         subjects: Arc::clone(&storage.subjects),
         keys: Arc::clone(&storage.keys),
         kek: Arc::clone(&kek),
-        tenants: config
-            .tenants
-            .iter()
-            .filter_map(|tenant| Some((tenant.clone(), issuers.get(tenant)?.clone())))
-            .collect(),
+        served: Arc::clone(&served),
         sender: Arc::new(poster),
         clock: Arc::clone(&clock),
         interval: Duration::from_secs(LOGOUT_DELIVERY_INTERVAL_SECS),
         timeout: Duration::from_secs(LOGOUT_DELIVERY_RUN_TIMEOUT_SECS),
     });
     let delivering = tokio::spawn(tessari_oauth_daemons::run(delivery, stopped.clone()));
+    let refresh = Arc::new(DirectoryRefresh {
+        companies: Arc::clone(&storage.companies),
+        served: Arc::clone(&served),
+        interval: Duration::from_secs(DIRECTORY_REFRESH_SECS),
+        timeout: Duration::from_secs(DIRECTORY_REFRESH_TIMEOUT_SECS),
+    });
+    let refreshing = tokio::spawn(tessari_oauth_daemons::run(refresh, stopped.clone()));
     let state = PublicState {
         keys: Arc::clone(&storage.keys),
         clients: Arc::clone(&storage.clients),
@@ -180,7 +195,7 @@ async fn run(
             requests: config.login_limit.requests,
             window_secs: config.login_limit.window_secs,
         },
-        issuers: Arc::new(issuers),
+        served,
         clock,
     };
     // Signals are taken before the listener opens, so no signal can arrive while the default action still applies.
@@ -202,15 +217,17 @@ async fn run(
         _ = terminate.recv() => tracing::info!(signal = "SIGTERM", "shutting down"),
     }
     stop.send(true)?;
-    let (served, rotated, delivered) =
+    let (answered, rotated, delivered, refreshed) =
         tokio::time::timeout(Duration::from_secs(SHUTDOWN_DRAIN_SECS), async {
             let rotated = rotating.await;
             let delivered = delivering.await;
-            (serving.await, rotated, delivered)
+            let refreshed = refreshing.await;
+            (serving.await, rotated, delivered, refreshed)
         })
         .await
         .map_err(|_| format!("requests still in flight after {SHUTDOWN_DRAIN_SECS} s"))?;
     rotated?;
     delivered?;
-    Ok(served??)
+    refreshed?;
+    Ok(answered??)
 }

@@ -51,6 +51,7 @@ pub(super) async fn resume(
     query: std::result::Result<Query<Resume>, QueryRejection>,
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let now = (state.clock)();
     let (Some(id), Some(browser)) = (
         query

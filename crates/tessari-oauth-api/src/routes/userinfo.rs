@@ -54,6 +54,7 @@ pub(super) async fn userinfo(
     headers: HeaderMap,
 ) -> crate::Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
+    let issuer = &*issuer;
     let now = (state.clock)();
     let Some((scheme, token)) = credentials(&headers) else {
         let missing = Refusal {

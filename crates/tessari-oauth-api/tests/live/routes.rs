@@ -1,6 +1,5 @@
 //! The metadata and key set routes: what each answers, what each refuses, and the headers on every answer.
 
-use std::collections::HashMap;
 use std::num::NonZeroU64;
 use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
@@ -13,6 +12,7 @@ use tessari_oauth_api::{PublicState, public_router};
 use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
 use tessari_oauth_infrastructure::tessaridb::StoreConfig;
 use tessari_oauth_storage::Storage;
+use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_test_support::{fresh_storage, plain_node, unique};
@@ -54,7 +54,11 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         authorize_limit: unlimited(),
         login_limit: unlimited(),
         signing_algorithm: Algorithm::Es256,
-        issuers: Arc::new(HashMap::from([(acme(), ISSUER.to_owned())])),
+        served: {
+            let served = Served::new("https://id.example.com");
+            served.replace([acme()]);
+            Arc::new(served)
+        },
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
     }
 }
@@ -184,6 +188,34 @@ async fn a_tenant_this_server_does_not_serve_is_not_found_and_not_named_back() {
         assert!(!answer.body.to_string().contains("globex"), "{path}");
         protected(&answer);
     }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_company_is_served_exactly_while_the_snapshot_names_it() {
+    let storage = live_storage().await;
+    let state = state(&storage, unlimited());
+    let served = Arc::clone(&state.served);
+    let router = public_router(state);
+    let metadata = |router: axum::Router| async move {
+        let request = Request::get("/acme/.well-known/oauth-authorization-server")
+            .body(Body::empty())
+            .expect("a request");
+        router
+            .oneshot(request)
+            .await
+            .expect("the router answers")
+            .status()
+    };
+    assert_eq!(metadata(router.clone()).await, StatusCode::OK);
+    served.replace([]);
+    assert_eq!(
+        metadata(router.clone()).await,
+        StatusCode::NOT_FOUND,
+        "suspended"
+    );
+    served.replace([acme()]);
+    assert_eq!(metadata(router).await, StatusCode::OK, "resumed");
 }
 
 #[tokio::test]

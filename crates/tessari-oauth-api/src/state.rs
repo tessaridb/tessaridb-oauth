@@ -3,13 +3,13 @@
 //! passkeys, sessions, consents and two-factor policies, the key-encryption key, the password pepper, the request
 //! counters and the clock.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
+use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::consents::ConsentService;
 use tessari_oauth_storage::factors::FactorService;
 use tessari_oauth_storage::interactions::InteractionService;
@@ -76,8 +76,8 @@ pub struct PublicState {
     pub login_limit: Limit,
     /// The algorithm the tenants' keys sign with — the server's choice, and the only one a token is verified under.
     pub signing_algorithm: Algorithm,
-    /// Each served tenant's issuer identifier, fixed at start-up from the configuration.
-    pub issuers: Arc<HashMap<TenantId, String>>,
+    /// The companies this node serves and their issuers, refreshed from the directory.
+    pub served: Arc<Served>,
     /// The clock the key rule is judged at.
     pub clock: Clock,
 }
@@ -89,9 +89,9 @@ impl PublicState {
     ///
     /// [`Error::NotFound`] for a segment that is not a tenant id or names a tenant this server does not serve — one
     /// answer for both, so the path is not an oracle for which tenants exist.
-    pub(crate) fn tenant(&self, raw: &str) -> Result<(TenantId, &str)> {
+    pub(crate) fn tenant(&self, raw: &str) -> Result<(TenantId, Arc<str>)> {
         let tenant = TenantId::parse(raw).map_err(|_| Error::NotFound)?;
-        let issuer = self.issuers.get(&tenant).ok_or(Error::NotFound)?;
-        Ok((tenant, issuer.as_str()))
+        let issuer = self.served.issuer(&tenant).ok_or(Error::NotFound)?;
+        Ok((tenant, issuer))
     }
 }

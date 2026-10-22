@@ -130,6 +130,28 @@ impl CompanyService {
             .collect()
     }
 
+    /// Every active company, read page by page.
+    ///
+    /// # Errors
+    ///
+    /// Store failures and [`Error::Unreadable`].
+    pub async fn active(&self) -> Result<Vec<TenantId>> {
+        let mut active = Vec::new();
+        let mut after: Option<TenantId> = None;
+        loop {
+            let page = self.page(after.as_ref(), COMPANY_PAGE_MAX).await?;
+            let Some(last) = page.last() else {
+                return Ok(active);
+            };
+            after = Some(last.id.clone());
+            active.extend(
+                page.into_iter()
+                    .filter(|company| company.status == CompanyStatus::Active)
+                    .map(|company| company.id),
+            );
+        }
+    }
+
     /// Move the company `id` from `from` to `to`; `false` when it was not in `from`, or does not exist.
     ///
     /// # Errors

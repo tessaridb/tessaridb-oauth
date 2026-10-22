@@ -280,7 +280,7 @@ first, for development only.
 | `STORE_AUTHORITY` | the PEM the node's certificate must lead to; without it only a loopback store is reached | none |
 | `STORE_CONNECTIONS` | connections to the store at most | `16` |
 | `REGION` | the region whose tenants this server holds (namespace `oauth_<REGION>`) | required |
-| `TENANTS` | the tenants this server is the issuer for, comma-separated | required |
+| `TENANTS` | the companies (tenants) created and activated at start, comma-separated; a company an operator suspended stays suspended | required |
 | `READ_LIMIT`, `READ_WINDOW_SECS` | metadata, key-set and UserInfo requests one client address may make per window | `300`, `60` |
 | `TOKEN_LIMIT`, `TOKEN_WINDOW_SECS` | token requests one client address may make per window | `60`, `60` |
 | `AUTHORIZE_LIMIT`, `AUTHORIZE_WINDOW_SECS` | authorization requests one client address may make per window | `120`, `60` |
@@ -291,8 +291,11 @@ cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary
 curl --cacert cert.pem https://localhost:8443/acme/.well-known/oauth-authorization-server
 ```
 
-At start the server provisions each tenant's database, makes a signing key for any tenant without one and then
-checks every five minutes for keys due to rotate. Each read, authorization request, token request and sign-in step is
+At start the server records each configured company in the region's directory, provisions its database and makes it
+active, makes a signing key for any company without one and then checks every five minutes for keys due to rotate.
+Every node re-reads which companies are active every five seconds and serves exactly those: a company that is not
+active answers `404`, like a name that was never a company.
+Each read, authorization request, token request and sign-in step is
 counted per client address in TessariDB, under separate limits; past the limit the answer is `429` with
 `Retry-After`, every counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`, and when the store
 cannot count the request is refused with `503` rather than served. A wrong password is also counted against the

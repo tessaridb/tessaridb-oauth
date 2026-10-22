@@ -1,7 +1,7 @@
 //! The token endpoint's fixtures: a live store serving two tenants with a published key and two public clients each,
 //! codes issued straight into it, and requests posted through the router as the listener posts them.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::num::NonZeroU64;
 use std::sync::{Arc, OnceLock};
 
@@ -13,6 +13,7 @@ use tessari_oauth_core::codes::IssuedCode;
 use tessari_oauth_infrastructure::custody::{Kek, PasswordCost, Passwords, SigningKey};
 use tessari_oauth_storage::Storage;
 use tessari_oauth_storage::clients::NewClient;
+use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_test_support::{fresh_kek, fresh_passwords, fresh_storage, plain_node};
@@ -149,9 +150,11 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         authorize_limit: plenty(),
         login_limit: plenty(),
         signing_algorithm: Algorithm::Es256,
-        issuers: Arc::new(HashMap::from(
-            ["acme", "initech"].map(|name| (tenant(name), issuer(name))),
-        )),
+        served: {
+            let served = Served::new("https://id.example.com");
+            served.replace(["acme", "initech"].map(tenant));
+            Arc::new(served)
+        },
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
     }
 }
