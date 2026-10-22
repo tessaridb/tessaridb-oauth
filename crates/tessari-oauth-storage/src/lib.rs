@@ -4,6 +4,7 @@ pub mod admin;
 mod answers;
 pub mod audit;
 mod bootstrap;
+mod client_removal;
 pub mod clients;
 pub mod codes;
 pub mod companies;
@@ -32,6 +33,7 @@ pub mod throttle;
 pub mod users;
 
 pub use bootstrap::Bootstrapped;
+pub use client_removal::Removed;
 pub use error::{Error, Result};
 pub use storage::Storage;
 pub use tenancy::Tenancy;

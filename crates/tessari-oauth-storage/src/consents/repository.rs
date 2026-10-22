@@ -28,6 +28,9 @@ pub(crate) trait ConsentRepository: Send + Sync {
     /// Every record of `user_id`, revoked ones included.
     async fn list_for_user(&self, place: &Place, user_id: &str) -> Result<Vec<ConsentEntity>>;
 
+    /// Every record of `client_id`, revoked ones included.
+    async fn list_for_client(&self, place: &Place, client_id: &str) -> Result<Vec<ConsentEntity>>;
+
     /// Mark the record revoked only while it is not, answering it as it stood before.
     async fn revoke(
         &self,

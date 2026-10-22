@@ -209,6 +209,36 @@ impl ConsentService {
             .collect()
     }
 
+    /// The users of `tenant` holding a standing grant to `client`.
+    ///
+    /// # Errors
+    ///
+    /// When the store is unavailable or holds a row this crate cannot read.
+    pub async fn holders(&self, tenant: &TenantId, client: &ClientId) -> Result<usize> {
+        Ok(self.standing_for(tenant, client).await?.len())
+    }
+
+    /// The users whose grant to `client` in `tenant` stands.
+    pub(crate) async fn standing_for(
+        &self,
+        tenant: &TenantId,
+        client: &ClientId,
+    ) -> Result<Vec<UserId>> {
+        let place = self.tenancy.place(tenant)?;
+        self.repository
+            .list_for_client(&place, client.as_str())
+            .await?
+            .into_iter()
+            .map(to_model)
+            .filter(|consent| {
+                consent
+                    .as_ref()
+                    .map_or(true, |consent| consent.revoked.is_none())
+            })
+            .map(|consent| consent.map(|consent| consent.user))
+            .collect()
+    }
+
     /// End `user`'s grant to `client`, recording `by`; answers whether a standing grant was ended by this call.
     ///
     /// # Errors

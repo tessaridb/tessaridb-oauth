@@ -103,6 +103,18 @@ impl ClientRepository for TessaridbClientRepository {
         Ok(())
     }
 
+    async fn remove(&self, place: &Place, client_id: &str) -> Result<Option<ClientEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "DELETE clients:$id RETURN BEFORE;",
+                vec![("id".to_owned(), Value::from(client_id))],
+            )
+            .await?;
+        answers::returned(answers, client_id, "client")
+    }
+
     async fn page(
         &self,
         place: &Place,

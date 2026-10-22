@@ -351,3 +351,146 @@ async fn registrations_are_paged_in_id_order_in_their_own_tenant_only() {
         .expect("a page");
     assert_eq!(ids(other), ["svc-0"]);
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn removing_a_client_ends_every_grant_and_family_it_held_and_nothing_else() {
+    use tessari_oauth_core::consents::ConsentRequest;
+    use tessari_oauth_storage::consents::{NewGrant, Revoker};
+    use tessari_oauth_storage::refresh::{Holder, RefreshGrant};
+    use tessari_oauth_types::{RefreshToken, UserId};
+
+    let storage = fresh(&tenant("acme"), 2).await;
+    for id in ["svc-1", "svc-2"] {
+        storage
+            .clients
+            .register(
+                &tenant("acme"),
+                &service_client(id, vec![ED25519_JWK.to_owned()]),
+                NOW,
+            )
+            .await
+            .expect("registered");
+    }
+    let user = |id: &str| UserId::parse(id).expect("a user id");
+    let client = |id: &str| ClientId::parse(id).expect("a client id");
+    for (who, to) in [
+        ("user-7", "svc-1"),
+        ("user-8", "svc-1"),
+        ("user-7", "svc-2"),
+    ] {
+        storage
+            .consents
+            .grant(&NewGrant {
+                tenant: tenant("acme"),
+                user: user(who),
+                client_id: client(to),
+                request: ConsentRequest {
+                    scopes: ScopeSet::parse("orders:read").expect("scopes"),
+                    resources: BTreeSet::new(),
+                },
+                policy_version: 1,
+                shown_version: "descriptions-v1".to_owned(),
+                at: NOW,
+            })
+            .await
+            .expect("granted");
+    }
+    for (name, to) in [("f1", "svc-1"), ("f2", "svc-2")] {
+        let grant = RefreshGrant {
+            tenant: tenant("acme"),
+            user: user("user-7"),
+            client_id: client(to),
+            scopes: ScopeSet::parse("orders:read").expect("scopes"),
+            resources: BTreeSet::new(),
+            bound_to: None,
+        };
+        storage
+            .refresh
+            .start(
+                &RefreshToken::from_secret(format!("refresh-secret-{name}")),
+                &grant,
+                &format!("family-{name}"),
+                NOW,
+            )
+            .await
+            .expect("started");
+    }
+    assert_eq!(
+        storage
+            .consents
+            .holders(&tenant("acme"), &client("svc-1"))
+            .await
+            .expect("counted"),
+        2
+    );
+
+    let removed = storage
+        .remove_client(&tenant("acme"), &client("svc-1"), NOW)
+        .await
+        .expect("removed");
+    assert_eq!(
+        (removed.registered, removed.consents, removed.families),
+        (true, 2, 1)
+    );
+    let gone = storage
+        .clients
+        .find(&tenant("acme"), &client("svc-1"))
+        .await
+        .expect("answered");
+    assert!(gone.is_none(), "the registration is gone");
+    for who in ["user-7", "user-8"] {
+        let grants = storage
+            .consents
+            .list(&tenant("acme"), &user(who))
+            .await
+            .expect("listed");
+        let ended = grants
+            .iter()
+            .find(|consent| consent.client_id == client("svc-1"))
+            .expect("the grant is kept as revoked");
+        assert_eq!(
+            ended
+                .revoked
+                .as_ref()
+                .map(|revocation| revocation.by.clone()),
+            Some(Revoker::ClientRemoved)
+        );
+    }
+    assert_eq!(
+        storage
+            .consents
+            .holders(&tenant("acme"), &client("svc-2"))
+            .await
+            .expect("counted"),
+        1,
+        "another client's grants stand"
+    );
+    let standing = storage
+        .refresh
+        .revoke_standing(
+            &tenant("acme"),
+            &Holder::Client(&client("svc-2")),
+            "probe",
+            NOW,
+        )
+        .await
+        .expect("counted");
+    assert_eq!(standing, 1, "another client's family stood");
+    let again = storage
+        .remove_client(&tenant("acme"), &client("svc-1"), NOW)
+        .await
+        .expect("answered");
+    assert_eq!(
+        (again.registered, again.consents, again.families),
+        (false, 0, 0),
+        "a removal sent again finds nothing left to end"
+    );
+    let console = storage
+        .remove_client(&tenant("acme"), &client("admin-console"), NOW)
+        .await;
+    assert!(
+        matches!(&console, Err(error) if error.category() == ErrorCategory::Validation),
+        "{console:?}"
+    );
+}

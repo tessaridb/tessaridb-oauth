@@ -48,6 +48,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      resources array REQUIRED, policy_version int REQUIRED, shown_version string REQUIRED, \
      granted_at int REQUIRED, revision int REQUIRED, revoked_at int, revoked_by string); \
      DEFINE INDEX IF NOT EXISTS by_user ON consents FIELDS user_id; \
+     DEFINE INDEX IF NOT EXISTS by_client ON consents FIELDS client_id; \
      DEFINE TABLE IF NOT EXISTS refresh_families (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, created_at int REQUIRED, \
      expires_at int REQUIRED, revoked_at int, revoked_reason string); \

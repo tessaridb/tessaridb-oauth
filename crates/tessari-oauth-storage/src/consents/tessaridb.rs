@@ -104,6 +104,18 @@ impl ConsentRepository for TessaridbConsentRepository {
         answers::records(answers, "consent")
     }
 
+    async fn list_for_client(&self, place: &Place, client_id: &str) -> Result<Vec<ConsentEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM consents WHERE client_id = $client_id;",
+                vec![("client_id".to_owned(), text(client_id))],
+            )
+            .await?;
+        answers::records(answers, "consent")
+    }
+
     async fn revoke(
         &self,
         place: &Place,

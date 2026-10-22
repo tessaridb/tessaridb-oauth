@@ -22,6 +22,9 @@ pub(crate) trait ClientRepository: Send + Sync {
         resources: &[String],
     ) -> Result<()>;
 
+    /// Delete the registration of `client_id`, answering it as it stood when there was one.
+    async fn remove(&self, place: &Place, client_id: &str) -> Result<Option<ClientEntity>>;
+
     /// At most `count` registrations after `after` in id order.
     async fn page(
         &self,

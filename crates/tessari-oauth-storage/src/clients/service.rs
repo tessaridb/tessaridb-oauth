@@ -229,6 +229,21 @@ impl ClientService {
             .await
     }
 
+    /// Delete the registration of `client` in `tenant`, answering whether there was one. Crate-only: removing a client
+    /// is [`crate::Storage::remove_client`], which also ends what the client held.
+    ///
+    /// # Errors
+    ///
+    /// The store's failures.
+    pub(crate) async fn remove(&self, tenant: &TenantId, client: &ClientId) -> Result<bool> {
+        let place = self.tenancy.place(tenant)?;
+        Ok(self
+            .repository
+            .remove(&place, client.as_str())
+            .await?
+            .is_some())
+    }
+
     /// At most `count` registrations of `tenant`, never more than [`CLIENT_PAGE_MAX`], after `after` in id order.
     ///
     /// # Errors
