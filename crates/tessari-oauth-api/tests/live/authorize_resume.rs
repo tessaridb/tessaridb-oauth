@@ -22,7 +22,7 @@ use crate::routes::{Answer, header};
 use crate::token_fixture::{API, NOW, REDIRECT, Server, issuer, plenty, server, state, tenant};
 
 /// The verifier whose S256 challenge the pending authorizations carry (RFC 7636 appendix B).
-const VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+pub(crate) const VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 const SESSION_COOKIE: &str = "__Host-tessari-session";
 
 /// GET `path` on the public router, carrying the session cookie `session` when given.
@@ -45,7 +45,7 @@ async fn get(server: &Server, path: &str, session: Option<&str>) -> Answer {
 }
 
 /// Sign `email` in with a password; answer the pending authorization's id, the session value and the user.
-async fn signed_in(server: &Server, email: &str) -> (String, String, UserId) {
+pub(crate) async fn signed_in(server: &Server, email: &str) -> (String, String, UserId) {
     let user = with_password(server, email).await;
     let cookie = identified(server, email).await;
     let interaction = signin(server, &cookie).await.interaction;

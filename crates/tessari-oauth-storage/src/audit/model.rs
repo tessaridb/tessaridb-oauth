@@ -25,11 +25,13 @@ pub enum AuditKind {
     RecoveryUsed,
     /// A sign-in completed and opened a session at this issuer.
     SignedIn,
+    /// A user granted a client the scopes and resources it asked for.
+    Consented,
 }
 
 impl AuditKind {
     /// Every kind.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::IssuedCode,
         Self::IssuedRefresh,
         Self::IssuedClient,
@@ -40,6 +42,7 @@ impl AuditKind {
         Self::Cascade,
         Self::RecoveryUsed,
         Self::SignedIn,
+        Self::Consented,
     ];
 
     /// The name the message carries.
@@ -56,6 +59,7 @@ impl AuditKind {
             Self::Cascade => "cascade",
             Self::RecoveryUsed => "recovery_used",
             Self::SignedIn => "signed_in",
+            Self::Consented => "consented",
         }
     }
 

@@ -32,6 +32,8 @@ pub enum ErrorCode {
     InvalidToken,
     /// The access token is valid but does not carry the scope the resource requires (RFC 6750 §3.1).
     InsufficientScope,
+    /// The user refused the request (RFC 6749 §4.1.2.1).
+    AccessDenied,
 }
 
 impl ErrorCode {
@@ -52,6 +54,7 @@ impl ErrorCode {
             Self::LoginRequired => "login_required",
             Self::InvalidToken => "invalid_token",
             Self::InsufficientScope => "insufficient_scope",
+            Self::AccessDenied => "access_denied",
         }
     }
 }

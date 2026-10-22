@@ -10,6 +10,7 @@ mod authorize;
 mod authorize_resume;
 mod login;
 mod login_complete;
+mod login_consent;
 mod login_factors;
 mod login_factors_race;
 mod login_passkey;

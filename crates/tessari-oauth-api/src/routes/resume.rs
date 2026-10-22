@@ -82,28 +82,31 @@ pub(super) async fn resume(
         .await
         .map_err(Error::Store)?;
     match coverage {
-        Coverage::Covered => answered(&state, &tenant, issuer, &id, session.user, now).await,
+        Coverage::Covered => match issued(&state, &tenant, issuer, &id, session.user, now).await? {
+            Some(target) => see_other(&target),
+            None => Ok(page(ErrorCode::InvalidRequest)),
+        },
         Coverage::Prompt { .. } => see_other(&format!("{issuer}{CONSENT_PATH}?interaction={id}")),
     }
 }
 
-/// Take the pending authorization `id` in `tenant` for `user` at `now`, once, and answer it at its redirect URI with
-/// a fresh code; refused on a page here when another request took it first.
-async fn answered(
+/// Take the pending authorization `id` in `tenant` for `user` at `now`, once, and answer the address of its redirect
+/// URI carrying a fresh code; `None` when another request took it first.
+pub(super) async fn issued(
     state: &PublicState,
     tenant: &TenantId,
     issuer: &str,
     id: &str,
     user: UserId,
     now: Timestamp,
-) -> Result<Response> {
+) -> Result<Option<String>> {
     let Some(request) = state
         .interactions
         .finish(tenant, id, now)
         .await
         .map_err(Error::Store)?
     else {
-        return Ok(page(ErrorCode::InvalidRequest));
+        return Ok(None);
     };
     let drawn = random_secret().map_err(|_| Error::Internal)?;
     let value = base64url::encode(&drawn);
@@ -135,5 +138,5 @@ async fn answered(
         }
         query.append_pair("iss", issuer);
     }
-    see_other(target.as_str())
+    Ok(Some(target.into()))
 }

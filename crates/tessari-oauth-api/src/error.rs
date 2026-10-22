@@ -39,6 +39,9 @@ pub enum Error {
     /// failure for both, so the answer says nothing about which addresses have accounts.
     #[error("the credentials were not accepted")]
     CredentialsRejected,
+    /// The browser holds no session at this issuer, so there is nobody to answer for.
+    #[error("no session")]
+    SessionRequired,
 }
 
 impl Error {
@@ -54,6 +57,7 @@ impl Error {
             Self::SigninGone => ErrorCategory::NotFound,
             Self::StepRefused => ErrorCategory::Conflict,
             Self::CredentialsRejected => ErrorCategory::Unauthorized,
+            Self::SessionRequired => ErrorCategory::Unauthorized,
         }
     }
 }
@@ -99,6 +103,11 @@ impl IntoResponse for Error {
                 StatusCode::UNAUTHORIZED,
                 "credentials_rejected",
                 "the address or the password is not right",
+            ),
+            (Self::SessionRequired, _) => (
+                StatusCode::UNAUTHORIZED,
+                "session_required",
+                "sign in first",
             ),
             (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

@@ -213,7 +213,10 @@ completes a sign-in ends it and opens the user's session under a cookie of its o
 at that moment (a session lasts a working day without use and a week at most), and clears the sign-in cookie.
 The browser then continues at `<issuer>/oauth2/authorize/resume`: when the user's consent to the client covers
 every scope and resource asked for, the request is answered once at its redirect URI with a code, its `state` and
-`iss`; otherwise the browser is sent to `<issuer>/consent`, and without a session to sign in again.
+`iss`; otherwise the browser is sent to `<issuer>/consent`, and without a session to sign in again. The consent
+page reads `GET <issuer>/login/api/consent?interaction=<id>`, which lists only the scopes and resources not yet
+granted, and posts the user's `allow` or `deny`: allowing records the grant before a code exists, denying grants
+nothing and answers `access_denied`, and either answer is the redirect-URI address the browser goes on to.
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.

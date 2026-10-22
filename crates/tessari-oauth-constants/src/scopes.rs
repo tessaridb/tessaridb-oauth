@@ -6,3 +6,8 @@ pub const OPENID_SCOPE: &str = "openid";
 /// given under another version covers nothing, so changing what a scope releases means raising this and asking every
 /// user again.
 pub const CONSENT_POLICY_VERSION: u32 = 1;
+
+/// The version of the words the consent screen shows for the policy in force, stored with each grant so a later
+/// question about what the user was told has an answer. It moves with the screen's text, which can change without
+/// changing what a scope releases.
+pub const CONSENT_SHOWN_VERSION: &str = "1";

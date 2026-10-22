@@ -13,12 +13,14 @@
 //! authorization continues.
 
 mod begin;
+mod consent;
 mod factors;
 mod identify;
 mod passkey;
 mod password;
 
 pub(super) use begin::begin;
+pub(super) use consent::{consent, decide};
 pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
 pub(super) use passkey::{passkey, passkey_options};
