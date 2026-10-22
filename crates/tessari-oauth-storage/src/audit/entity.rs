@@ -27,6 +27,10 @@ pub struct AuditEntity {
     pub reason: Option<String>,
     /// A cascade's family count.
     pub families: Option<i64>,
+    /// Who acted.
+    pub actor: Option<String>,
+    /// The operator role's name.
+    pub role_name: Option<String>,
     /// Unix seconds of the event.
     pub at: i64,
 }
@@ -45,6 +49,8 @@ impl FromRecord for AuditEntity {
             jkt: row.take("jkt")?,
             reason: row.take("reason")?,
             families: row.take("families")?,
+            actor: row.take("actor")?,
+            role_name: row.take("role_name")?,
             at: row.take("at")?,
         })
     }

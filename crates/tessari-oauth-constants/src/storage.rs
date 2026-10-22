@@ -94,3 +94,6 @@ pub const DIRECTORY_REFRESH_SECS: u64 = 5;
 
 /// The most one directory refresh may take, in seconds.
 pub const DIRECTORY_REFRESH_TIMEOUT_SECS: u64 = 4;
+
+/// The company platform operators belong to: the only one whose users may hold the `companies` role.
+pub const SYSTEM_COMPANY: &str = "system";

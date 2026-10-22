@@ -29,7 +29,9 @@ use tessari_oauth_types::{Algorithm, Clock, Timestamp};
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::watch;
 
-type Failure = Box<dyn Error + Send + Sync>;
+mod bootstrap;
+
+pub(crate) type Failure = Box<dyn Error + Send + Sync>;
 
 /// The algorithm new signing keys are made for, and the only one an access token is verified under.
 const SIGNING_ALGORITHM: Algorithm = Algorithm::Es256;
@@ -38,7 +40,24 @@ fn main() -> ExitCode {
     let Ok(_flush_on_exit) = tessari_oauth_observability::init_tracing() else {
         return ExitCode::FAILURE;
     };
-    match start() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let outcome = match arguments.split_first() {
+        Some((command, rest)) if command == bootstrap::COMMAND => {
+            return bootstrap::run(rest).map_or_else(
+                |failure| {
+                    tracing::error!(error = %failure, "the emergency path failed");
+                    ExitCode::FAILURE
+                },
+                |()| ExitCode::SUCCESS,
+            );
+        }
+        Some((other, _)) => {
+            tracing::error!(command = %other, "not a command this binary knows");
+            return ExitCode::FAILURE;
+        }
+        None => start(),
+    };
+    match outcome {
         Ok(()) => {
             tracing::info!("shutdown complete");
             ExitCode::SUCCESS
@@ -64,17 +83,7 @@ fn start() -> Result<(), Failure> {
         config.password_cost,
         config.password_concurrency.get(),
     )?;
-    let store = StoreConfig {
-        address: config.store.address.clone(),
-        user: config.store.user.clone(),
-        password: config.store.password.clone(),
-        authority: config
-            .store
-            .authority
-            .as_ref()
-            .map(std::fs::read)
-            .transpose()?,
-    };
+    let store = store_config(&config)?;
     for tenant in &config.tenants {
         let issuer = format!("{}/{}", config.public.url, tenant.as_str());
         discovery::metadata(&issuer, SIGNING_ALGORITHM)
@@ -90,8 +99,23 @@ fn start() -> Result<(), Failure> {
     runtime.block_on(run(config, storage, served, kek, passwords, tls, poster))
 }
 
+/// How to reach the store the configuration names, its authority read from disk.
+pub(crate) fn store_config(config: &NodeConfig) -> Result<StoreConfig, Failure> {
+    Ok(StoreConfig {
+        address: config.store.address.clone(),
+        user: config.store.user.clone(),
+        password: config.store.password.clone(),
+        authority: config
+            .store
+            .authority
+            .as_ref()
+            .map(std::fs::read)
+            .transpose()?,
+    })
+}
+
 /// The system clock as the core's clock port; a clock before the epoch reads as the epoch.
-fn system_clock() -> Clock {
+pub(crate) fn system_clock() -> Clock {
     Arc::new(|| {
         Timestamp::from_unix_secs(
             SystemTime::now()

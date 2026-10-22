@@ -13,6 +13,7 @@ use tessari_oauth_types::{ClientId, KeyThumbprint, ScopeSet, TenantId, Timestamp
 use super::entity::AuditMessageEntity;
 use super::repository::AuditRepository;
 use super::{AuditEntity, AuditEvent, AuditKind, AuditRecord};
+use crate::operators::OperatorRole;
 use crate::{Error, Result, Tenancy};
 
 /// The audit trail.
@@ -55,6 +56,8 @@ fn to_entity(event: &AuditEvent, now: Timestamp) -> Result<AuditEntity> {
                 record: "audit message",
                 reason: "a count beyond i64",
             })?,
+        actor: event.actor.clone(),
+        role_name: event.role.map(|role| role.name().to_owned()),
         at: i64::try_from(now.unix_secs()).map_err(|_| Error::Invalid {
             record: "audit message",
             reason: "a time beyond i64",
@@ -98,6 +101,11 @@ fn to_record(message: AuditMessageEntity) -> Result<AuditRecord> {
             .map(u64::try_from)
             .transpose()
             .map_err(|_| unreadable("families"))?,
+        actor: entity.actor,
+        role: entity
+            .role_name
+            .map(|name| OperatorRole::parse(&name).ok_or_else(|| unreadable("role_name")))
+            .transpose()?,
     };
     Ok(AuditRecord {
         position: u64::try_from(message.position).map_err(|_| unreadable("position"))?,

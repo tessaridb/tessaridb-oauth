@@ -33,7 +33,8 @@ use crate::Result;
 /// `sessions` holds a user's session under the digest of its session cookie value, for at most the week
 /// (`SESSION_ABSOLUTE_SECS`) a session lasts, found for its user's own list by `by_user`.
 /// `enrolments` holds a user's one live enrolment code under its digest for 72 hours, found by `by_user` when a new code
-/// replaces it.
+/// replaces it. `operator_grants` holds each role a user may administer the company with under `<user id>.<role>`,
+/// with who gave it, why and until when, found for its holder by `by_user`.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -110,7 +111,12 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE INDEX IF NOT EXISTS by_user ON sessions FIELDS user_id; \
      DEFINE TABLE IF NOT EXISTS enrolments (\
      user_id string REQUIRED, created_at int REQUIRED, created_by string REQUIRED) EXPIRE AFTER 72h; \
-     DEFINE INDEX IF NOT EXISTS by_user ON enrolments FIELDS user_id;";
+     DEFINE INDEX IF NOT EXISTS by_user ON enrolments FIELDS user_id; \
+     DEFINE TABLE IF NOT EXISTS operator_grants (\
+     user_id string REQUIRED, role_name string REQUIRED, granted_by string REQUIRED, granted_at int REQUIRED, \
+     reason string REQUIRED); \
+     DEFINE FIELD IF NOT EXISTS expires_at ON operator_grants TYPE int; \
+     DEFINE INDEX IF NOT EXISTS by_user ON operator_grants FIELDS user_id;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

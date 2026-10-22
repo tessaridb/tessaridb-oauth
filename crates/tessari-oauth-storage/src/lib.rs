@@ -2,6 +2,7 @@
 
 mod answers;
 pub mod audit;
+mod bootstrap;
 pub mod clients;
 pub mod codes;
 pub mod companies;
@@ -12,6 +13,7 @@ pub mod factors;
 pub mod interactions;
 pub mod keys;
 pub mod logouts;
+pub mod operators;
 pub mod passkeys;
 pub mod policies;
 pub mod refresh;
@@ -26,6 +28,7 @@ pub mod tenants;
 pub mod throttle;
 pub mod users;
 
+pub use bootstrap::Bootstrapped;
 pub use error::{Error, Result};
 pub use storage::Storage;
 pub use tenancy::Tenancy;

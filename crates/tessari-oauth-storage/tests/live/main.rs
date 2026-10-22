@@ -10,6 +10,7 @@
 #![cfg(test)]
 
 mod audit;
+mod bootstrap;
 mod clients;
 mod codes;
 mod companies;
@@ -21,6 +22,7 @@ mod interactions;
 mod interactions_finish;
 mod keys;
 mod logouts;
+mod operators;
 mod passkeys;
 mod policies;
 mod refresh;
