@@ -35,7 +35,7 @@ export type Route =
   | { kind: "operators"; after: string | null }
   | { kind: "policy" }
   | { kind: "audit"; after: number | null }
-  | { kind: "companies" };
+  | { kind: "companies"; after: string | null };
 
 /** Whether `name` is a role the console knows. */
 export function isRole(name: string): name is Role {
@@ -78,7 +78,7 @@ export function route(hash: string): Route {
       return { kind: "audit", after: after !== null && /^\d+$/.test(after) ? Number(after) : null };
     }
     case "companies":
-      return { kind: "companies" };
+      return { kind: "companies", after: query.get("after") };
     default:
       return { kind: "overview" };
   }
@@ -113,4 +113,9 @@ export function readRefusal(status: number, body: unknown, retryAfter: string | 
     return { kind: "refused", code };
   }
   return { kind: "failed" };
+}
+
+/** Whether `typed` is the company id `company`, as a company-wide change (a policy, a suspension) is confirmed. */
+export function confirmedBy(typed: string, company: string): boolean {
+  return typed.trim() === company && company !== "";
 }

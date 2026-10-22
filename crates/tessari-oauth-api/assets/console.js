@@ -55,7 +55,7 @@
         return { kind: "audit", after: after !== null && /^\d+$/.test(after) ? Number(after) : null };
       }
       case "companies":
-        return { kind: "companies" };
+        return { kind: "companies", after: query.get("after") };
       default:
         return { kind: "overview" };
     }
@@ -79,6 +79,9 @@
       return { kind: "refused", code };
     }
     return { kind: "failed" };
+  }
+  function confirmedBy(typed, company2) {
+    return typed.trim() === company2 && company2 !== "";
   }
 
   // src/console-dom.ts
@@ -219,6 +222,18 @@
         return "This account is disabled. Enable it before granting it a role.";
       case "not_granted":
         return "This account does not hold this role any more. Reload the view to see the current grants.";
+      default:
+        return changeRefusalText(code);
+    }
+  }
+  function companyRefusalText(code) {
+    switch (code) {
+      case "company_taken":
+        return "A company with this id already exists. Choose another id.";
+      case "system_company":
+        return "The system company runs this console and is never suspended.";
+      case "changed_meanwhile":
+        return "This company is no longer in the state the view showed. Reload the view and try again.";
       default:
         return changeRefusalText(code);
     }
@@ -468,6 +483,265 @@
     say("");
   }
 
+  // src/companies-read.ts
+  var ID_MAX_BYTES = 63;
+  var NAME_MAX_CHARS = 100;
+  var STATUSES = ["provisioning", "active", "suspended"];
+  function isStatus(name) {
+    return STATUSES.some((status) => status === name);
+  }
+  function companiesPath(after) {
+    return after === null ? "api/companies" : `api/companies?${new URLSearchParams({ after }).toString()}`;
+  }
+  function readCompany(value) {
+    const id = field(value, "id");
+    const name = field(value, "name");
+    const status = field(value, "status");
+    const createdAt = field(value, "created_at");
+    const createdBy = field(value, "created_by");
+    if (typeof id !== "string" || id === "" || typeof name !== "string" || !isStatus(status) || typeof createdAt !== "number" || !Number.isSafeInteger(createdAt) || createdAt < 0 || typeof createdBy !== "string") {
+      return null;
+    }
+    return { id, name, status, createdAt, createdBy };
+  }
+  function readCompaniesPage(body) {
+    const listed = field(body, "companies");
+    const next = field(body, "next");
+    if (!Array.isArray(listed) || next !== null && typeof next !== "string") {
+      return null;
+    }
+    const companies = [];
+    for (const value of listed) {
+      const company2 = readCompany(value);
+      if (company2 === null) {
+        return null;
+      }
+      companies.push(company2);
+    }
+    return { companies, next };
+  }
+  function companyIdOf(typed) {
+    const id = typed.trim();
+    return id.length <= ID_MAX_BYTES && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(id) ? id : null;
+  }
+  function companyNameOf(typed) {
+    const name = typed.trim();
+    const length = [...name].length;
+    return length >= 1 && length <= NAME_MAX_CHARS && !/\p{Cc}/u.test(name) ? name : null;
+  }
+
+  // src/companies.ts
+  function statusBadge(company2) {
+    const badge2 = make("span", "badge", company2.status);
+    badge2.dataset["state"] = company2.status === "active" ? "ok" : "warn";
+    return badge2;
+  }
+  function day(seconds2) {
+    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds2 * 1e3));
+  }
+  function createForm(screen, created) {
+    const keyFor = keys();
+    const id = make("input", "mono");
+    id.type = "text";
+    id.autocomplete = "off";
+    id.spellcheck = false;
+    const name = make("input", "");
+    name.type = "text";
+    name.autocomplete = "off";
+    name.maxLength = 100;
+    const reason = reasonField("company-reason");
+    const said = notice();
+    const submit = make("button", "primary", "Create the company");
+    submit.type = "submit";
+    const form = make(
+      "form",
+      "change-form",
+      make("h2", "", "Create a company"),
+      labelled("company-id", "Id (lowercase letters, digits and inner hyphens; it becomes the issuer path)", id),
+      labelled("company-name", "Name people see", name),
+      reason.row,
+      said,
+      submit
+    );
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      said.hidden = true;
+      const chosen = companyIdOf(id.value);
+      const named = companyNameOf(name.value);
+      if (chosen === null || named === null) {
+        const wrong = chosen === null ? id : name;
+        said.textContent = chosen === null ? "Give an id of 1 to 63 lowercase letters, digits and inner hyphens." : "Give a name of 1 to 100 characters.";
+        said.hidden = false;
+        wrong.setAttribute("aria-invalid", "true");
+        wrong.focus();
+        return;
+      }
+      id.removeAttribute("aria-invalid");
+      name.removeAttribute("aria-invalid");
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      submit.disabled = true;
+      void change("api/companies", keyFor, { id: chosen, name: named, reason: why }).then((answer) => {
+        submit.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        const made = answer.ok ? readCompany(answer.body) : null;
+        if (made !== null) {
+          created(`Company ${made.id} created; its issuer is served now (${made.status}).`);
+          return;
+        }
+        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That company", companyRefusalText);
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    return form;
+  }
+  function directory(screen, own, companies, moved) {
+    const keyFor = keys();
+    const reason = reasonField("move-reason");
+    const said = notice();
+    const question = make("p", "");
+    const typed = make("input", "mono");
+    typed.type = "text";
+    typed.autocomplete = "off";
+    typed.spellcheck = false;
+    const typedRow = labelled("move-company", "Type the company id to confirm", typed);
+    let target = null;
+    const go = make("button", "danger", "");
+    go.type = "button";
+    const confirmPanel = make("div", "confirm", question, typedRow, reason.row, said);
+    confirmPanel.hidden = true;
+    const ask = (company2) => {
+      target = company2;
+      const suspending = company2.status === "active";
+      question.replaceChildren(
+        suspending ? "Suspend " : "Resume ",
+        make("code", "", company2.id),
+        suspending ? "? Its sign-in, its tokens and its console stop being served, so no application can sign anyone in through it until it is resumed." : "? Its sign-in, tokens and console are served again."
+      );
+      typedRow.hidden = !suspending;
+      go.textContent = suspending ? "Suspend the company" : "Resume the company";
+      go.className = suspending ? "danger" : "primary";
+      typed.value = "";
+      said.hidden = true;
+      confirmPanel.hidden = false;
+      (suspending ? typed : reason.input).focus();
+    };
+    const head = make(
+      "tr",
+      "",
+      make("th", "", "Id"),
+      make("th", "", "Name"),
+      make("th", "", "State"),
+      make("th", "", "Created"),
+      make("th", "", "Created by"),
+      make("th", "", "Change")
+    );
+    for (const cell of head.children) {
+      cell.setAttribute("scope", "col");
+    }
+    const body = make("tbody", "");
+    for (const company2 of companies) {
+      const offered2 = company2.id !== own && (company2.status === "active" || company2.status === "suspended");
+      const action = offered2 ? button(company2.status === "active" ? "Suspend" : "Resume", "quiet", () => ask(company2)) : "";
+      body.append(
+        make(
+          "tr",
+          "",
+          make("td", "", make("code", "", company2.id)),
+          make("td", "", company2.name),
+          make("td", "", statusBadge(company2)),
+          make("td", "", day(company2.createdAt)),
+          make("td", "", make("code", "", company2.createdBy)),
+          make("td", "", action)
+        )
+      );
+    }
+    go.addEventListener("click", () => {
+      const chosen = target;
+      const why = reasonIn(reason.input, said);
+      if (chosen === null || why === null) {
+        return;
+      }
+      const suspending = chosen.status === "active";
+      if (suspending && !confirmedBy(typed.value, chosen.id)) {
+        said.textContent = `Type ${chosen.id} exactly to confirm.`;
+        said.hidden = false;
+        typed.setAttribute("aria-invalid", "true");
+        typed.focus();
+        return;
+      }
+      typed.removeAttribute("aria-invalid");
+      const path = `api/companies/${encodeURIComponent(chosen.id)}/${suspending ? "suspend" : "resume"}`;
+      void change(path, keyFor, { reason: why }).then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        const made = answer.ok ? readCompany(answer.body) : null;
+        if (made !== null) {
+          moved(`Company ${made.id} is now ${made.status}.`);
+          return;
+        }
+        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That company", companyRefusalText);
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    const keep = button("Leave it as it is", "secondary", () => {
+      confirmPanel.hidden = true;
+      target = null;
+    });
+    confirmPanel.append(make("div", "actions", go, keep));
+    return [make("table", "grid", make("thead", "", head), body), confirmPanel];
+  }
+  async function companiesView(screen, own, after, message = "") {
+    say("Loading the companies.");
+    const answer = await call("GET", companiesPath(after));
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Companies", answer, "That page");
+      return;
+    }
+    const page = readCompaniesPage(answer.body);
+    if (page === null) {
+      unreadable(screen, "Companies");
+      return;
+    }
+    const redraw = (said) => void companiesView(screen, own, after, said);
+    const parts = [
+      heading("Companies"),
+      make("p", "lead", "Every company this node serves, each its own issuer with its own users, clients and keys.")
+    ];
+    if (page.companies.length === 0) {
+      parts.push(make("p", "empty", after === null ? "No companies yet." : "No more companies."));
+    } else {
+      parts.push(...directory(screen, own, page.companies, redraw));
+    }
+    const paging = make("p", "paging");
+    if (after !== null) {
+      paging.append(link("#/companies", "First page"));
+    }
+    if (page.next !== null) {
+      paging.append(link(`#/companies?${new URLSearchParams({ after: page.next }).toString()}`, "Next page"));
+    }
+    if (paging.childElementCount > 0) {
+      parts.push(paging);
+    }
+    parts.push(createForm(screen, redraw));
+    show(screen.view, ...parts);
+    say(message);
+  }
+
   // src/operators-read.ts
   var DEFAULT_DAYS = 90;
   var MAX_DAYS = 365;
@@ -525,7 +799,7 @@
 
   // src/operators.ts
   var DAYS_WRONG = "Give a whole number of days from 1 to 365, or leave it empty for 90.";
-  function day(seconds2) {
+  function day2(seconds2) {
     return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds2 * 1e3));
   }
   function grantForm(screen, roles, granted) {
@@ -638,7 +912,7 @@
           make("td", "", make("code", "", grant.user)),
           make("td", "", make("span", "pill", grant.role)),
           make("td", "", make("code", "", grant.grantedBy)),
-          make("td", "", grant.expiresAt === null ? "Never" : day(grant.expiresAt)),
+          make("td", "", grant.expiresAt === null ? "Never" : day2(grant.expiresAt)),
           make("td", "", grant.reason),
           make("td", "", revoke)
         )
@@ -737,9 +1011,6 @@
       case "off":
         return "No account of this company is asked for a second factor: a password alone signs in, including for accounts that enrolled one.";
     }
-  }
-  function confirmedBy(typed, company2) {
-    return typed.trim() === company2 && company2 !== "";
   }
 
   // src/policy.ts
@@ -1062,7 +1333,7 @@
 
   // src/users.ts
   var pending = "";
-  function statusBadge(user) {
+  function statusBadge2(user) {
     const badge2 = make("span", "badge", user.status === "active" ? "Active" : "Disabled");
     badge2.dataset["state"] = user.status === "active" ? "ok" : "warn";
     return badge2;
@@ -1103,7 +1374,7 @@
           "",
           make("td", "", make("code", "", user.email)),
           make("td", "", user.emailVerified ? "Yes" : "No"),
-          make("td", "", statusBadge(user)),
+          make("td", "", statusBadge2(user)),
           make("td", "", link(`#/users/${encodeURIComponent(user.user)}`, user.user, "mono-link"))
         )
       );
@@ -1183,7 +1454,7 @@
       make("dt", "", "Verified"),
       make("dd", "", user.emailVerified ? "Yes" : "No"),
       make("dt", "", "State"),
-      make("dd", "", statusBadge(user))
+      make("dd", "", statusBadge2(user))
     );
     const redraw = (said) => void userView(screen, id, said);
     show(
@@ -1284,6 +1555,9 @@
         return;
       case "audit":
         void auditView(screen, at.after);
+        return;
+      case "companies":
+        void companiesView(screen, company, at.after);
         return;
       default:
         overview(who);

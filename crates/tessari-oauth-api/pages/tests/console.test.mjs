@@ -34,7 +34,7 @@ test("a hash names one view, and anything else is the overview", () => {
   assert.deepEqual(route("#/audit"), { kind: "audit", after: null });
   assert.deepEqual(route("#/audit?after=40"), { kind: "audit", after: 40 });
   assert.deepEqual(route("#/audit?after=x"), { kind: "audit", after: null }, "a position is a whole number");
-  assert.deepEqual(route("#/companies"), { kind: "companies" });
+  assert.deepEqual(route("#/companies"), { kind: "companies", after: null });
   assert.deepEqual(route("#/elsewhere"), { kind: "overview" });
   assert.deepEqual(route("#/users/"), { kind: "users", email: null, after: null });
 });

@@ -61,3 +61,17 @@ export function operatorRefusalText(code: string): string {
       return changeRefusalText(code);
   }
 }
+
+/** The words for a company change the server refused with `code`. */
+export function companyRefusalText(code: string): string {
+  switch (code) {
+    case "company_taken":
+      return "A company with this id already exists. Choose another id.";
+    case "system_company":
+      return "The system company runs this console and is never suspended.";
+    case "changed_meanwhile":
+      return "This company is no longer in the state the view showed. Reload the view and try again.";
+    default:
+      return changeRefusalText(code);
+  }
+}

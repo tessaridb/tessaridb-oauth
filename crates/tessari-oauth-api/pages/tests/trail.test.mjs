@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { auditPath, readAuditPage } from "../src/audit-read.ts";
-import { confirmedBy, policyConsequence, readPolicy } from "../src/policy-read.ts";
+import { confirmedBy } from "../src/console-read.ts";
+import { policyConsequence, readPolicy } from "../src/policy-read.ts";
 
 test("the policy is read in its one spelling", () => {
   assert.equal(readPolicy({ policy: "required" }), "required");

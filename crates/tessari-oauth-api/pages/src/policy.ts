@@ -6,7 +6,8 @@ import { changeRefusalText } from "./console-copy.ts";
 import { change, keys, notice, reasonField, reasonIn, refusedOn, refusedText, unreadable } from "./console-change.ts";
 import { type Screen, button, heading, labelled, make, segmented, show } from "./console-dom.ts";
 import { call, say } from "./dom.ts";
-import { POLICIES, type Policy, confirmedBy, policyConsequence, readPolicy } from "./policy-read.ts";
+import { confirmedBy } from "./console-read.ts";
+import { POLICIES, type Policy, policyConsequence, readPolicy } from "./policy-read.ts";
 
 const PATH = "api/policy/two-factor";
 

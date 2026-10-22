@@ -1,5 +1,5 @@
 // What the sign-in policy view decides, kept apart from the document: the two-factor policy as the server names it,
-// what changing it does to every account of the company, and the typed confirmation a company-wide change asks for.
+// what changing it does to every account of the company.
 
 import { field } from "./flow.ts";
 
@@ -36,9 +36,4 @@ export function policyConsequence(from: Policy, to: Policy): string | null {
       return "No account of this company is asked for a second factor: a password alone signs in, including for "
         + "accounts that enrolled one.";
   }
-}
-
-/** Whether `typed` is the company id `company`, the confirmation a company-wide change asks for. */
-export function confirmedBy(typed: string, company: string): boolean {
-  return typed.trim() === company && company !== "";
 }
