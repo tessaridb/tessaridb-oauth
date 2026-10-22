@@ -273,7 +273,7 @@ and an address is shown masked until it is revealed with a reason.
 
 What the console does not do yet, stated as limits rather than promised: a change that reaches a whole company is
 made by one operator (no second approval); the roles given by `bootstrap-operator` do not expire; and a company made
-in the `system` console has no way yet to get its first operator.
+in the `system` console gets its first operator only through `bootstrap-operator --company`.
 
 Every console route needs one operator role, and a refusal for a missing role is recorded. A change comes from the
 console's own origin as JSON carrying the operator's `reason` (1 to 500 characters) and an `Idempotency-Key` header (16
@@ -434,6 +434,7 @@ finish within 25 seconds, and the process exits 0.
 
 ```sh
 tessaridb-oauth bootstrap-operator --email root@example.com
+tessaridb-oauth bootstrap-operator --company acme --email ops@acme.example
 ```
 
 This is the emergency path, for the first operator after installation or for one whose access is lost. It reads
@@ -443,6 +444,11 @@ and `users`. When the account has no password yet it prints a one-time enrolment
 `POST <PUBLIC_URL>/system/login/api/enroll`; an account that has a password keeps it. The code is shown once and
 never logged, so run the command at a terminal rather than under a supervisor that collects its output. Every run
 is logged at `ERROR` as `break_glass` and recorded on the `system` company's audit trail.
+
+With `--company`, the same path gives a company made since its first operator: the company must exist and be served
+(an unknown, provisioning or suspended one is refused and nothing is written), the account is found or registered in
+that company, it is given `users`, `clients`, `policy` and `audit` there (never `companies`), the code is for
+`POST <PUBLIC_URL>/<company>/login/api/enroll`, and the run is recorded on that company's audit trail.
 
 Operator roles are held per company and per task: `users`, `clients`, `policy`, `audit`, and `companies`, which only
 users of the `system` company may hold. A grant names who gave it and why, may carry an expiry after which it no
