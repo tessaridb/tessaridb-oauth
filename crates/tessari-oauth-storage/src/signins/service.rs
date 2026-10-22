@@ -33,35 +33,6 @@ fn unreadable(reason: &str) -> Error {
     }
 }
 
-const fn method_name(method: Method) -> &'static str {
-    match method {
-        Method::Password => "pwd",
-        Method::Totp => "totp",
-        Method::RecoveryCode => "recovery",
-        Method::Passkey {
-            user_verified: true,
-        } => "passkey-uv",
-        Method::Passkey {
-            user_verified: false,
-        } => "passkey",
-    }
-}
-
-fn method_named(name: &str) -> Result<Method> {
-    Ok(match name {
-        "pwd" => Method::Password,
-        "totp" => Method::Totp,
-        "recovery" => Method::RecoveryCode,
-        "passkey-uv" => Method::Passkey {
-            user_verified: true,
-        },
-        "passkey" => Method::Passkey {
-            user_verified: false,
-        },
-        _ => return Err(unreadable("methods")),
-    })
-}
-
 /// The row `ceremony` is kept as, at `revision`, for `interaction`, begun at `created_at`.
 fn kept(ceremony: &Ceremony, interaction: &str, revision: i64, created_at: i64) -> SigninEntity {
     let (identified, user_id, second_factor) = match ceremony.identity() {
@@ -80,7 +51,7 @@ fn kept(ceremony: &Ceremony, interaction: &str, revision: i64, created_at: i64) 
         methods: ceremony
             .verified_methods()
             .iter()
-            .map(|method| method_name(*method).to_owned())
+            .map(|method| method.name().to_owned())
             .collect(),
         revision,
         created_at,
@@ -110,7 +81,7 @@ fn held(row: SigninEntity, now: Timestamp) -> Result<Option<Signin>> {
     let methods = row
         .methods
         .iter()
-        .map(|name| method_named(name))
+        .map(|name| Method::named(name).ok_or_else(|| unreadable("methods")))
         .collect::<Result<Vec<_>>>()?;
     let ceremony = Ceremony::resume(identity, methods).map_err(|_| unreadable("progress"))?;
     Ok(Some(Signin {

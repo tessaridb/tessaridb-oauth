@@ -23,6 +23,41 @@ pub enum Method {
     },
 }
 
+impl Method {
+    /// The name this method is kept by in storage.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Password => "pwd",
+            Self::Totp => "totp",
+            Self::RecoveryCode => "recovery",
+            Self::Passkey {
+                user_verified: true,
+            } => "passkey-uv",
+            Self::Passkey {
+                user_verified: false,
+            } => "passkey",
+        }
+    }
+
+    /// The method kept as `name`, when it names one.
+    #[must_use]
+    pub fn named(name: &str) -> Option<Self> {
+        Some(match name {
+            "pwd" => Self::Password,
+            "totp" => Self::Totp,
+            "recovery" => Self::RecoveryCode,
+            "passkey-uv" => Self::Passkey {
+                user_verified: true,
+            },
+            "passkey" => Self::Passkey {
+                user_verified: false,
+            },
+            _ => return None,
+        })
+    }
+}
+
 /// The level a sign-in reached, as this issuer publishes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {

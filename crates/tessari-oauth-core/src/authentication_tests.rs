@@ -72,3 +72,15 @@ fn the_levels_are_published_under_their_own_names() {
     assert!(Level::SingleFactor < Level::MultiFactor);
     assert!(Level::MultiFactor < Level::PhishingResistant);
 }
+
+#[test]
+fn each_method_is_kept_by_its_own_name_and_read_back_from_it() {
+    let methods = [Method::Password, Method::Totp, Method::RecoveryCode, UV, UP];
+    let names: Vec<&str> = methods.iter().map(|method| method.name()).collect();
+    assert_eq!(names, ["pwd", "totp", "recovery", "passkey-uv", "passkey"]);
+    for method in methods {
+        assert_eq!(Method::named(method.name()), Some(method), "{method:?}");
+    }
+    assert_eq!(Method::named("otp"), None, "a name no method is kept by");
+    assert_eq!(Method::named("PWD"), None, "names are exact");
+}
