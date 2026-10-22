@@ -3,6 +3,7 @@
 
 pub mod access_token;
 pub mod assertion;
+pub mod authentication;
 pub mod authorize;
 pub mod client_credentials;
 pub mod clients;
