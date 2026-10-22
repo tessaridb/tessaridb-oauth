@@ -15,6 +15,7 @@ doctest = false
 tessari-oauth-infrastructure.workspace = true
 tessari-oauth-storage.workspace = true
 thiserror.workspace = true
+tokio = { workspace = true, features = ["rt"] }
 
 [lints]
 workspace = true

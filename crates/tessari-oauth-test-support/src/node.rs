@@ -69,13 +69,15 @@ pub fn plain_node() -> Result<StoreConfig, Error> {
 }
 
 /// Storage on the node `config` names, over a pool of `connections`, for a region nobody else uses; nothing
-/// provisioned yet.
+/// provisioned yet. The region's namespace is removed when the calling test ends.
 ///
 /// # Errors
 ///
 /// When the pool refuses the configuration.
 pub fn fresh_storage(config: StoreConfig, connections: usize) -> Result<Storage, Error> {
-    let database = Database::new(config, connections).map_err(Error::Pool)?;
-    let tenancy = Tenancy::for_region(&unique("live")).map_err(Error::Region)?;
+    let database = Database::new(config.clone(), connections).map_err(Error::Pool)?;
+    let region = unique("live");
+    let tenancy = Tenancy::for_region(&region).map_err(Error::Region)?;
+    crate::removed_at_end(&config, format!("oauth_{region}"));
     Ok(Storage::new(&database, &tenancy))
 }

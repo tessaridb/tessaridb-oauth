@@ -1125,6 +1125,7 @@ dependencies = [
  "tessari-oauth-infrastructure",
  "tessari-oauth-storage",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
