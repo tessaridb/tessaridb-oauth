@@ -36,7 +36,25 @@
           <div class="actions">
             <button type="button" id="password-open" class="secondary">Change password</button>
             <button type="button" id="codes-open" class="secondary">Get new recovery codes</button>
+            <button type="button" id="app-open" class="secondary" hidden>Set up an authenticator app</button>
           </div>
+
+          <form id="app-form" class="panel" hidden novalidate>
+            <p>Add this account to your authenticator app, then enter the 6-digit code it shows.
+              The key is shown only now.</p>
+            <p><a id="app-link" class="quiet-link">Open in an authenticator app</a></p>
+            <p>Or enter this key: <code id="app-secret" class="secret"></code></p>
+            <div class="field">
+              <label for="app-code">Code from the app</label>
+              <input id="app-code" name="app-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                     required aria-required="true" aria-describedby="app-code-error">
+              <p id="app-code-error" class="field-error" hidden></p>
+            </div>
+            <div class="actions">
+              <button type="submit" class="primary">Turn on</button>
+              <button type="button" id="app-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
 
           <form id="password-form" class="panel" hidden novalidate>
             <input id="password-username" type="email" autocomplete="username" readonly hidden>
@@ -71,6 +89,9 @@
           </div>
           <h3 id="passkeys-title">Passkeys</h3>
           <ul id="passkeys" class="rows" aria-labelledby="passkeys-title"></ul>
+          <div class="actions">
+            <button type="button" id="passkey-add" class="secondary" hidden>Add a passkey</button>
+          </div>
         </section>
 
         <section aria-labelledby="sessions-title">

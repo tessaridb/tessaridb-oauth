@@ -604,3 +604,19 @@ h3 {
   list-style: none;
   font-family: var(--mono);
 }
+
+.secret {
+  overflow-wrap: anywhere;
+  letter-spacing: 0.05em;
+}
+
+.quiet-link {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.quiet-link:focus-visible {
+  outline: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--focus-ring);
+}

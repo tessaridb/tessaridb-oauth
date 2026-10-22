@@ -25,6 +25,34 @@
     }
     return { kind: "retry" };
   }
+  var ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  function toBase64url(bytes2) {
+    let text2 = "";
+    for (let at = 0; at < bytes2.length; at += 3) {
+      const chunk = bytes2.subarray(at, at + 3);
+      const bits = (chunk[0] ?? 0) << 16 | (chunk[1] ?? 0) << 8 | (chunk[2] ?? 0);
+      const sextets = [bits >> 18, bits >> 12, bits >> 6, bits].map((value) => ALPHABET[value & 63] ?? "");
+      text2 += sextets.slice(0, chunk.length + 1).join("");
+    }
+    return text2;
+  }
+  function fromBase64url(text2) {
+    if (!/^[A-Za-z0-9_-]*$/.test(text2) || text2.length % 4 === 1) {
+      return null;
+    }
+    const bytes2 = [];
+    let bits = 0;
+    let held = 0;
+    for (const char of text2) {
+      bits = bits << 6 | ALPHABET.indexOf(char);
+      held += 6;
+      if (held >= 8) {
+        held -= 8;
+        bytes2.push(bits >> held & 255);
+      }
+    }
+    return Uint8Array.from(bytes2);
+  }
 
   // src/account-read.ts
   function accountApi(pathname) {
@@ -137,14 +165,14 @@
   function inSeconds(count2) {
     return seconds.select(count2) === "one" ? `${count2} second` : `${count2} seconds`;
   }
-  function refusalText(refused2) {
-    switch (refused2.kind) {
+  function refusalText(refused3) {
+    switch (refused3.kind) {
       case "rejected":
         return "That didn't match. Check it and try again.";
       case "expired":
         return "This sign-in has expired. Go back to the application and start again.";
       case "throttled":
-        return refused2.seconds === null ? "Too many attempts. Wait a moment, then try again." : `Too many attempts. Try again in ${inSeconds(refused2.seconds)}.`;
+        return refused3.seconds === null ? "Too many attempts. Wait a moment, then try again." : `Too many attempts. Try again in ${inSeconds(refused3.seconds)}.`;
       case "retry":
         return "Something went wrong on our side. Try again in a moment.";
     }
@@ -210,7 +238,16 @@
     passwordGuessable: "That password is too easy to guess. Don't use your email address.",
     passwordRejected: "That password can't be used. Choose a longer one that isn't your email address.",
     passwordChanged: "Password changed. You were signed out on your other devices.",
-    codesIssued: "New recovery codes are ready. Your old ones no longer work."
+    codesIssued: "New recovery codes are ready. Your old ones no longer work.",
+    alreadyEnrolled: "This account already has an authenticator app.",
+    appCodeRequired: "Enter the 6-digit code your app shows for this account.",
+    appStartAgain: "That code didn't match, so the key was discarded. Set up the app again to get a new key.",
+    appAdded: "Authenticator app turned on. You were signed out on your other devices.",
+    lastMethod: "That's the last way to sign in to this account. Add another one before removing it.",
+    passkeyNotAccepted: "That passkey couldn't be added. Try again, or use a different device.",
+    passkeyCancelled: "No passkey was added.",
+    passkeyAdded: "Passkey added. You were signed out on your other devices.",
+    passkeyRemoved: "Passkey removed. You were signed out on your other devices."
   };
 
   // src/dom.ts
@@ -258,6 +295,220 @@
   }
   function say(text2) {
     element("status", HTMLParagraphElement).textContent = text2;
+  }
+
+  // src/enrolment-read.ts
+  function readAppSecret(answer) {
+    const secret = field(answer, "secret");
+    const uri = field(answer, "uri");
+    if (typeof secret !== "string" || secret === "" || typeof uri !== "string" || !uri.startsWith("otpauth://totp/")) {
+      return null;
+    }
+    return { secret, uri };
+  }
+  function bytes(value) {
+    const decoded = typeof value === "string" ? fromBase64url(value) : null;
+    return decoded === null || decoded.length === 0 ? null : decoded;
+  }
+  function readRegistration(answer) {
+    const challenge = bytes(field(answer, "challenge"));
+    const rpId = field(answer, "rp_id");
+    const user = field(answer, "user");
+    const userId = bytes(field(user, "id"));
+    const userName = field(user, "name");
+    const excludedIds = strings(field(answer, "exclude"));
+    const exclude = excludedIds?.map(bytes) ?? null;
+    const algorithms = field(answer, "algorithms");
+    const verification = field(answer, "user_verification");
+    const timeout = field(answer, "timeout_ms");
+    if (challenge === null || typeof rpId !== "string" || userId === null || typeof userName !== "string" || exclude === null || !Array.isArray(algorithms) || algorithms.length === 0 || !algorithms.every((algorithm) => Number.isSafeInteger(algorithm)) || verification !== "required" && verification !== "preferred" || typeof timeout !== "number") {
+      return null;
+    }
+    const excluded = exclude.filter((id) => id !== null);
+    if (excluded.length !== exclude.length) {
+      return null;
+    }
+    return {
+      challenge,
+      rpId,
+      userId,
+      userName,
+      exclude: excluded,
+      algorithms: algorithms.filter((algorithm) => typeof algorithm === "number"),
+      userVerification: verification,
+      timeout
+    };
+  }
+  function enrolRefusal(status, body) {
+    const code = field(body, "code");
+    switch (code) {
+      case "already_enrolled":
+        return "already-enrolled";
+      case "nothing_pending":
+        return "start-again";
+      case "code_rejected":
+        return "code-rejected";
+      case "last_sign_in_method":
+        return "last-method";
+      case "invalid_request":
+        return "not-accepted";
+      case "reauthentication_required":
+        return status === 401 ? "reauthenticate" : "other";
+      case "session_required":
+        return status === 401 ? "signed-out" : "other";
+      default:
+        return "other";
+    }
+  }
+
+  // src/account-enrol.ts
+  function refused(answer, followups) {
+    const why = enrolRefusal(answer.status, answer.body);
+    switch (why) {
+      case "signed-out":
+        followups.signedOut();
+        break;
+      case "reauthenticate":
+        say(ACCOUNT_TEXT.reauthenticate);
+        break;
+      case "already-enrolled":
+        say(ACCOUNT_TEXT.alreadyEnrolled);
+        break;
+      case "start-again":
+      case "code-rejected":
+        say(ACCOUNT_TEXT.appStartAgain);
+        break;
+      case "last-method":
+        say(ACCOUNT_TEXT.lastMethod);
+        break;
+      case "not-accepted":
+        say(ACCOUNT_TEXT.passkeyNotAccepted);
+        break;
+      case "other":
+        say(refusalText(refusal(answer.status, answer.body, answer.retryAfter)));
+        break;
+    }
+  }
+  function wireApp(base, holdsApp, followups) {
+    const open = element("app-open", HTMLButtonElement);
+    const form = element("app-form", HTMLFormElement);
+    const input = element("app-code", HTMLInputElement);
+    const secret = element("app-secret", HTMLElement);
+    const link = element("app-link", HTMLAnchorElement);
+    open.hidden = holdsApp;
+    const close = () => {
+      input.value = "";
+      secret.textContent = "";
+      link.removeAttribute("href");
+      fieldError(input, null);
+      form.hidden = true;
+    };
+    open.addEventListener("click", () => {
+      void (async () => {
+        open.disabled = true;
+        const answer = await call("POST", `${base}/totp/begin`, {});
+        open.disabled = false;
+        const begun = answer.ok ? readAppSecret(answer.body) : null;
+        if (begun === null) {
+          refused(answer, followups);
+          return;
+        }
+        secret.textContent = begun.secret;
+        link.href = begun.uri;
+        form.hidden = false;
+        open.hidden = true;
+        input.focus();
+      })();
+    });
+    element("app-cancel", HTMLButtonElement).addEventListener("click", () => {
+      close();
+      open.hidden = false;
+      open.focus();
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void (async () => {
+        const code = input.value.replaceAll(" ", "");
+        if (!/^\d{6}$/.test(code)) {
+          fieldError(input, ACCOUNT_TEXT.appCodeRequired);
+          return;
+        }
+        const answer = await call("POST", `${base}/totp/confirm`, { code });
+        close();
+        if (!answer.ok) {
+          refused(answer, followups);
+          open.hidden = false;
+          open.focus();
+          return;
+        }
+        say(ACCOUNT_TEXT.appAdded);
+        await followups.changed();
+      })();
+    });
+  }
+  function wirePasskeyAdd(base, followups) {
+    const add = element("passkey-add", HTMLButtonElement);
+    add.hidden = typeof window.PublicKeyCredential !== "function";
+    add.addEventListener("click", () => {
+      void (async () => {
+        add.disabled = true;
+        try {
+          await addPasskey(base, followups);
+        } finally {
+          add.disabled = false;
+        }
+      })();
+    });
+  }
+  async function addPasskey(base, followups) {
+    const asked = await call("POST", `${base}/passkeys/options`, {});
+    const options = asked.ok ? readRegistration(asked.body) : null;
+    if (options === null) {
+      refused(asked, followups);
+      return;
+    }
+    let created;
+    try {
+      created = await navigator.credentials.create({
+        publicKey: {
+          challenge: options.challenge,
+          rp: { id: options.rpId, name: "TessariDB" },
+          user: { id: options.userId, name: options.userName, displayName: options.userName },
+          pubKeyCredParams: options.algorithms.map((alg) => ({ type: "public-key", alg })),
+          excludeCredentials: options.exclude.map((id) => ({ type: "public-key", id })),
+          authenticatorSelection: { residentKey: "required", userVerification: options.userVerification },
+          attestation: "none",
+          timeout: options.timeout
+        }
+      });
+    } catch {
+      created = null;
+    }
+    if (!(created instanceof PublicKeyCredential) || !(created.response instanceof AuthenticatorAttestationResponse)) {
+      say(ACCOUNT_TEXT.passkeyCancelled);
+      return;
+    }
+    const answer = await call("POST", `${base}/passkeys/register`, {
+      client_data_json: toBase64url(new Uint8Array(created.response.clientDataJSON)),
+      attestation_object: toBase64url(new Uint8Array(created.response.attestationObject))
+    });
+    if (!answer.ok) {
+      refused(answer, followups);
+      return;
+    }
+    say(ACCOUNT_TEXT.passkeyAdded);
+    await followups.changed();
+  }
+  async function removePasskey(base, id, pressed, followups) {
+    pressed.disabled = true;
+    const answer = await call("POST", `${base}/passkeys/remove`, { id });
+    pressed.disabled = false;
+    if (!answer.ok) {
+      refused(answer, followups);
+      return;
+    }
+    say(ACCOUNT_TEXT.passkeyRemoved);
+    await followups.changed();
   }
 
   // src/account-factors.ts
@@ -416,7 +667,7 @@
     say(text2);
     element("title", HTMLHeadingElement).focus();
   }
-  function refused(answer) {
+  function refused2(answer) {
     if (signedOutBy(answer)) {
       signedOut(ACCOUNT_TEXT.signedOut);
       return;
@@ -457,7 +708,7 @@
     }
     list.replaceChildren(...rows);
   }
-  function showMe(me) {
+  function showMe(base, me, followups) {
     element("email", HTMLElement).textContent = me.email;
     const verified = element("verified", HTMLSpanElement);
     verified.textContent = me.emailVerified ? ACCOUNT_TEXT.verified : ACCOUNT_TEXT.unverified;
@@ -467,9 +718,13 @@
     element("method-recovery", HTMLElement).textContent = codesLeft(me.recoveryCodes);
     fill(
       element("passkeys", HTMLUListElement),
-      me.passkeys.map(
-        (passkey) => row(passkey.synced ? "Synced passkey" : "Passkey on one device", `Added ${when(passkey.createdAt)}`)
-      ),
+      me.passkeys.map((passkey) => {
+        const added = when(passkey.createdAt);
+        const remove = button("Remove", `Remove the passkey added ${added}`, (pressed) => {
+          void removePasskey(base, passkey.id, pressed, followups);
+        });
+        return row(passkey.synced ? "Synced passkey" : "Passkey on one device", `Added ${added}`, remove);
+      }),
       ACCOUNT_TEXT.noPasskeys
     );
   }
@@ -509,7 +764,7 @@
     const answer = await call("POST", `${base}/sessions/end`, { sid });
     if (!answer.ok) {
       pressed.disabled = false;
-      refused(answer);
+      refused2(answer);
       return;
     }
     say(ACCOUNT_TEXT.ended);
@@ -521,7 +776,7 @@
     const answer = await call("POST", `${base}/grants/revoke`, { client_id: clientId });
     if (!answer.ok) {
       pressed.disabled = false;
-      refused(answer);
+      refused2(answer);
       return;
     }
     const endBy = readEndBy(answer.body);
@@ -530,7 +785,7 @@
     const listed = await call("GET", `${base}/grants`);
     const grants = listed.ok ? readGrants(listed.body) : null;
     if (grants === null) {
-      refused(listed);
+      refused2(listed);
       return;
     }
     showGrants(base, grants);
@@ -540,19 +795,20 @@
     const listed = await call("GET", `${base}/sessions`);
     const sessions = listed.ok ? readSessions(listed.body) : null;
     if (sessions === null) {
-      refused(listed);
+      refused2(listed);
       return;
     }
     showSessions(base, sessions);
   }
-  async function refreshAccount(base) {
+  async function refreshAccount(base, followups) {
     const answer = await call("GET", `${base}/me`);
     const me = answer.ok ? readMe(answer.body) : null;
     if (me === null) {
-      refused(answer);
+      refused2(answer);
       return;
     }
-    showMe(me);
+    showMe(base, me, followups);
+    element("app-open", HTMLButtonElement).hidden = me.totp;
     await refreshSessions(base);
   }
   async function signOutEverywhere(base) {
@@ -560,7 +816,7 @@
     const answer = await call("POST", `${base}/sessions/end-all`, {});
     everywhereYes.disabled = false;
     if (!answer.ok) {
-      refused(answer);
+      refused2(answer);
       return;
     }
     signedOut(ACCOUNT_TEXT.everywhereDone);
@@ -578,7 +834,7 @@
     ]);
     const failed = [meAnswer, sessionsAnswer, grantsAnswer].find((answer) => !answer.ok);
     if (failed !== void 0) {
-      refused(failed);
+      refused2(failed);
       return;
     }
     const me = readMe(meAnswer.body);
@@ -588,7 +844,11 @@
       say(ACCOUNT_TEXT.unreadable);
       return;
     }
-    showMe(me);
+    const followups = {
+      changed: () => refreshAccount(base, followups),
+      signedOut: () => signedOut(ACCOUNT_TEXT.signedOut)
+    };
+    showMe(base, me, followups);
     showSessions(base, sessions);
     showGrants(base, grants);
     element("everywhere-warning", HTMLParagraphElement).textContent = ACCOUNT_TEXT.everywhereConfirm;
@@ -603,12 +863,10 @@
       everywhere.focus();
     });
     everywhereYes.addEventListener("click", () => void signOutEverywhere(base));
-    const followups = {
-      changed: () => refreshAccount(base),
-      signedOut: () => signedOut(ACCOUNT_TEXT.signedOut)
-    };
     wirePassword(base, me.totp, followups);
     wireRecoveryCodes(base, followups);
+    wireApp(base, me.totp, followups);
+    wirePasskeyAdd(base, followups);
     account.hidden = false;
     say("");
   }

@@ -12,7 +12,8 @@ import {
   readMe,
   readSessions,
 } from "./account-read.ts";
-import { wirePassword, wireRecoveryCodes } from "./account-factors.ts";
+import { removePasskey, wireApp, wirePasskeyAdd } from "./account-enrol.ts";
+import { type Followups, wirePassword, wireRecoveryCodes } from "./account-factors.ts";
 import { ACCOUNT_TEXT, codesLeft, describeMethods, describeScope, refusalText, when } from "./copy.ts";
 import { type Answer, call, element, say } from "./dom.ts";
 import { field, refusal } from "./flow.ts";
@@ -83,7 +84,8 @@ function fill(list: HTMLUListElement, rows: HTMLLIElement[], empty: string): voi
   list.replaceChildren(...rows);
 }
 
-function showMe(me: Me): void {
+/** Show the account; `followups` wires each passkey's removal. */
+function showMe(base: string, me: Me, followups: Followups): void {
   element("email", HTMLElement).textContent = me.email;
   const verified = element("verified", HTMLSpanElement);
   verified.textContent = me.emailVerified ? ACCOUNT_TEXT.verified : ACCOUNT_TEXT.unverified;
@@ -93,9 +95,13 @@ function showMe(me: Me): void {
   element("method-recovery", HTMLElement).textContent = codesLeft(me.recoveryCodes);
   fill(
     element("passkeys", HTMLUListElement),
-    me.passkeys.map((passkey) =>
-      row(passkey.synced ? "Synced passkey" : "Passkey on one device", `Added ${when(passkey.createdAt)}`),
-    ),
+    me.passkeys.map((passkey) => {
+      const added = when(passkey.createdAt);
+      const remove = button("Remove", `Remove the passkey added ${added}`, (pressed) => {
+        void removePasskey(base, passkey.id, pressed, followups);
+      });
+      return row(passkey.synced ? "Synced passkey" : "Passkey on one device", `Added ${added}`, remove);
+    }),
     ACCOUNT_TEXT.noPasskeys,
   );
 }
@@ -178,14 +184,15 @@ async function refreshSessions(base: string): Promise<void> {
 }
 
 /** Show the account and the sessions again, after a change that ended other sessions or used up codes. */
-async function refreshAccount(base: string): Promise<void> {
+async function refreshAccount(base: string, followups: Followups): Promise<void> {
   const answer = await call("GET", `${base}/me`);
   const me = answer.ok ? readMe(answer.body) : null;
   if (me === null) {
     refused(answer);
     return;
   }
-  showMe(me);
+  showMe(base, me, followups);
+  element("app-open", HTMLButtonElement).hidden = me.totp;
   await refreshSessions(base);
 }
 
@@ -223,7 +230,11 @@ async function main(): Promise<void> {
     say(ACCOUNT_TEXT.unreadable);
     return;
   }
-  showMe(me);
+  const followups: Followups = {
+    changed: () => refreshAccount(base, followups),
+    signedOut: () => signedOut(ACCOUNT_TEXT.signedOut),
+  };
+  showMe(base, me, followups);
   showSessions(base, sessions);
   showGrants(base, grants);
   element("everywhere-warning", HTMLParagraphElement).textContent = ACCOUNT_TEXT.everywhereConfirm;
@@ -238,12 +249,10 @@ async function main(): Promise<void> {
     everywhere.focus();
   });
   everywhereYes.addEventListener("click", () => void signOutEverywhere(base));
-  const followups = {
-    changed: () => refreshAccount(base),
-    signedOut: () => signedOut(ACCOUNT_TEXT.signedOut),
-  };
   wirePassword(base, me.totp, followups);
   wireRecoveryCodes(base, followups);
+  wireApp(base, me.totp, followups);
+  wirePasskeyAdd(base, followups);
   account.hidden = false;
   say("");
 }

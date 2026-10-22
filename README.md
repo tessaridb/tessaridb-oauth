@@ -287,7 +287,8 @@ The sign-in, consent and account pages are served by the binary itself at `<issu
 `<issuer>/account`, with their script, style and mark under `<issuer>/assets/`. The account page shows the
 signed-in user's address, how the account signs in, where it is signed in and which applications hold access; it
 signs out one session or every session after a confirmation, takes an application's access back, saying when the
-tokens it already holds stop working, changes the password and issues new recovery codes, shown once. Without a session it says so; it does not yet start a sign-in itself. They load nothing from anywhere else, talk only to this
+tokens it already holds stop working, changes the password, issues new recovery codes shown once, turns on an
+authenticator app from a key shown once, and adds or removes passkeys. Without a session it says so; it does not yet start a sign-in itself. They load nothing from anywhere else, talk only to this
 server, submit no form, cannot be framed, follow the system's light or dark theme and work from the keyboard alone;
 a passkey is offered wherever the browser supports one. Their TypeScript source is in
 `crates/tessari-oauth-api/pages/`, and its built output is committed to `crates/tessari-oauth-api/assets/`, so

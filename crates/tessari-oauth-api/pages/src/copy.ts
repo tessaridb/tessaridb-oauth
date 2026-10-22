@@ -122,4 +122,13 @@ export const ACCOUNT_TEXT = {
   passwordRejected: "That password can't be used. Choose a longer one that isn't your email address.",
   passwordChanged: "Password changed. You were signed out on your other devices.",
   codesIssued: "New recovery codes are ready. Your old ones no longer work.",
+  alreadyEnrolled: "This account already has an authenticator app.",
+  appCodeRequired: "Enter the 6-digit code your app shows for this account.",
+  appStartAgain: "That code didn't match, so the key was discarded. Set up the app again to get a new key.",
+  appAdded: "Authenticator app turned on. You were signed out on your other devices.",
+  lastMethod: "That's the last way to sign in to this account. Add another one before removing it.",
+  passkeyNotAccepted: "That passkey couldn't be added. Try again, or use a different device.",
+  passkeyCancelled: "No passkey was added.",
+  passkeyAdded: "Passkey added. You were signed out on your other devices.",
+  passkeyRemoved: "Passkey removed. You were signed out on your other devices.",
 } as const;
