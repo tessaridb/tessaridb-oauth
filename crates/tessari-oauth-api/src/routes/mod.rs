@@ -25,7 +25,7 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use tessari_oauth_constants::{
-    ACCOUNT_API_PATH, AUTHORIZE_BODY_MAX_BYTES, LOGIN_API_PATH, LOGIN_BODY_MAX_BYTES,
+    ACCOUNT_API_PATH, AUTHORIZE_BODY_MAX_BYTES, LOGIN_API_PATH, LOGIN_BODY_MAX_BYTES, LOGOUT_PATH,
     TOKEN_BODY_MAX_BYTES,
 };
 use tessari_oauth_core::clients::{ClientDirectory, ClientRegistration};
@@ -67,7 +67,7 @@ pub fn public_router(state: PublicState) -> Router {
         )
         .route("/{tenant}/oauth2/authorize/resume", get(resume::resume))
         .route(
-            "/{tenant}/oauth2/logout",
+            &format!("/{{tenant}}{LOGOUT_PATH}"),
             get(logout::query).post(logout::form),
         )
         .layer(DefaultBodyLimit::max(AUTHORIZE_BODY_MAX_BYTES))

@@ -7,7 +7,8 @@
 
 use serde::Serialize;
 use tessari_oauth_constants::{
-    AUTHORIZATION_PATH, JWKS_PATH, PAR_PATH, REVOCATION_PATH, TOKEN_PATH, USERINFO_PATH,
+    AUTHORIZATION_PATH, JWKS_PATH, LOGOUT_PATH, PAR_PATH, REVOCATION_PATH, TOKEN_PATH,
+    USERINFO_PATH,
 };
 use tessari_oauth_types::Algorithm;
 use url::Url;
@@ -32,6 +33,7 @@ pub struct Metadata {
     token_endpoint: String,
     jwks_uri: String,
     userinfo_endpoint: String,
+    end_session_endpoint: String,
     response_types_supported: [&'static str; 1],
     grant_types_supported: Vec<&'static str>,
     token_endpoint_auth_methods_supported: [&'static str; 2],
@@ -85,6 +87,7 @@ pub fn metadata(issuer: &str, id_token_algorithm: Algorithm) -> Result<Metadata,
         token_endpoint: format!("{issuer}{TOKEN_PATH}"),
         jwks_uri: format!("{issuer}{JWKS_PATH}"),
         userinfo_endpoint: format!("{issuer}{USERINFO_PATH}"),
+        end_session_endpoint: format!("{issuer}{LOGOUT_PATH}"),
         response_types_supported: [RESPONSE_TYPE_CODE],
         grant_types_supported: GrantType::ALL.iter().map(|grant| grant.name()).collect(),
         token_endpoint_auth_methods_supported: VERIFIED_AUTH_METHODS,

@@ -194,6 +194,14 @@ fn userinfo_is_advertised_under_the_issuer() {
 }
 
 #[test]
+fn rp_initiated_logout_is_advertised_under_the_issuer() {
+    assert_eq!(
+        document()["end_session_endpoint"],
+        "https://id.example.com/acme/oauth2/logout"
+    );
+}
+
+#[test]
 fn nothing_the_server_does_not_enforce_yet_is_advertised() {
     let document = document();
     // The ID token's subject type and algorithm are advertised now that ID tokens are issued; scopes are not yet.

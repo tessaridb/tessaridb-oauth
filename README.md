@@ -166,7 +166,8 @@ A client signs a user out here (OpenID Connect RP-Initiated Logout 1.0) by sendi
 browser's cookie holds is ended only when it is the session the hint names, the cookie is cleared, and the ending is
 recorded in the audit trail. The browser goes back only to a `post_logout_redirect_uri` the client registered, matched
 exactly, with its `state`; any other value is never followed and a signed-out page is shown here instead. A cross-site
-`POST` carries no session cookie (`SameSite=Lax`), so a client signs users out with a `GET` redirect.
+`POST` carries no session cookie (`SameSite=Lax`), so a client signs users out with a `GET` redirect. Discovery
+advertises the endpoint as `end_session_endpoint`.
 
 ### Your account: `<issuer>/account/api/me`
 

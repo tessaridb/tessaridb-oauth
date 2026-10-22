@@ -58,6 +58,9 @@ pub const REVOCATION_PATH: &str = "/oauth2/revoke";
 /// it names, since it is a resource of the server's own.
 pub const USERINFO_PATH: &str = "/oauth2/userinfo";
 
+/// The RP-initiated logout path (OpenID Connect RP-Initiated Logout 1.0 `end_session_endpoint`).
+pub const LOGOUT_PATH: &str = "/oauth2/logout";
+
 /// The key set path (RFC 8414 `jwks_uri`).
 pub const JWKS_PATH: &str = "/oauth2/jwks";
 
