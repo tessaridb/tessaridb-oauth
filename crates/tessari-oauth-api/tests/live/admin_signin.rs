@@ -4,17 +4,19 @@
 //! console keeps until it comes back. The cookie is `__Host-` and `Secure` over https, plain on a loopback console.
 
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use tessari_oauth_api::{AdminState, admin_router};
 use tessari_oauth_storage::companies::Served;
+use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_types::{Challenge, SigninBinding, Timestamp};
 use tower::ServiceExt;
 use url::Url;
 
-use crate::token_fixture::{NOW, Server, server, tenant};
+use crate::token_fixture::{NOW, Server, plenty, server, tenant};
 
 pub(crate) fn console_state(server: &Server, console: &str) -> AdminState {
     let served = Served::new("https://id.example.com");
@@ -26,6 +28,8 @@ pub(crate) fn console_state(server: &Server, console: &str) -> AdminState {
         operators: Arc::clone(&server.storage.operators),
         audit: Arc::clone(&server.storage.audit),
         sessions: Arc::clone(&server.storage.sessions),
+        throttle: Arc::clone(&server.storage.throttle),
+        limit: plenty(),
         served: Arc::new(served),
         console: Arc::from(console),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
@@ -122,4 +126,26 @@ async fn a_loopback_console_in_the_clear_sets_a_plain_cookie_and_an_unknown_comp
     let unknown = get(state, "/admin/globex/signin").await;
     assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
     assert!(unknown.headers().get(header::SET_COOKIE).is_none());
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn the_console_counts_its_requests_and_refuses_past_its_limit() {
+    let server = server(2).await;
+    let state = AdminState {
+        limit: Limit {
+            requests: NonZeroU64::new(2).expect("non-zero"),
+            window_secs: NonZeroU64::new(60).expect("non-zero"),
+        },
+        ..console_state(&server, "https://admin.example.com")
+    };
+    for _ in 0..2 {
+        let served = get(state.clone(), "/admin/acme/signin").await;
+        assert_eq!(served.status(), StatusCode::SEE_OTHER);
+        assert_eq!(served.headers()["x-ratelimit-class"], "admin");
+    }
+    let refused = get(state, "/admin/acme/signin").await;
+    assert_eq!(refused.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(refused.headers().contains_key(header::RETRY_AFTER));
+    assert!(refused.headers().get(header::SET_COOKIE).is_none());
 }

@@ -9,7 +9,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tessari_oauth_api::{PublicState, public_router, serve};
+use tessari_oauth_api::{AdminState, PublicState, admin_router, public_router, serve};
 use tessari_oauth_constants::{
     DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS,
     KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS,
@@ -32,6 +32,12 @@ use tokio::sync::watch;
 mod bootstrap;
 
 pub(crate) type Failure = Box<dyn Error + Send + Sync>;
+
+/// The TLS configuration of each listener: the public one always, the admin console's when it was given one.
+struct Listeners {
+    public: Arc<rustls::ServerConfig>,
+    admin: Option<Arc<rustls::ServerConfig>>,
+}
 
 /// The algorithm new signing keys are made for, and the only one an access token is verified under.
 const SIGNING_ALGORITHM: Algorithm = Algorithm::Es256;
@@ -73,10 +79,19 @@ fn main() -> ExitCode {
 fn start() -> Result<(), Failure> {
     let config = NodeConfig::from_env()?;
     tracing::debug!(?config, "loaded configuration");
-    let tls = listener_config(&ListenerTls::new(
-        std::fs::read(&config.public.tls_cert)?,
-        std::fs::read(&config.public.tls_key)?,
-    ))?;
+    let tls = Listeners {
+        public: listener_config(&ListenerTls::new(
+            std::fs::read(&config.public.tls_cert)?,
+            std::fs::read(&config.public.tls_key)?,
+        ))?,
+        admin: match &config.admin.tls {
+            Some(admin) => Some(listener_config(&ListenerTls::new(
+                std::fs::read(&admin.cert)?,
+                std::fs::read(&admin.key)?,
+            ))?),
+            None => None,
+        },
+    };
     let kek = Arc::new(Kek::load(&config.kek)?);
     let passwords = Passwords::load(
         &config.pepper,
@@ -132,7 +147,7 @@ async fn run(
     served: Arc<Served>,
     kek: Arc<Kek>,
     passwords: Arc<Passwords>,
-    tls: Arc<rustls::ServerConfig>,
+    tls: Listeners,
     poster: Poster,
 ) -> Result<(), Failure> {
     let clock = system_clock();
@@ -185,6 +200,22 @@ async fn run(
         timeout: Duration::from_secs(DIRECTORY_REFRESH_TIMEOUT_SECS),
     });
     let refreshing = tokio::spawn(tessari_oauth_daemons::run(refresh, stopped.clone()));
+    let console = AdminState {
+        admin: Arc::clone(&storage.admin),
+        codes: Arc::clone(&storage.codes),
+        clients: Arc::clone(&storage.clients),
+        operators: Arc::clone(&storage.operators),
+        audit: Arc::clone(&storage.audit),
+        sessions: Arc::clone(&storage.sessions),
+        throttle: Arc::clone(&storage.throttle),
+        limit: Limit {
+            requests: config.login_limit.requests,
+            window_secs: config.login_limit.window_secs,
+        },
+        served: Arc::clone(&served),
+        console: Arc::from(config.admin.url.as_str()),
+        clock: Arc::clone(&clock),
+    };
     let state = PublicState {
         keys: Arc::clone(&storage.keys),
         clients: Arc::clone(&storage.clients),
@@ -230,31 +261,49 @@ async fn run(
     let mut terminate = signal(SignalKind::terminate())?;
     let listener = tokio::net::TcpListener::bind(config.public.address).await?;
     tracing::info!(address = %config.public.address, tenants = config.tenants.len(), "server started");
-    let mut until_stopped = stopped;
+    let admin_listener = tokio::net::TcpListener::bind(config.admin.address).await?;
+    if tls.admin.is_none() {
+        tracing::warn!(
+            address = %config.admin.address,
+            "the admin console serves in the clear; reach it only from this host or through a TLS terminator"
+        );
+    }
+    tracing::info!(address = %config.admin.address, "admin console started");
+    let mut until_stopped = stopped.clone();
     let serving = tokio::spawn(serve(
         listener,
         public_router(state),
-        Some(tls),
+        Some(tls.public),
         // A sender that is gone means stop as well.
         async move { until_stopped.changed().await.unwrap_or_default() },
         "public",
+    ));
+    let mut admin_until_stopped = stopped;
+    let serving_admin = tokio::spawn(serve(
+        admin_listener,
+        admin_router(console),
+        tls.admin,
+        async move { admin_until_stopped.changed().await.unwrap_or_default() },
+        "admin",
     ));
     tokio::select! {
         _ = interrupt.recv() => tracing::info!(signal = "SIGINT", "shutting down"),
         _ = terminate.recv() => tracing::info!(signal = "SIGTERM", "shutting down"),
     }
     stop.send(true)?;
-    let (answered, rotated, delivered, refreshed) =
+    let (answered, answered_admin, rotated, delivered, refreshed) =
         tokio::time::timeout(Duration::from_secs(SHUTDOWN_DRAIN_SECS), async {
             let rotated = rotating.await;
             let delivered = delivering.await;
             let refreshed = refreshing.await;
-            (serving.await, rotated, delivered, refreshed)
+            let answered_admin = serving_admin.await;
+            (serving.await, answered_admin, rotated, delivered, refreshed)
         })
         .await
         .map_err(|_| format!("requests still in flight after {SHUTDOWN_DRAIN_SECS} s"))?;
     rotated?;
     delivered?;
     refreshed?;
+    answered_admin??;
     Ok(answered??)
 }

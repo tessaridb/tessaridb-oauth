@@ -17,6 +17,7 @@ use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::sessions::SessionService;
+use tessari_oauth_storage::throttle::{Limit, ThrottleService};
 use tessari_oauth_types::Clock;
 
 use crate::{Error, Result};
@@ -41,6 +42,10 @@ pub struct AdminState {
     pub audit: Arc<AuditService>,
     /// Issuer sessions: a console session ends with the one it came from.
     pub sessions: Arc<SessionService>,
+    /// The request counters every admin route is counted in.
+    pub throttle: Arc<ThrottleService>,
+    /// How many requests a client address may make to the console per window.
+    pub limit: Limit,
     /// The companies this node serves and their issuers.
     pub served: Arc<Served>,
     /// The console's base URL, as `TESSARIDB_OAUTH_ADMIN_URL` gives it.
@@ -89,6 +94,10 @@ pub fn admin_router(state: AdminState) -> Router {
         .route("/admin/{company}/api/me", get(session::me))
         .route("/admin/{company}/signout", post(session::signout))
         .fallback(|| async { crate::Error::NotFound })
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::throttle::admins,
+        ))
         .with_state(state)
         .layer(axum::middleware::map_response(|response| async {
             crate::headers::no_store(crate::headers::protect(response))

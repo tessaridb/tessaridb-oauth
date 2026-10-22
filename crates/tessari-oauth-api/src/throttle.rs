@@ -14,8 +14,10 @@ use axum::extract::{ConnectInfo, Request, State};
 use axum::http::{HeaderName, HeaderValue};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use tessari_oauth_storage::throttle::{Admission, Limit};
+use tessari_oauth_storage::throttle::{Admission, Limit, ThrottleService};
+use tessari_oauth_types::Timestamp;
 
+use crate::admin::AdminState;
 use crate::state::PublicState;
 use crate::{Error, Result};
 
@@ -33,6 +35,9 @@ const LOGIN_GROUP: &str = "login";
 
 /// The route group of the account portal's requests.
 const ACCOUNT_GROUP: &str = "account";
+
+/// The route group of the admin console's requests.
+const ADMIN_GROUP: &str = "admin";
 
 /// The counted name of a request with no peer address.
 const NO_ADDRESS: &str = "no-address";
@@ -69,7 +74,15 @@ pub(crate) async fn reads(
     next: Next,
 ) -> Result<Response> {
     let limit = state.read_limit;
-    count(&state, READ_GROUP, limit, request, next).await
+    count(
+        &state.throttle,
+        (state.clock)(),
+        READ_GROUP,
+        limit,
+        request,
+        next,
+    )
+    .await
 }
 
 /// Count the request under the token limit, and refuse it past the limit or when the store cannot count.
@@ -79,7 +92,15 @@ pub(crate) async fn tokens(
     next: Next,
 ) -> Result<Response> {
     let limit = state.token_limit;
-    count(&state, TOKEN_GROUP, limit, request, next).await
+    count(
+        &state.throttle,
+        (state.clock)(),
+        TOKEN_GROUP,
+        limit,
+        request,
+        next,
+    )
+    .await
 }
 
 /// Count the request under the authorization limit, and refuse it past the limit or when the store cannot count.
@@ -89,7 +110,15 @@ pub(crate) async fn authorizations(
     next: Next,
 ) -> Result<Response> {
     let limit = state.authorize_limit;
-    count(&state, AUTHORIZE_GROUP, limit, request, next).await
+    count(
+        &state.throttle,
+        (state.clock)(),
+        AUTHORIZE_GROUP,
+        limit,
+        request,
+        next,
+    )
+    .await
 }
 
 /// Count the request under the sign-in limit, and refuse it past the limit or when the store cannot count.
@@ -99,7 +128,15 @@ pub(crate) async fn logins(
     next: Next,
 ) -> Result<Response> {
     let limit = state.login_limit;
-    count(&state, LOGIN_GROUP, limit, request, next).await
+    count(
+        &state.throttle,
+        (state.clock)(),
+        LOGIN_GROUP,
+        limit,
+        request,
+        next,
+    )
+    .await
 }
 
 /// Count the request under the sign-in limit's numbers in a count of its own, and refuse it past the limit or when
@@ -110,12 +147,39 @@ pub(crate) async fn accounts(
     next: Next,
 ) -> Result<Response> {
     let limit = state.login_limit;
-    count(&state, ACCOUNT_GROUP, limit, request, next).await
+    count(
+        &state.throttle,
+        (state.clock)(),
+        ACCOUNT_GROUP,
+        limit,
+        request,
+        next,
+    )
+    .await
 }
 
-/// Count the request in `group` under `limit`, then serve or refuse it.
+/// Count the request under the admin console's limit, and refuse it past the limit or when the store cannot count.
+pub(crate) async fn admins(
+    State(state): State<AdminState>,
+    request: Request,
+    next: Next,
+) -> Result<Response> {
+    let limit = state.limit;
+    count(
+        &state.throttle,
+        (state.clock)(),
+        ADMIN_GROUP,
+        limit,
+        request,
+        next,
+    )
+    .await
+}
+
+/// Count the request in `group` under `limit` at `now`, then serve or refuse it.
 async fn count(
-    state: &PublicState,
+    throttle: &ThrottleService,
+    now: Timestamp,
     group: &'static str,
     limit: Limit,
     mut request: Request,
@@ -125,9 +189,8 @@ async fn count(
     request
         .extensions_mut()
         .insert(ClientAddress(client.clone()));
-    let admission = state
-        .throttle
-        .admit(group, &client, limit, (state.clock)())
+    let admission = throttle
+        .admit(group, &client, limit, now)
         .await
         .map_err(Error::Store)?;
     let (mut response, remaining) = match admission {

@@ -247,6 +247,21 @@ every session, the asking one included, and every refresh family the user holds 
 many of each ended and when the access tokens already issued stop working. Every ending is recorded in the audit
 trail, and the same rules as the grant list apply: the session cookie, JSON only, their own limit, never cached.
 
+### The admin console: `<ADMIN_URL>/admin/<company>`
+
+An operator opens a company's console at `<ADMIN_URL>/admin/<company>/signin`, which sends the browser to that
+company's own sign-in as the client `admin-console`, with PKCE, a `state` and a `nonce`. Every company has this client
+registered, with no grant type, so nothing outside the server can redeem its codes. The return to
+`<ADMIN_URL>/admin/<company>/callback` opens a console session only when the `state`, the issuer, the code and its
+`nonce` all check out, the operator signed in with two factors, and they hold at least one current operator role. Any
+other return gets one and the same refusal and is recorded in the audit trail.
+
+The session is kept in an `HttpOnly`, `SameSite=Strict` cookie (`__Host-` and `Secure` over https). It lasts at most
+8 hours, ends after 30 minutes unused, and ends with the company sign-in session it came from or when the operator's
+last role is taken away. `GET <ADMIN_URL>/admin/<company>/api/me` names the operator and their roles, and
+`POST <ADMIN_URL>/admin/<company>/signout` ends the session, accepted only from the console's own origin. Console
+requests are counted per client address under the `LOGIN_LIMIT` and `LOGIN_WINDOW_SECS` numbers.
+
 ### The audit trail
 
 Every outcome at the token and revocation endpoints, and every refusal at the authorization and UserInfo endpoints,
@@ -348,7 +363,7 @@ once and `npm run build` there; `npm run verify` type-checks, runs the page test
 assets differ from a rebuild.
 
 Logs are JSON on standard output, filtered by
-`RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
+`RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listeners stop accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.
 
 ### The first platform operator
