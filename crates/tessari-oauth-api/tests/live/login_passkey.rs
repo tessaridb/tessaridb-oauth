@@ -1,5 +1,5 @@
-//! The passkey steps over a live store: options name a fresh challenge kept for one assertion and this relying
-//! party, with no list of credentials, for a known and an unknown address alike.
+//! The passkey options over a live store: they name a fresh challenge kept for one assertion and this relying party,
+//! with no list of credentials, for a known and an unknown address alike, and follow the sign-in's stage.
 
 use axum::http::StatusCode;
 use serde_json::{Value, json};
@@ -12,7 +12,7 @@ use crate::login_password::{identified, with_password};
 use crate::token_fixture::{NOW, Server, server, tenant};
 
 /// Ask the sign-in under `cookie` for passkey options.
-async fn options(server: &Server, cookie: Option<&str>) -> crate::routes::Answer {
+pub(crate) async fn options(server: &Server, cookie: Option<&str>) -> crate::routes::Answer {
     post(server, "passkey/options", cookie, json!({})).await
 }
 

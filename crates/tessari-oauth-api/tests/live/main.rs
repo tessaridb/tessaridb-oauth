@@ -5,11 +5,14 @@
 
 #![cfg(test)]
 
+mod authenticator;
 mod authorize;
 mod login;
 mod login_factors;
 mod login_factors_race;
 mod login_passkey;
+mod login_passkey_assertion;
+mod login_passkey_counts;
 mod login_password;
 mod par;
 mod routes;

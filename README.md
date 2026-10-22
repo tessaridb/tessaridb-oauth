@@ -206,7 +206,10 @@ cannot count the request is refused with `503` rather than served. A wrong passw
 address being signed in to, the client address and the pair of the two (a wrong one-time or recovery code against
 the first two); past a few failures that key is held for a
 short, growing time that ends by itself (never a lockout), and a wrong password and an address with no account get
-the same `401`. Logs are JSON on standard output, filtered by
+the same `401`. A passkey answers its sign-in's challenge once: one that verified its user is a whole sign-in and
+names the account itself, one where a password came first stands as the second factor, and a passkey of another
+account, a foreign origin or a counter that did not move forward gets that same `401` and is counted. Logs are JSON
+on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.
 

@@ -16,7 +16,7 @@ mod password;
 pub(super) use begin::begin;
 pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
-pub(super) use passkey::passkey_options;
+pub(super) use passkey::{passkey, passkey_options};
 pub(super) use password::password;
 
 use axum::Json;
@@ -203,9 +203,14 @@ async fn verified(
         ceremony.verified(method)
     })
     .await?;
-    // The step is taken; forgetting is housekeeping, and failures left counted lapse with their window. Under a
-    // run of failures against the same address the forget can keep losing to their counts, which must not turn a
-    // taken step into a refusal.
+    forget(state, tenant, account).await;
+    Ok(answer(stage, None))
+}
+
+/// Forget the failures of the identified address's key `account` once a step is taken. The step stands either way:
+/// forgetting is housekeeping, failures left counted lapse with their window, and under a run of failures against
+/// the same address the forget can keep losing to their counts, which must not turn a taken step into a refusal.
+async fn forget(state: &PublicState, tenant: &TenantId, account: &str) {
     if let Err(failure) = state.throttle.signin_succeeded(account).await {
         tracing::warn!(
             event = "signin_failures_kept",
@@ -214,5 +219,4 @@ async fn verified(
             "a sign-in step was taken but its address's failures could not be forgotten"
         );
     }
-    Ok(answer(stage, None))
 }
