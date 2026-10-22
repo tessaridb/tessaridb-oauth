@@ -7,6 +7,7 @@
 
 mod authenticator;
 mod authorize;
+mod authorize_prompt;
 mod authorize_resume;
 mod browser_binding;
 mod id_token;

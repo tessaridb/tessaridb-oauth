@@ -16,6 +16,7 @@ use serde::Deserialize;
 use tessari_oauth_constants::{
     AUTHORIZATION_CODE_TTL_SECS, CONSENT_PATH, CONSENT_POLICY_VERSION, LOGIN_PATH, SESSION_COOKIE,
 };
+use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_core::codes::{CodeAuthentication, IssuedCode};
 use tessari_oauth_core::consents::{ConsentRequest, Coverage};
 use tessari_oauth_infrastructure::custody::random_secret;
@@ -68,9 +69,43 @@ pub(super) async fn resume(
             .map_err(Error::Store)?,
         None => None,
     };
+    let sign_in = format!("{issuer}{LOGIN_PATH}?interaction={id}");
     let Some(session) = session else {
-        return see_other(&format!("{issuer}{LOGIN_PATH}?interaction={id}"));
+        return if request.silent {
+            silently_refused(
+                &state,
+                &tenant,
+                issuer,
+                (&id, &browser),
+                ErrorCode::LoginRequired,
+                now,
+            )
+            .await
+        } else {
+            see_other(&sign_in)
+        };
     };
+    let signed_in_for = now
+        .unix_secs()
+        .saturating_sub(session.auth_time.unix_secs());
+    if request
+        .max_age
+        .is_some_and(|max_age| signed_in_for > max_age)
+    {
+        return if request.silent {
+            silently_refused(
+                &state,
+                &tenant,
+                issuer,
+                (&id, &browser),
+                ErrorCode::LoginRequired,
+                now,
+            )
+            .await
+        } else {
+            see_other(&sign_in)
+        };
+    }
     let asked = ConsentRequest {
         scopes: request.scopes.clone(),
         resources: request.resources.clone(),
@@ -93,8 +128,59 @@ pub(super) async fn resume(
                 None => Ok(page(ErrorCode::InvalidRequest)),
             }
         }
+        Coverage::Prompt { .. } if request.silent => {
+            silently_refused(
+                &state,
+                &tenant,
+                issuer,
+                (&id, &browser),
+                ErrorCode::ConsentRequired,
+                now,
+            )
+            .await
+        }
         Coverage::Prompt { .. } => see_other(&format!("{issuer}{CONSENT_PATH}?interaction={id}")),
     }
+}
+
+/// Take the pending authorization `id` that `browser` brought in `tenant` at `now`, once, and send the browser to its
+/// redirect URI with `error`: a request that asked for no page is answered rather than shown one.
+async fn silently_refused(
+    state: &PublicState,
+    tenant: &TenantId,
+    issuer: &str,
+    (id, browser): (&str, &BrowserBinding),
+    error: ErrorCode,
+    now: Timestamp,
+) -> Result<Response> {
+    let taken = state
+        .interactions
+        .finish(tenant, id, browser, now)
+        .await
+        .map_err(Error::Store)?;
+    match taken {
+        Some(request) => see_other(&refused_at(&request, issuer, error)?),
+        None => Ok(page(ErrorCode::InvalidRequest)),
+    }
+}
+
+/// The address of `request`'s redirect URI refusing it with `error`, its `state` and the issuer (RFC 6749 §4.1.2.1,
+/// RFC 9207).
+pub(super) fn refused_at(
+    request: &AuthorizationRequest,
+    issuer: &str,
+    error: ErrorCode,
+) -> Result<String> {
+    let mut target = url::Url::parse(&request.redirect_uri).map_err(|_| Error::Internal)?;
+    {
+        let mut query = target.query_pairs_mut();
+        query.append_pair("error", error.as_str());
+        if let Some(state) = &request.state {
+            query.append_pair("state", state);
+        }
+        query.append_pair("iss", issuer);
+    }
+    Ok(target.into())
 }
 
 /// Take the pending authorization `id` that `browser` brought in `tenant` for the user of `session` at `now`, once,

@@ -22,7 +22,7 @@ use tessari_oauth_storage::sessions::Session;
 use tessari_oauth_types::{BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp};
 
 use super::super::browser::held;
-use super::super::resume::issued;
+use super::super::resume::{issued, refused_at};
 use super::{body, cookie, record, well_formed};
 use crate::state::PublicState;
 use crate::{Error, Result};
@@ -153,7 +153,9 @@ pub(in crate::routes) async fn decide(
                 .finish(&tenant, &answered.interaction, &browser, now)
                 .await
                 .map_err(Error::Store)?;
-            taken.map(|request| denied(&request, issuer)).transpose()?
+            taken
+                .map(|request| refused_at(&request, issuer, ErrorCode::AccessDenied))
+                .transpose()?
         }
     };
     let redirect = target.ok_or(Error::SigninGone)?;
@@ -203,18 +205,4 @@ fn asked(request: &AuthorizationRequest) -> ConsentRequest {
         scopes: request.scopes.clone(),
         resources: request.resources.clone(),
     }
-}
-
-/// The address of `request`'s redirect URI refusing it as denied by the user, from `issuer`.
-fn denied(request: &AuthorizationRequest, issuer: &str) -> Result<String> {
-    let mut target = url::Url::parse(&request.redirect_uri).map_err(|_| Error::Internal)?;
-    {
-        let mut query = target.query_pairs_mut();
-        query.append_pair("error", ErrorCode::AccessDenied.as_str());
-        if let Some(state) = &request.state {
-            query.append_pair("state", state);
-        }
-        query.append_pair("iss", issuer);
-    }
-    Ok(target.into())
 }

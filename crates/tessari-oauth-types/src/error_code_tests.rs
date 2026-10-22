@@ -17,6 +17,7 @@ fn each_code_is_spelled_as_the_specification_spells_it() {
         (ErrorCode::InvalidTarget, "invalid_target"),
         (ErrorCode::UnsupportedTokenType, "unsupported_token_type"),
         (ErrorCode::LoginRequired, "login_required"),
+        (ErrorCode::ConsentRequired, "consent_required"),
         (ErrorCode::InvalidToken, "invalid_token"),
         (ErrorCode::InsufficientScope, "insufficient_scope"),
         (ErrorCode::AccessDenied, "access_denied"),

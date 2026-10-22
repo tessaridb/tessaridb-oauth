@@ -33,7 +33,7 @@ pub(crate) const VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 const SESSION_COOKIE: &str = "__Host-tessari-session";
 
 /// GET `path` on the public router, carrying the session cookie `session` when given.
-async fn get(server: &Server, path: &str, session: Option<&str>) -> Answer {
+pub(crate) async fn get(server: &Server, path: &str, session: Option<&str>) -> Answer {
     let mut request =
         Request::get(path).extension(ConnectInfo(SocketAddr::from(([192, 0, 2, 1], 50_000))));
     request = match session {
@@ -72,7 +72,7 @@ pub(crate) async fn signed_in(server: &Server, email: &str) -> (String, String, 
 }
 
 /// Record `user`'s consent to the pending authorizations' scopes and resource for `portal`.
-async fn consented(server: &Server, user: &UserId) {
+pub(crate) async fn consented(server: &Server, user: &UserId) {
     server
         .storage
         .consents
@@ -92,12 +92,12 @@ async fn consented(server: &Server, user: &UserId) {
         .expect("granted");
 }
 
-fn resume_path(interaction: &str) -> String {
+pub(crate) fn resume_path(interaction: &str) -> String {
     format!("/acme/oauth2/authorize/resume?interaction={interaction}")
 }
 
 /// The query of the redirect `answered` sent the browser on.
-fn sent_to(answered: &Answer) -> url::Url {
+pub(crate) fn sent_to(answered: &Answer) -> url::Url {
     assert_eq!(answered.status, StatusCode::SEE_OTHER);
     url::Url::parse(header(answered, "location")).expect("an absolute location")
 }
