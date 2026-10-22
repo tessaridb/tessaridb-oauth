@@ -135,9 +135,11 @@ impl SessionService {
     pub async fn end(&self, tenant: &TenantId, secret: &SessionSecret) -> Result<bool> {
         let place = self.tenancy.place(tenant)?;
         let id = secret.digest();
-        let taken = retry::bounded(SIGNIN_WRITE_ATTEMPTS, retry::on_store_retry, || {
-            self.repository.take(&place, &id)
-        })
+        let taken = retry::take_once(
+            SIGNIN_WRITE_ATTEMPTS,
+            || self.repository.take(&place, &id),
+            || async { Ok(self.repository.find(&place, &id).await?.is_some()) },
+        )
         .await?;
         Ok(taken.is_some())
     }

@@ -161,22 +161,14 @@ impl InteractionService {
         now: Timestamp,
     ) -> Result<Option<AuthorizationRequest>> {
         let place = self.tenancy.place(tenant)?;
-        let taken = retry::bounded(INTERACTION_CLAIM_ATTEMPTS, retry::on_store_retry, || {
-            self.repository.take(&place, id)
-        })
-        .await;
-        let entity = match taken {
-            Ok(Some(entity)) => entity,
-            Ok(None) => return Ok(None),
-            // A delete that keeps meeting other requests' deletes of the same record: when it is gone, one of them
-            // took it.
-            Err(refusal @ Error::Store(tessari_oauth_infrastructure::Error::Refused { .. })) => {
-                return match self.repository.find(&place, id).await? {
-                    Some(_) => Err(refusal),
-                    None => Ok(None),
-                };
-            }
-            Err(failure) => return Err(failure),
+        let taken = retry::take_once(
+            INTERACTION_CLAIM_ATTEMPTS,
+            || self.repository.take(&place, id),
+            || async { Ok(self.repository.find(&place, id).await?.is_some()) },
+        )
+        .await?;
+        let Some(entity) = taken else {
+            return Ok(None);
         };
         if entity.claimed_at.is_none() || !current(&entity, tenant, INTERACTION_TTL_SECS, now)? {
             return Ok(None);

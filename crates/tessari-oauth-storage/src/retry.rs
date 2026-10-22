@@ -59,6 +59,33 @@ where
     }
 }
 
+/// Take a record by deleting it, once: `take` repeated on the store's `retry`, and when the attempts run out on a
+/// refusal, `still_there` decides. Simultaneous deletes of one record keep meeting each other, so the attempts can
+/// run out for every taker but the one that took it; a record that is gone was taken by another, and this taker
+/// took nothing. A record still there keeps the refusal.
+pub(crate) async fn take_once<T, Take, Taking, Look, Looking>(
+    attempts: u32,
+    take: Take,
+    still_there: Look,
+) -> Result<Option<T>>
+where
+    Take: FnMut() -> Taking,
+    Taking: Future<Output = Result<Option<T>>>,
+    Look: FnOnce() -> Looking,
+    Looking: Future<Output = Result<bool>>,
+{
+    match bounded(attempts, on_store_retry, take).await {
+        Err(refusal @ Error::Store(tessari_oauth_infrastructure::Error::Refused { .. })) => {
+            if still_there().await? {
+                Err(refusal)
+            } else {
+                Ok(None)
+            }
+        }
+        taken => taken,
+    }
+}
+
 /// The judgement for a write that only the store's `retry` should repeat.
 pub(crate) fn on_store_retry(failure: &Error) -> Again {
     match failure {
@@ -66,3 +93,7 @@ pub(crate) fn on_store_retry(failure: &Error) -> Again {
         _ => Again::No,
     }
 }
+
+#[cfg(test)]
+#[path = "retry_tests.rs"]
+mod tests;

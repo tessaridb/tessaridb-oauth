@@ -29,6 +29,7 @@ mod signer;
 mod signin_throttle;
 mod signins;
 mod subjects;
+mod takes_race;
 mod throttle;
 mod tls;
 mod users;

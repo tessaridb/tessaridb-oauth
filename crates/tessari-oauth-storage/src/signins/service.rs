@@ -209,9 +209,11 @@ impl SigninService {
     ) -> Result<Option<Signin>> {
         let place = self.tenancy.place(tenant)?;
         let id = binding.digest();
-        let taken = retry::bounded(SIGNIN_WRITE_ATTEMPTS, retry::on_store_retry, || {
-            self.repository.take(&place, &id)
-        })
+        let taken = retry::take_once(
+            SIGNIN_WRITE_ATTEMPTS,
+            || self.repository.take(&place, &id),
+            || async { Ok(self.repository.find(&place, &id).await?.is_some()) },
+        )
         .await?;
         match taken {
             Some(row) => held(row, now),
