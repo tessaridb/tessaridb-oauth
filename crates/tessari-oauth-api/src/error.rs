@@ -71,6 +71,9 @@ pub enum Error {
     /// which check failed.
     #[error("the console sign-in was refused")]
     ConsoleRefused,
+    /// A request that changes state came from another origin than the console's own.
+    #[error("cross-origin request")]
+    CrossOrigin,
 }
 
 impl Error {
@@ -93,7 +96,7 @@ impl Error {
             }
             Self::AlreadyEnrolled | Self::NothingPending => ErrorCategory::Conflict,
             Self::CodeRejected | Self::PasswordRejected(_) => ErrorCategory::Validation,
-            Self::ConsoleRefused => ErrorCategory::Forbidden,
+            Self::ConsoleRefused | Self::CrossOrigin => ErrorCategory::Forbidden,
         }
     }
 }
@@ -192,6 +195,11 @@ impl IntoResponse for Error {
                 StatusCode::FORBIDDEN,
                 "console_refused",
                 "this sign-in does not open the admin console; start again",
+            ),
+            (Self::CrossOrigin, _) => (
+                StatusCode::FORBIDDEN,
+                "cross_origin",
+                "the request did not come from the console",
             ),
             (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

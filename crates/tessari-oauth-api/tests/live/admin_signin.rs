@@ -25,6 +25,7 @@ pub(crate) fn console_state(server: &Server, console: &str) -> AdminState {
         clients: Arc::clone(&server.storage.clients),
         operators: Arc::clone(&server.storage.operators),
         audit: Arc::clone(&server.storage.audit),
+        sessions: Arc::clone(&server.storage.sessions),
         served: Arc::new(served),
         console: Arc::from(console),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),

@@ -2,19 +2,21 @@
 //! and the console keeps their session on its own origin.
 
 mod callback;
+mod session;
 mod signin;
 
 use std::sync::Arc;
 
 use axum::Router;
 use axum::http::HeaderValue;
-use axum::routing::get;
+use axum::routing::{get, post};
 use tessari_oauth_storage::admin::AdminService;
 use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::operators::OperatorService;
+use tessari_oauth_storage::sessions::SessionService;
 use tessari_oauth_types::Clock;
 
 use crate::{Error, Result};
@@ -37,6 +39,8 @@ pub struct AdminState {
     pub operators: Arc<OperatorService>,
     /// The audit trail.
     pub audit: Arc<AuditService>,
+    /// Issuer sessions: a console session ends with the one it came from.
+    pub sessions: Arc<SessionService>,
     /// The companies this node serves and their issuers.
     pub served: Arc<Served>,
     /// The console's base URL, as `TESSARIDB_OAUTH_ADMIN_URL` gives it.
@@ -82,6 +86,8 @@ pub fn admin_router(state: AdminState) -> Router {
     Router::new()
         .route("/admin/{company}/signin", get(signin::signin))
         .route("/admin/{company}/callback", get(callback::callback))
+        .route("/admin/{company}/api/me", get(session::me))
+        .route("/admin/{company}/signout", post(session::signout))
         .fallback(|| async { crate::Error::NotFound })
         .with_state(state)
         .layer(axum::middleware::map_response(|response| async {
