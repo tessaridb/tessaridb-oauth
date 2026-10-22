@@ -1,12 +1,15 @@
-//! `POST /{tenant}/account/api/totp/begin` and `POST /{tenant}/account/api/totp/confirm`: the signed-in user enrols an
-//! authenticator app.
+//! `POST /{tenant}/account/api/totp/begin`, `POST /{tenant}/account/api/totp/confirm` and
+//! `POST /{tenant}/account/api/totp/remove`: the signed-in user enrols an authenticator app, or turns it off.
 //!
 //! Both need a session that may change the account's factors (a recent sign-in at the account's level). Beginning
 //! draws a secret from the system random source, keeps it sealed for this session for ten minutes, and answers it
 //! once, in base32 and as the Key URI an app scans; an account that already has an app is refused
 //! (`already_enrolled`). Confirming takes the pending secret once: a code from it enrols the app, spends that code's
 //! step, signs out the user's other sessions, revokes every refresh family and is recorded; a wrong code ends the
-//! attempt, so a code is never guessed against one secret twice. The secret is never logged or recorded. Bodies are
+//! attempt, so a code is never guessed against one secret twice. The secret is never logged or recorded. Turning
+//! the app off needs the same recent sign-in (with an app held, that means one that used it), takes the unspent
+//! recovery codes with it and ends the same things; with no app it answers `{"removed": false}` and changes
+//! nothing. Bodies are
 //! JSON and the session cookie is `SameSite=Lax`, so a cross-site page can do neither. No answer may be stored by a
 //! cache.
 
@@ -118,4 +121,48 @@ pub(super) async fn confirm(
         access_tokens_end_by,
     };
     Ok((StatusCode::OK, Json(enrolled)).into_response())
+}
+
+/// What turning the app off ended with it.
+#[derive(Serialize)]
+struct Removed {
+    removed: bool,
+    sessions: usize,
+    families: usize,
+    access_tokens_end_by: u64,
+}
+
+#[derive(Serialize)]
+struct NotRemoved {
+    removed: bool,
+}
+
+pub(super) async fn remove(
+    State(state): State<PublicState>,
+    Path(tenant): Path<String>,
+    headers: HeaderMap,
+    read: std::result::Result<Json<Nothing>, JsonRejection>,
+) -> Result<Response> {
+    let (tenant, _) = state.tenant(&tenant)?;
+    body(read)?;
+    let now = (state.clock)();
+    let asking = signed_in(&state, &tenant, &headers, now).await?;
+    may_change(&state, &tenant, &asking, now).await?;
+    if !state
+        .factors
+        .remove_totp(&tenant, &asking.user)
+        .await
+        .map_err(Error::Store)?
+    {
+        return Ok((StatusCode::OK, Json(NotRemoved { removed: false })).into_response());
+    }
+    let (sessions, families, access_tokens_end_by) =
+        changed(&state, &tenant, &asking, "totp_removed", now).await?;
+    let removed = Removed {
+        removed: true,
+        sessions,
+        families,
+        access_tokens_end_by,
+    };
+    Ok((StatusCode::OK, Json(removed)).into_response())
 }

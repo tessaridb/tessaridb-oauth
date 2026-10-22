@@ -148,6 +148,10 @@ pub fn public_router(state: PublicState) -> Router {
             post(account_totp::confirm),
         )
         .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/totp/remove"),
+            post(account_totp::remove),
+        )
+        .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/password"),
             post(account_password::change),
         )
