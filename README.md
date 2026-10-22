@@ -24,9 +24,9 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 > The binary serves each tenant's server metadata (RFC 8414, also served as the OpenID Provider configuration) and key
 > set (RFC 7517) over TLS, its authorization, pushed authorization request, token, revocation and UserInfo endpoints,
 > the sign-in and consent pages, ID tokens, and the account API a signed-in user reads and manages their own sessions
-> and grants with, it rotates the tenants' signing keys and tells clients when a session ends. Accounts and their
-> factors are not yet created or changed through any served surface; the account portal page and the admin panel come
-> next. No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
+> and grants with, it rotates the tenants' signing keys and tells clients when a session ends. Operators open,
+> enrol, disable and enable accounts, grant operator roles, set the two-factor policy, read the audit trail and make
+> companies through the admin console's API; the account portal page and the admin panel's pages come next. No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
 > page describes what the project is for, not a working system.
 
 ## What it is for
@@ -64,9 +64,9 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail |
-| Built, not served yet | creating accounts and enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
-| Planned | the account portal page, the admin panel, a two-factor policy per tenant, companies with their own administrators, more regions |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, operators, audit trail, companies) |
+| Built, not served yet | enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
+| Planned | the account portal page, the admin panel's pages, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
 ## How it behaves
