@@ -44,6 +44,7 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         users: Arc::clone(&storage.users),
         factors: Arc::clone(&storage.factors),
         signins: Arc::clone(&storage.signins),
+        passkeys: Arc::clone(&storage.passkeys),
         sessions: Arc::clone(&storage.sessions),
         passwords: passwords(),
         read_limit,

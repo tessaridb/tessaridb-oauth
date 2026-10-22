@@ -176,7 +176,7 @@ first, for development only.
 
 | Variable (`TESSARIDB_OAUTH_…`) | Meaning | Default |
 |---|---|---|
-| `PUBLIC_URL` | the https base URL; tenant `acme`'s issuer is `<PUBLIC_URL>/acme` | required |
+| `PUBLIC_URL` | the https base URL; tenant `acme`'s issuer is `<PUBLIC_URL>/acme`; its host is the passkey relying party, so changing the host retires every enrolled passkey | required |
 | `PUBLIC_ADDRESS` | where the public listener binds | `0.0.0.0:8443` |
 | `TLS_CERT`, `TLS_KEY` | the listener's certificate chain and private key, PEM | required |
 | `KEK` | the 32-byte key-encryption key file, mode 600 or 400; signing keys are stored sealed under it | required |

@@ -10,11 +10,13 @@
 mod begin;
 mod factors;
 mod identify;
+mod passkey;
 mod password;
 
 pub(super) use begin::begin;
 pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
+pub(super) use passkey::passkey_options;
 pub(super) use password::password;
 
 use axum::Json;
