@@ -12,6 +12,7 @@
 mod audit;
 mod clients;
 mod codes;
+mod companies;
 mod consents;
 mod factor_removal;
 mod factors;

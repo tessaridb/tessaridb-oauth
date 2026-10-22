@@ -3,7 +3,8 @@
 //! A tenant's identity data stays in its home region, so the region is the namespace and the tenant the database.
 //! Tenant ids hold lowercase letters, digits and hyphens and never an underscore, so mapping `-` to `_` is
 //! one-to-one: two tenants can never share a database name. The region's request counters live beside them in a
-//! database named `throttle`, which no tenant's `t_` name can be.
+//! database named `throttle`, and its directory of companies in one named `directory`; no tenant's `t_` name can be
+//! either.
 
 use tessari_oauth_infrastructure::tessaridb::Place;
 use tessari_oauth_types::TenantId;
@@ -15,6 +16,7 @@ use crate::Result;
 pub struct Tenancy {
     namespace: String,
     throttle: Place,
+    directory: Place,
 }
 
 impl Tenancy {
@@ -26,15 +28,22 @@ impl Tenancy {
     pub fn for_region(region: &str) -> Result<Self> {
         let namespace = format!("oauth_{region}");
         let throttle = Place::new(namespace.as_str(), "throttle")?;
+        let directory = Place::new(namespace.as_str(), "directory")?;
         Ok(Self {
             namespace,
             throttle,
+            directory,
         })
     }
 
     /// Where the region's request counters live; built once, because every counted request needs it.
     pub(crate) const fn throttle(&self) -> &Place {
         &self.throttle
+    }
+
+    /// Where the region's directory of companies lives.
+    pub(crate) const fn directory(&self) -> &Place {
+        &self.directory
     }
 
     /// Where `tenant`'s records live.

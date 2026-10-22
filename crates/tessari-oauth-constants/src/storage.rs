@@ -81,3 +81,9 @@ pub const LOGOUT_DELIVERY_INTERVAL_SECS: u64 = 5;
 /// The most one delivery run may take, in seconds: shorter than the 30 s a claim holds its delivery, so a run that is
 /// abandoned leaves its claims to lapse rather than racing the next run for them.
 pub const LOGOUT_DELIVERY_RUN_TIMEOUT_SECS: u64 = 25;
+
+/// The longest company name, in characters.
+pub const COMPANY_NAME_MAX_CHARS: usize = 100;
+
+/// The most companies one directory page holds.
+pub const COMPANY_PAGE_MAX: u32 = 100;

@@ -8,6 +8,7 @@ use crate::Tenancy;
 use crate::audit::{AuditService, TessaridbAuditRepository};
 use crate::clients::{ClientService, TessaridbClientRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
+use crate::companies::{CompanyService, TessaridbCompanyRepository};
 use crate::consents::{ConsentService, TessaridbConsentRepository};
 use crate::factors::{FactorService, TessaridbFactorRepository};
 use crate::interactions::{InteractionService, TessaridbInteractionRepository};
@@ -27,6 +28,8 @@ use crate::users::{TessaridbUserRepository, UserService};
 /// The services the server reaches its records through.
 #[derive(Clone)]
 pub struct Storage {
+    /// The region's directory of companies.
+    pub companies: Arc<CompanyService>,
     /// Tenant provisioning.
     pub tenants: Arc<TenantService>,
     /// Client registrations.
@@ -69,6 +72,7 @@ impl Storage {
     /// Assemble the services over `database`, for the region `tenancy` names.
     #[must_use]
     pub fn new(database: &Database, tenancy: &Tenancy) -> Self {
+        let company_repository = Arc::new(TessaridbCompanyRepository::new(database.clone()));
         let tenant_repository = Arc::new(TessaridbTenantRepository::new(database.clone()));
         let client_repository = Arc::new(TessaridbClientRepository::new(database.clone()));
         let code_repository = Arc::new(TessaridbCodeRepository::new(database.clone()));
@@ -92,6 +96,7 @@ impl Storage {
         let logout_repository = Arc::new(TessaridbLogoutRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
         Self {
+            companies: Arc::new(CompanyService::new(company_repository, tenancy.clone())),
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
             clients: Arc::new(ClientService::new(client_repository, tenancy.clone())),
             codes: Arc::new(CodeService::new(code_repository, tenancy.clone())),

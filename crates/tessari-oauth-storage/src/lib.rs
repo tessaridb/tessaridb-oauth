@@ -4,6 +4,7 @@ mod answers;
 pub mod audit;
 pub mod clients;
 pub mod codes;
+pub mod companies;
 pub mod consents;
 mod error;
 pub mod factors;
