@@ -18,6 +18,7 @@ mod params;
 pub mod password;
 pub mod refresh;
 mod refusal;
+pub mod signin;
 pub mod subject;
 pub mod token;
 pub mod totp;
