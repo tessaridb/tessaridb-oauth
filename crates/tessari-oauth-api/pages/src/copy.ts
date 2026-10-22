@@ -90,7 +90,7 @@ export const ACCOUNT_TEXT = {
   loading: "Loading your account.",
   missing: "This page could not find its account. Check the address and try again.",
   unreadable: "Your account could not be loaded. Try again in a moment.",
-  signedOut: "You're not signed in here. Sign in to an application that uses this account, then come back.",
+  signedOut: "You're not signed in here. Sign in to see and manage your account.",
   verified: "Verified",
   unverified: "Not verified",
   set: "Set",
@@ -110,8 +110,7 @@ export const ACCOUNT_TEXT = {
     `Removed ${client}'s access. Anything it already holds stops working by ${when(endBy)}.`,
   notRevoked: "That access was already removed.",
   reauthenticate:
-    "Changing how you sign in needs a sign-in from the last ten minutes. " +
-    "Sign in again through an application, then come back.",
+    "Changing how you sign in needs a sign-in from the last ten minutes. Sign in again, then try once more.",
   passwordHintAlone: "At least 15 characters. A few unrelated words work well.",
   passwordHintWithApp: "At least 8 characters, since you also use an authenticator app.",
   passwordRequired: "Enter a new password.",

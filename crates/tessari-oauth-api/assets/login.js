@@ -106,6 +106,14 @@
     const tenant = pathname.slice(0, -suffix.length);
     return tenant.length > 1 ? `${tenant}/login/api` : null;
   }
+  function beginBody(search) {
+    const query = new URLSearchParams(search);
+    const interaction = query.get("interaction");
+    if (interaction !== null && interaction !== "") {
+      return { interaction };
+    }
+    return query.get("return") === "account" ? { account: true } : null;
+  }
   function readNext(answer) {
     const next = field(answer, "next");
     return STEPS.find((step2) => step2 === next) ?? null;
@@ -297,8 +305,8 @@
   }
   async function main() {
     const base = apiBase(location.pathname, "login");
-    const interaction = new URLSearchParams(location.search).get("interaction");
-    if (base === null || interaction === null || interaction === "") {
+    const asked = beginBody(location.search);
+    if (base === null || asked === null) {
       say(TEXT.missing);
       return;
     }
@@ -347,7 +355,7 @@
       passkeyOption.hidden = true;
     }
     say(TEXT.starting);
-    const begun = await call("POST", `${base}/begin`, { interaction });
+    const begun = await call("POST", `${base}/begin`, asked);
     settle(begun, null);
   }
   void main();

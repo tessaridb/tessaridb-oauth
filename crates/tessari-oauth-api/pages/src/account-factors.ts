@@ -12,10 +12,16 @@ export interface Followups {
   signedOut: () => void;
 }
 
+/** Offer the sign-in that a change needing a recent one asks for. */
+export function offerSignIn(): void {
+  element("sign-in", HTMLParagraphElement).hidden = false;
+}
+
 /** The page's words for a refused change, or null when the refusal is the field's own (shown beside it). */
 function refusedText(why: ChangeRefusal, answer: Answer): string | null {
   switch (why) {
     case "reauthenticate":
+      offerSignIn();
       return ACCOUNT_TEXT.reauthenticate;
     case "too-short":
     case "too-long":

@@ -5,6 +5,7 @@ import { test } from "node:test";
 
 import {
   apiBase,
+  beginBody,
   fromBase64url,
   readCompleted,
   readDelta,
@@ -104,4 +105,13 @@ test("passkey options are read into what the browser asks for", () => {
   assert.equal(readPasskeyOptions({ challenge: "AAEC", rp_id: "x", user_verification: "never", timeout_ms: 1 }), null);
   assert.equal(readPasskeyOptions({ challenge: "*", rp_id: "x", user_verification: "preferred", timeout_ms: 1 }), null);
   assert.equal(readPasskeyOptions({ challenge: "AAEC", rp_id: "x", user_verification: "preferred" }), null);
+});
+
+test("a sign-in begins for the authorization in the address, or for the account page", () => {
+  assert.deepEqual(beginBody("?interaction=abc"), { interaction: "abc" });
+  assert.deepEqual(beginBody("?return=account"), { account: true });
+  assert.deepEqual(beginBody("?interaction=abc&return=account"), { interaction: "abc" }, "an authorization first");
+  assert.equal(beginBody("?interaction="), null);
+  assert.equal(beginBody("?return=elsewhere"), null, "no other return is followed");
+  assert.equal(beginBody(""), null);
 });

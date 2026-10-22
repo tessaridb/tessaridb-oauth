@@ -620,3 +620,25 @@ h3 {
   border-radius: var(--radius-sm);
   box-shadow: var(--focus-ring);
 }
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 var(--s-5);
+  border-radius: var(--button-radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.button-link:active {
+  transform: scale(0.97);
+}
+
+.button-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

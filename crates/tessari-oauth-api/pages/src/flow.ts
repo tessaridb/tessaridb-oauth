@@ -55,6 +55,16 @@ export function apiBase(pathname: string, page: "login" | "consent"): string | n
   return tenant.length > 1 ? `${tenant}/login/api` : null;
 }
 
+/** What a sign-in begins for, from the page's query `search`: the authorization it names, or the account page. */
+export function beginBody(search: string): { interaction: string } | { account: true } | null {
+  const query = new URLSearchParams(search);
+  const interaction = query.get("interaction");
+  if (interaction !== null && interaction !== "") {
+    return { interaction };
+  }
+  return query.get("return") === "account" ? { account: true } : null;
+}
+
 /** The step a step's answer names. */
 export function readNext(answer: unknown): Step | null {
   const next = field(answer, "next");

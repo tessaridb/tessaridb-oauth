@@ -1,5 +1,6 @@
-// The sign-in page. It begins a sign-in for the authorization named in its address, then shows whichever step the
-// server says comes next, until the server says the sign-in is complete and where the authorization continues.
+// The sign-in page. It begins a sign-in for the authorization named in its address, or for the account page, then
+// shows whichever step the server says comes next, until the server says the sign-in is complete and where it
+// continues.
 // Everything the user typed stays in place when a step is refused.
 
 import { TEXT, refusalText } from "./copy.ts";
@@ -7,6 +8,7 @@ import { type Answer, call, element, fieldError, say } from "./dom.ts";
 import {
   type Step,
   apiBase,
+  beginBody,
   readCompleted,
   readNext,
   readPasskeyOptions,
@@ -151,8 +153,8 @@ async function passkey(base: string): Promise<void> {
 
 async function main(): Promise<void> {
   const base = apiBase(location.pathname, "login");
-  const interaction = new URLSearchParams(location.search).get("interaction");
-  if (base === null || interaction === null || interaction === "") {
+  const asked = beginBody(location.search);
+  if (base === null || asked === null) {
     say(TEXT.missing);
     return;
   }
@@ -201,7 +203,7 @@ async function main(): Promise<void> {
     passkeyOption.hidden = true;
   }
   say(TEXT.starting);
-  const begun = await call("POST", `${base}/begin`, { interaction });
+  const begun = await call("POST", `${base}/begin`, asked);
   settle(begun, null);
 }
 

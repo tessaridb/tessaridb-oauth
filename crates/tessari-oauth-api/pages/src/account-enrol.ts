@@ -2,7 +2,7 @@
 // once and confirmed by a code from it, and passkeys, created by the browser against a challenge issued to this
 // account and removed one at a time. Each needs a recent sign-in, and the server refuses taking away the last way in.
 
-import type { Followups } from "./account-factors.ts";
+import { type Followups, offerSignIn } from "./account-factors.ts";
 import { ACCOUNT_TEXT, refusalText } from "./copy.ts";
 import { type Answer, call, element, fieldError, say } from "./dom.ts";
 import { type EnrolRefusal, enrolRefusal, readAppSecret, readRegistration } from "./enrolment-read.ts";
@@ -16,6 +16,7 @@ function refused(answer: Answer, followups: Followups): void {
       followups.signedOut();
       break;
     case "reauthenticate":
+      offerSignIn();
       say(ACCOUNT_TEXT.reauthenticate);
       break;
     case "already-enrolled":

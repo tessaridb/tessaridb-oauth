@@ -32,6 +32,7 @@ function signedOutBy(answer: Answer): boolean {
 /** Show the signed-out state with `text`. */
 function signedOut(text: string): void {
   account.hidden = true;
+  element("sign-in", HTMLParagraphElement).hidden = false;
   say(text);
   element("title", HTMLHeadingElement).focus();
 }
