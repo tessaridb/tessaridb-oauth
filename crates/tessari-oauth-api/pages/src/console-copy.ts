@@ -21,3 +21,27 @@ export function refusalText(refusal: ConsoleRefusal, what: string): string {
       return "The server did not answer. Try again.";
   }
 }
+
+/** The words for a change the server refused with `code`: what happened and what to do next. */
+export function changeRefusalText(code: string): string {
+  switch (code) {
+    case "email_taken":
+      return "An account in this company already signs in with this address. Look it up instead.";
+    case "already_enrolled":
+      return "This account has already set a password, so it needs no enrolment code.";
+    case "account_disabled":
+      return "This account is disabled. Enable it before issuing an enrolment code.";
+    case "changed_meanwhile":
+      return "Someone changed this while you were looking. The view now shows it as it is; check it and try again.";
+    case "reason_required":
+      return "Say why, in 1 to 500 characters.";
+    case "idempotency_key_reused":
+      return "This form was already used for a different change. Reload the view and try again.";
+    case "change_in_progress":
+      return "This change is still being made. Wait a moment, then reload the view.";
+    case "cross_origin":
+      return "The request did not come from this console. Reload the console and try again.";
+    default:
+      return "The server refused this change. Reload the view and try again.";
+  }
+}

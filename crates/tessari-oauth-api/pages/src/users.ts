@@ -6,7 +6,11 @@ import { readRefusal } from "./console-read.ts";
 import { refusalText } from "./console-copy.ts";
 import { type Screen, heading, labelled, link, make, show } from "./console-dom.ts";
 import { type Answer, call, say } from "./dom.ts";
+import { actionsFor, openForm } from "./users-actions.ts";
 import { type User, readUser, readUsersPage, usersPath } from "./users-read.ts";
+
+/** What the next account view says once drawn: the outcome of the change that led to it. */
+let pending = "";
 
 /** Draw `answer`'s refusal on `screen`, or hand over to signing in when the session has ended. */
 export function refusedOn(screen: Screen, title: string, answer: Answer, what: string): void {
@@ -118,12 +122,18 @@ export async function usersView(screen: Screen, email: string | null, after: str
   if (paging.childElementCount > 0) {
     parts.push(paging);
   }
+  parts.push(
+    openForm(screen, (user) => {
+      pending = "Account opened.";
+      location.hash = `#/users/${encodeURIComponent(user)}`;
+    }),
+  );
   show(screen.view, ...parts);
   say("");
 }
 
-/** One account by its id. */
-export async function userView(screen: Screen, id: string): Promise<void> {
+/** One account by its id, with `message` said once it is drawn. */
+export async function userView(screen: Screen, id: string, message = ""): Promise<void> {
   say("Loading the account.");
   const answer = await call("GET", `api/users/${encodeURIComponent(id)}`);
   if (!screen.live()) {
@@ -138,18 +148,27 @@ export async function userView(screen: Screen, id: string): Promise<void> {
     unreadable(screen, "Account");
     return;
   }
+  const address = make("code", "", user.email);
   const facts = make(
     "dl",
     "facts",
     make("dt", "", "Account"),
     make("dd", "", make("code", "", user.user)),
     make("dt", "", "Address"),
-    make("dd", "", make("code", "", user.email)),
+    make("dd", "", address),
     make("dt", "", "Verified"),
     make("dd", "", user.emailVerified ? "Yes" : "No"),
     make("dt", "", "State"),
     make("dd", "", statusBadge(user)),
   );
-  show(screen.view, heading("Account"), facts, make("p", "paging", link("#/users", "Back to users")));
-  say("");
+  const redraw = (said: string): void => void userView(screen, id, said);
+  show(
+    screen.view,
+    heading("Account"),
+    facts,
+    actionsFor(screen, user, address, redraw),
+    make("p", "paging", link("#/users", "Back to users")),
+  );
+  say(message !== "" ? message : pending);
+  pending = "";
 }

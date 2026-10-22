@@ -19,13 +19,19 @@ export interface Answer {
   retryAfter: string | null;
 }
 
-/** Call `path` with `method` and, when given, `body` as JSON; a network failure answers as the server failing. */
-export async function call(method: "GET" | "POST", path: string, body?: unknown): Promise<Answer> {
+/** Call `path` with `method`, `body` as JSON and `extra` headers, when given; a network failure answers as the
+ * server failing. */
+export async function call(
+  method: "GET" | "POST" | "PUT",
+  path: string,
+  body?: unknown,
+  extra?: Record<string, string>,
+): Promise<Answer> {
   const init: RequestInit = {
     method,
     credentials: "same-origin",
     cache: "no-store",
-    headers: { accept: "application/json", "content-type": "application/json" },
+    headers: { accept: "application/json", "content-type": "application/json", ...extra },
   };
   if (body !== undefined) {
     init.body = JSON.stringify(body);

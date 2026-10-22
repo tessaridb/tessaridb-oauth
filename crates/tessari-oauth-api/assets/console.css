@@ -227,6 +227,18 @@
   color: var(--text-muted);
 }
 
+.change-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  max-width: 34rem;
+  margin-block-start: var(--s-6);
+}
+
+.change-form h2 {
+  margin: 0;
+}
+
 .console-status {
   position: fixed;
   inset-block-end: var(--s-4);

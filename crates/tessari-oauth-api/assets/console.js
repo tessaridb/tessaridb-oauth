@@ -95,6 +95,12 @@
     made.href = href;
     return made;
   }
+  function button(text, className, then) {
+    const made = make("button", className, text);
+    made.type = "button";
+    made.addEventListener("click", then);
+    return made;
+  }
   function heading(text) {
     const made = make("h1", "view-title", text);
     made.tabIndex = -1;
@@ -119,12 +125,12 @@
     }
     return found;
   }
-  async function call(method, path, body) {
+  async function call(method, path, body, extra) {
     const init = {
       method,
       credentials: "same-origin",
       cache: "no-store",
-      headers: { accept: "application/json", "content-type": "application/json" }
+      headers: { accept: "application/json", "content-type": "application/json", ...extra }
     };
     if (body !== void 0) {
       init.body = JSON.stringify(body);
@@ -162,6 +168,28 @@
         return `The server refused this (${refusal.code}).`;
       case "failed":
         return "The server did not answer. Try again.";
+    }
+  }
+  function changeRefusalText(code) {
+    switch (code) {
+      case "email_taken":
+        return "An account in this company already signs in with this address. Look it up instead.";
+      case "already_enrolled":
+        return "This account has already set a password, so it needs no enrolment code.";
+      case "account_disabled":
+        return "This account is disabled. Enable it before issuing an enrolment code.";
+      case "changed_meanwhile":
+        return "Someone changed this while you were looking. The view now shows it as it is; check it and try again.";
+      case "reason_required":
+        return "Say why, in 1 to 500 characters.";
+      case "idempotency_key_reused":
+        return "This form was already used for a different change. Reload the view and try again.";
+      case "change_in_progress":
+        return "This change is still being made. Wait a moment, then reload the view.";
+      case "cross_origin":
+        return "The request did not come from this console. Reload the console and try again.";
+      default:
+        return "The server refused this change. Reload the view and try again.";
     }
   }
 
@@ -203,7 +231,270 @@
     return { users, next: typeof next === "string" ? next : null };
   }
 
+  // src/users-change.ts
+  var REASON_MAX_CHARS = 500;
+  function reasonOf(typed) {
+    const reason = typed.trim();
+    const length = [...reason].length;
+    return length >= 1 && length <= REASON_MAX_CHARS ? reason : null;
+  }
+  function count(body, key) {
+    const value = field(body, key);
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  function readOpened(body) {
+    const user = field(body, "user");
+    const email = field(body, "email");
+    return typeof user === "string" && user !== "" && typeof email === "string" ? { user, email } : null;
+  }
+  function readDisabled(body) {
+    const sessions = count(body, "sessions");
+    const families = count(body, "families");
+    const accessTokensEndBy = count(body, "access_tokens_end_by");
+    if (sessions === null || families === null || accessTokensEndBy === null) {
+      return null;
+    }
+    return { sessions, families, accessTokensEndBy };
+  }
+  function readRevealed(body) {
+    const email = field(body, "email");
+    return typeof email === "string" && email !== "" ? { email } : null;
+  }
+  function readIssued(body) {
+    const code = field(body, "code");
+    const validSecs = count(body, "valid_secs");
+    if (field(body, "shown_once") !== true || typeof code !== "string" || code === "" || validSecs === null) {
+      return null;
+    }
+    return { code, validHours: Math.floor(validSecs / 3600) };
+  }
+  function keyring(fresh) {
+    let last = null;
+    return (body) => {
+      const sent = JSON.stringify(body);
+      if (last === null || last.sent !== sent) {
+        last = { sent, key: fresh() };
+      }
+      return last.key;
+    };
+  }
+
+  // src/users-actions.ts
+  function keys() {
+    return keyring(() => crypto.randomUUID());
+  }
+  function change(path, keyFor, body) {
+    return call("POST", path, body, { "idempotency-key": keyFor(body) });
+  }
+  function refusedText(screen, answer) {
+    const refusal = readRefusal(answer.status, answer.body, answer.retryAfter);
+    if (refusal.kind === "signed_out") {
+      screen.signedOut();
+      return null;
+    }
+    if (refusal.kind === "refused") {
+      return changeRefusalText(refusal.code);
+    }
+    const code = field(answer.body, "code");
+    return refusal.kind === "not_found" && code === "user_not_found" ? "This account is no longer in this company." : refusalText(refusal, "This account");
+  }
+  function reasonField(id) {
+    const input = make("input", "");
+    input.type = "text";
+    input.required = true;
+    input.maxLength = 500;
+    input.autocomplete = "off";
+    return { input, row: labelled(id, "Reason (recorded with the change)", input) };
+  }
+  function reasonIn(input, notice2) {
+    const reason = reasonOf(input.value);
+    if (reason === null) {
+      notice2.textContent = changeRefusalText("reason_required");
+      notice2.hidden = false;
+      input.setAttribute("aria-invalid", "true");
+      input.focus();
+      return null;
+    }
+    input.removeAttribute("aria-invalid");
+    return reason;
+  }
+  function notice() {
+    const made = make("p", "notice");
+    made.setAttribute("role", "alert");
+    made.hidden = true;
+    return made;
+  }
+  function openForm(screen, opened) {
+    const keyFor = keys();
+    const email = make("input", "");
+    email.type = "email";
+    email.required = true;
+    email.autocomplete = "off";
+    const reason = reasonField("open-reason");
+    const said = notice();
+    const submit = make("button", "primary", "Open account");
+    submit.type = "submit";
+    const form = make(
+      "form",
+      "change-form",
+      make("h2", "", "Open an account"),
+      labelled("open-email", "Sign-in address", email),
+      reason.row,
+      said,
+      submit
+    );
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      submit.disabled = true;
+      void change("api/users", keyFor, { email: email.value.trim(), reason: why }).then((answer) => {
+        submit.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        const made = answer.ok ? readOpened(answer.body) : null;
+        if (made !== null) {
+          opened(made.user);
+          return;
+        }
+        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer);
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    return form;
+  }
+  function actionsFor(screen, user, address, redraw) {
+    const base = `api/users/${encodeURIComponent(user.user)}`;
+    const reason = reasonField("action-reason");
+    const said = notice();
+    const out = make("div", "");
+    const ring = { reveal: keys(), enrol: keys(), move: keys() };
+    const refusedHere = (answer) => {
+      const text = refusedText(screen, answer);
+      if (text !== null) {
+        said.textContent = text;
+        said.hidden = false;
+      }
+    };
+    const reveal = button("Show the whole address", "secondary", () => {
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      void change(`${base}/email/reveal`, ring.reveal, { reason: why }).then((answer) => {
+        const shown = answer.ok ? readRevealed(answer.body) : null;
+        if (!screen.live()) {
+          return;
+        }
+        if (shown === null) {
+          refusedHere(answer);
+          return;
+        }
+        ring.reveal = keys();
+        address.textContent = shown.email;
+        say("The whole address is shown, and the showing is recorded with your reason.");
+      });
+    });
+    const enrol = button("Issue an enrolment code", "secondary", () => {
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      void change(`${base}/enrolment`, ring.enrol, { reason: why }).then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        const issued = answer.ok ? readIssued(answer.body) : null;
+        if (issued === null) {
+          refusedHere(answer);
+          return;
+        }
+        ring.enrol = keys();
+        out.replaceChildren(
+          make(
+            "div",
+            "panel",
+            make("p", "", "Enrolment code, shown this once:"),
+            make("p", "secret", make("code", "", issued.code)),
+            make(
+              "p",
+              "hint",
+              `It lets the person set a password within ${issued.validHours} hours. Give it to them over a channel you trust; a new code replaces this one.`
+            )
+          )
+        );
+        say("Enrolment code issued.");
+      });
+    });
+    const move = (path) => {
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      void change(`${base}/${path}`, ring.move, { reason: why }).then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        if (!answer.ok) {
+          refusedHere(answer);
+          return;
+        }
+        if (path === "enable") {
+          redraw("Account enabled.");
+          return;
+        }
+        const ended = readDisabled(answer.body);
+        const until = ended === null ? null : new Date(ended.accessTokensEndBy * 1e3).toLocaleTimeString();
+        redraw(
+          ended === null || until === null ? "Account disabled." : `Account disabled: ${ended.sessions} sessions and ${ended.families} refresh families ended; access tokens it already holds stop working by ${until}.`
+        );
+      });
+    };
+    const confirmPanel = make(
+      "div",
+      "confirm",
+      make(
+        "p",
+        "",
+        "Disable ",
+        make("code", "", user.email),
+        "? Its sessions end, its refresh tokens stop working, and every application it signed in to is told."
+      )
+    );
+    confirmPanel.hidden = true;
+    const stay = button("Keep it active", "secondary", () => {
+      confirmPanel.hidden = true;
+      disable.focus();
+    });
+    confirmPanel.append(
+      make(
+        "div",
+        "actions",
+        button("Disable the account", "danger", () => move("disable")),
+        stay
+      )
+    );
+    const disable = button("Disable account", "secondary", () => {
+      if (reasonIn(reason.input, said) === null) {
+        return;
+      }
+      confirmPanel.hidden = false;
+      stay.focus();
+    });
+    const enable = button("Enable account", "secondary", () => move("enable"));
+    const buttons = make("div", "actions", reveal, enrol, user.status === "active" ? disable : enable);
+    const title = make("h2", "", "Change this account");
+    return make("section", "change-form", title, reason.row, said, buttons, confirmPanel, out);
+  }
+
   // src/users.ts
+  var pending = "";
   function refusedOn(screen, title, answer, what) {
     const refusal = readRefusal(answer.status, answer.body, answer.retryAfter);
     if (refusal.kind === "signed_out") {
@@ -303,10 +594,16 @@
     if (paging.childElementCount > 0) {
       parts.push(paging);
     }
+    parts.push(
+      openForm(screen, (user) => {
+        pending = "Account opened.";
+        location.hash = `#/users/${encodeURIComponent(user)}`;
+      })
+    );
     show(screen.view, ...parts);
     say("");
   }
-  async function userView(screen, id) {
+  async function userView(screen, id, message = "") {
     say("Loading the account.");
     const answer = await call("GET", `api/users/${encodeURIComponent(id)}`);
     if (!screen.live()) {
@@ -321,20 +618,29 @@
       unreadable(screen, "Account");
       return;
     }
+    const address = make("code", "", user.email);
     const facts = make(
       "dl",
       "facts",
       make("dt", "", "Account"),
       make("dd", "", make("code", "", user.user)),
       make("dt", "", "Address"),
-      make("dd", "", make("code", "", user.email)),
+      make("dd", "", address),
       make("dt", "", "Verified"),
       make("dd", "", user.emailVerified ? "Yes" : "No"),
       make("dt", "", "State"),
       make("dd", "", statusBadge(user))
     );
-    show(screen.view, heading("Account"), facts, make("p", "paging", link("#/users", "Back to users")));
-    say("");
+    const redraw = (said) => void userView(screen, id, said);
+    show(
+      screen.view,
+      heading("Account"),
+      facts,
+      actionsFor(screen, user, address, redraw),
+      make("p", "paging", link("#/users", "Back to users"))
+    );
+    say(message !== "" ? message : pending);
+    pending = "";
   }
 
   // src/console.ts
