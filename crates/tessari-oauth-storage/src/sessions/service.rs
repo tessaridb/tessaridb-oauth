@@ -3,13 +3,15 @@
 //!
 //! The record's id is the digest of the session cookie's value, so a copy of the table opens nothing. A session is
 //! not found once it has gone a working day without a request or a week since its sign-in, by this server's clock as
-//! well as the store's expiry. What the sign-in established is derived again from the methods it verified, so a
+//! well as the store's expiry. Its public id is drawn apart, so naming a session to a client says nothing about the
+//! cookie that holds it. What the sign-in established is derived again from the methods it verified, so a
 //! session never states a level its methods do not reach.
 
 use std::sync::Arc;
 
 use tessari_oauth_constants::{SESSION_ABSOLUTE_SECS, SESSION_IDLE_SECS, SIGNIN_WRITE_ATTEMPTS};
 use tessari_oauth_core::authentication::{Method, assess};
+use tessari_oauth_infrastructure::custody::token_id;
 use tessari_oauth_types::{SessionSecret, TenantId, Timestamp, UserId};
 
 use super::repository::SessionRepository;
@@ -73,6 +75,7 @@ impl SessionService {
         let signed_in = unix_secs(now)?;
         let session = SessionEntity {
             user_id: user.as_str().to_owned(),
+            sid: token_id()?,
             methods: methods
                 .iter()
                 .map(|method| method.name().to_owned())
@@ -122,6 +125,7 @@ impl SessionService {
         }
         Ok(Some(Session {
             user,
+            sid: kept.sid,
             auth_time: Timestamp::from_unix_secs(auth_time),
             assessment,
         }))

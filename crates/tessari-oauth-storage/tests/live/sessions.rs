@@ -127,3 +127,43 @@ async fn a_session_lapses_after_a_working_day_unseen_and_a_week_in_all() {
         "a working day unseen"
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_session_has_a_public_id_of_its_own_that_names_no_cookie() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    opened(&storage).await;
+    storage
+        .sessions
+        .create(
+            &tenant("acme"),
+            &secret("cookie-2"),
+            &UserId::parse("user-1").expect("a user id"),
+            &METHODS,
+            at(0),
+        )
+        .await
+        .expect("opened");
+    let find = |value: &'static str, offset: u64| {
+        let sessions = storage.sessions.clone();
+        async move {
+            sessions
+                .find(&tenant("acme"), &secret(value), at(offset))
+                .await
+                .expect("read")
+                .expect("a session")
+                .sid
+        }
+    };
+    let first = find("cookie-1", 1).await;
+    assert_eq!(find("cookie-1", 2).await, first, "stable for the session");
+    assert_ne!(find("cookie-2", 1).await, first, "one per session");
+    assert!(first.len() >= 22, "at least 128 bits: {first}");
+    assert!(
+        first
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+    );
+    assert_ne!(first, "cookie-1");
+    assert_ne!(first, secret("cookie-1").digest(), "not the record's id");
+}

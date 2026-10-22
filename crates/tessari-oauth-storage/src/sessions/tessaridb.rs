@@ -23,13 +23,21 @@ impl SessionRepository for TessaridbSessionRepository {
         self.database
             .run_at(
                 place,
-                "CREATE sessions:$id = { user_id: $user, methods: $methods, auth_time: $at, seen_at: $seen };",
+                "CREATE sessions:$id = \
+                 { user_id: $user, sid: $sid, methods: $methods, auth_time: $at, seen_at: $seen };",
                 vec![
                     ("id".to_owned(), Value::from(id)),
                     ("user".to_owned(), Value::from(session.user_id.as_str())),
+                    ("sid".to_owned(), Value::from(session.sid.as_str())),
                     (
                         "methods".to_owned(),
-                        Value::Array(session.methods.iter().map(|name| Value::from(name.as_str())).collect()),
+                        Value::Array(
+                            session
+                                .methods
+                                .iter()
+                                .map(|name| Value::from(name.as_str()))
+                                .collect(),
+                        ),
                     ),
                     ("at".to_owned(), Value::from(session.auth_time)),
                     ("seen".to_owned(), Value::from(session.seen_at)),

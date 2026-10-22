@@ -7,6 +7,8 @@ use tessari_oauth_infrastructure::tessaridb::{FromRecord, MappingFault, Row};
 pub struct SessionEntity {
     /// The account signed in.
     pub user_id: String,
+    /// The session's public id, which logout names it by; drawn at sign-in, never the cookie or its digest.
+    pub sid: String,
     /// The methods verified when it signed in, by name, in order.
     pub methods: Vec<String>,
     /// Unix seconds of the sign-in.
@@ -19,6 +21,7 @@ impl FromRecord for SessionEntity {
     fn from_row(mut row: Row) -> Result<Self, MappingFault> {
         Ok(Self {
             user_id: row.take("user_id")?,
+            sid: row.take("sid")?,
             methods: row.take("methods")?,
             auth_time: row.take("auth_time")?,
             seen_at: row.take("seen_at")?,

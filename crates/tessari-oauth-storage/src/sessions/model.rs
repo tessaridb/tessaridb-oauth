@@ -8,6 +8,8 @@ use tessari_oauth_types::{Timestamp, UserId};
 pub struct Session {
     /// The account signed in.
     pub user: UserId,
+    /// The session's public id, as an ID token's `sid` and logout name it.
+    pub sid: String,
     /// When it signed in.
     pub auth_time: Timestamp,
     /// What the sign-in established, derived again from the methods it verified.
