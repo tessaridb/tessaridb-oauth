@@ -184,3 +184,47 @@ async fn a_passkey_that_completes_the_sign_in_opens_its_session() {
     assert!(!expected.amr.is_empty(), "the passkey names a method");
     assert_eq!(signed_in(&server, &user).await, 1);
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_sign_in_begun_for_the_account_page_opens_a_session_and_continues_there() {
+    let server = server(2).await;
+    let user = with_password(&server, "hamming@example.com").await;
+    let begun = post(&server, "begin", None, json!({ "account": true })).await;
+    assert_eq!(begun.status, StatusCode::OK, "{}", begun.body);
+    assert_eq!(begun.body["next"], "identify");
+    let set = set_cookie(&begun, LOGIN_COOKIE);
+    let (pair, _) = set.split_once(';').expect("attributes follow the value");
+    let cookie = pair.split_once('=').expect("a value").1.to_owned();
+    let identified = post(
+        &server,
+        "identify",
+        Some(&cookie),
+        json!({ "email": "hamming@example.com" }),
+    )
+    .await;
+    assert_eq!(identified.status, StatusCode::OK, "{}", identified.body);
+    let done = post(
+        &server,
+        "password",
+        Some(&cookie),
+        json!({ "password": RIGHT }),
+    )
+    .await;
+    let opened = completed(&server, &done, &[Method::Password]).await;
+    assert_eq!(opened.user, user);
+    assert_eq!(
+        done.body["continue"],
+        format!("{}/account", issuer("acme")),
+        "no authorization is resumed; the account page is"
+    );
+    for asked in [
+        json!({}),
+        json!({ "account": false }),
+        json!({ "account": true, "interaction": "abc" }),
+    ] {
+        let refused = post(&server, "begin", None, asked.clone()).await;
+        assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{asked}");
+        assert_eq!(refused.body["code"], "invalid_request", "{asked}");
+    }
+}

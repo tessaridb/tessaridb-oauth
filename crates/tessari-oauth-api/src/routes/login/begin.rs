@@ -1,9 +1,11 @@
-//! `POST /{tenant}/login/api/begin`: start signing in for a pending authorization.
+//! `POST /{tenant}/login/api/begin`: start signing in for a pending authorization, or for the account page.
 //!
-//! The authorization must still be pending (kept, brought by this browser as its browser cookie says, and within its
-//! lifetime), or nothing is started and no cookie is set. A started sign-in is bound to a fresh value the server draws
-//! and sets as the sign-in cookie; beginning again starts a new one under a new value, and the old one lapses on its
-//! own.
+//! The body names exactly one of the two: `{"interaction": "<id>"}` or `{"account": true}`; anything else is
+//! refused. An authorization must still be pending (kept, brought by this browser as its browser cookie says, and
+//! within its lifetime), or nothing is started and no cookie is set. A sign-in for the account page answers no
+//! authorization: once complete it opens a session and continues to the account page. A started sign-in is bound
+//! to a fresh value the server draws and sets as the sign-in cookie; beginning again starts a new one under a new
+//! value, and the old one lapses on its own.
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
@@ -23,7 +25,9 @@ use crate::{Error, Result};
 
 #[derive(Deserialize)]
 pub(in crate::routes) struct Begin {
-    interaction: String,
+    interaction: Option<String>,
+    #[serde(default)]
+    account: bool,
 }
 
 pub(in crate::routes) async fn begin(
@@ -33,22 +37,34 @@ pub(in crate::routes) async fn begin(
     read: std::result::Result<Json<Begin>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, _) = state.tenant(&tenant)?;
-    let Begin { interaction } = body(read)?;
     let now = (state.clock)();
-    let Some(browser) = held(&headers).filter(|_| well_formed(&interaction)) else {
-        return Err(Error::SigninGone);
+    let purpose = match body(read)? {
+        Begin {
+            interaction: Some(interaction),
+            account: false,
+        } => {
+            let Some(browser) = held(&headers).filter(|_| well_formed(&interaction)) else {
+                return Err(Error::SigninGone);
+            };
+            state
+                .interactions
+                .find(&tenant, &interaction, &browser, now)
+                .await
+                .map_err(Error::Store)?
+                .ok_or(Error::SigninGone)?;
+            Purpose::Authorization(interaction)
+        }
+        Begin {
+            interaction: None,
+            account: true,
+        } => Purpose::Account,
+        Begin { .. } => return Err(Error::Invalid),
     };
-    state
-        .interactions
-        .find(&tenant, &interaction, &browser, now)
-        .await
-        .map_err(Error::Store)?
-        .ok_or(Error::SigninGone)?;
     let secret = random_secret().map_err(|_| Error::Internal)?;
     let binding = SigninBinding::from_secret(base64url::encode(&secret));
     let begun = state
         .signins
-        .begin(&tenant, &binding, &Purpose::Authorization(interaction), now)
+        .begin(&tenant, &binding, &purpose, now)
         .await
         .map_err(Error::Store)?;
     if !begun {
