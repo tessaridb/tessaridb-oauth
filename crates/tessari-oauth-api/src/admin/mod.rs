@@ -2,6 +2,9 @@
 //! and the console keeps their session on its own origin.
 
 mod callback;
+mod change;
+mod operator;
+mod policy;
 mod session;
 mod signin;
 
@@ -11,14 +14,16 @@ use axum::Router;
 use axum::http::HeaderValue;
 use axum::routing::{get, post};
 use tessari_oauth_storage::admin::AdminService;
+use tessari_oauth_storage::audit::AuditEvent;
 use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::operators::OperatorService;
+use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::sessions::SessionService;
 use tessari_oauth_storage::throttle::{Limit, ThrottleService};
-use tessari_oauth_types::Clock;
+use tessari_oauth_types::{Clock, TenantId};
 
 use crate::{Error, Result};
 
@@ -42,6 +47,8 @@ pub struct AdminState {
     pub audit: Arc<AuditService>,
     /// Issuer sessions: a console session ends with the one it came from.
     pub sessions: Arc<SessionService>,
+    /// Company policies the console reads and changes.
+    pub policies: Arc<PolicyService>,
     /// The request counters every admin route is counted in.
     pub throttle: Arc<ThrottleService>,
     /// How many requests a client address may make to the console per window.
@@ -58,6 +65,18 @@ impl AdminState {
     /// Whether the console is reached over https, which decides how its cookies are set.
     fn secure(&self) -> bool {
         self.console.starts_with("https://")
+    }
+
+    /// Append `event` to `tenant`'s trail; a trail that does not take it is logged, never answered.
+    async fn record(&self, tenant: &TenantId, event: &AuditEvent) {
+        if let Err(failure) = self.audit.record(tenant, event, (self.clock)()).await {
+            tracing::error!(
+                event = "audit_unrecorded",
+                tenant = tenant.as_str(),
+                category = ?failure.category(),
+                "an admin console event could not be appended to the audit trail"
+            );
+        }
     }
 
     /// `name` as this console sets it: `__Host-` prefixed over https.
@@ -93,6 +112,10 @@ pub fn admin_router(state: AdminState) -> Router {
         .route("/admin/{company}/callback", get(callback::callback))
         .route("/admin/{company}/api/me", get(session::me))
         .route("/admin/{company}/signout", post(session::signout))
+        .route(
+            "/admin/{company}/api/policy/two-factor",
+            get(policy::two_factor).put(policy::set_two_factor),
+        )
         .fallback(|| async { crate::Error::NotFound })
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),

@@ -33,3 +33,6 @@ pub const IDEMPOTENCY_KEY_MIN_LEN: usize = 16;
 
 /// The most characters an `Idempotency-Key` may have.
 pub const IDEMPOTENCY_KEY_MAX_LEN: usize = 128;
+
+/// The most characters an operator's reason for a console change may have.
+pub const ADMIN_REASON_MAX_CHARS: usize = 500;

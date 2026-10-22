@@ -207,6 +207,7 @@ async fn run(
         operators: Arc::clone(&storage.operators),
         audit: Arc::clone(&storage.audit),
         sessions: Arc::clone(&storage.sessions),
+        policies: Arc::clone(&storage.policies),
         throttle: Arc::clone(&storage.throttle),
         limit: Limit {
             requests: config.login_limit.requests,

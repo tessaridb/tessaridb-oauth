@@ -20,7 +20,7 @@ use crate::token_fixture::{NOW, Server, plenty, server, tenant};
 
 pub(crate) fn console_state(server: &Server, console: &str) -> AdminState {
     let served = Served::new("https://id.example.com");
-    served.replace([tenant("acme")]);
+    served.replace([tenant("acme"), tenant("initech")]);
     AdminState {
         admin: Arc::clone(&server.storage.admin),
         codes: Arc::clone(&server.storage.codes),
@@ -28,6 +28,7 @@ pub(crate) fn console_state(server: &Server, console: &str) -> AdminState {
         operators: Arc::clone(&server.storage.operators),
         audit: Arc::clone(&server.storage.audit),
         sessions: Arc::clone(&server.storage.sessions),
+        policies: Arc::clone(&server.storage.policies),
         throttle: Arc::clone(&server.storage.throttle),
         limit: plenty(),
         served: Arc::new(served),

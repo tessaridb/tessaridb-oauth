@@ -74,6 +74,21 @@ pub enum Error {
     /// A request that changes state came from another origin than the console's own.
     #[error("cross-origin request")]
     CrossOrigin,
+    /// The console operator does not hold the role the request needs.
+    #[error("a role is required")]
+    RoleRequired,
+    /// A console change came without the operator's reason, or with one too long.
+    #[error("a reason is required")]
+    ReasonRequired,
+    /// A console change came without a usable `Idempotency-Key`.
+    #[error("an idempotency key is required")]
+    IdempotencyKeyRequired,
+    /// The `Idempotency-Key` was already used for another change.
+    #[error("the idempotency key was used for another change")]
+    IdempotencyKeyReused,
+    /// The same change is still being made by an earlier request.
+    #[error("the change is in progress")]
+    ChangeInProgress,
 }
 
 impl Error {
@@ -96,7 +111,11 @@ impl Error {
             }
             Self::AlreadyEnrolled | Self::NothingPending => ErrorCategory::Conflict,
             Self::CodeRejected | Self::PasswordRejected(_) => ErrorCategory::Validation,
-            Self::ConsoleRefused | Self::CrossOrigin => ErrorCategory::Forbidden,
+            Self::ConsoleRefused | Self::CrossOrigin | Self::RoleRequired => {
+                ErrorCategory::Forbidden
+            }
+            Self::ReasonRequired | Self::IdempotencyKeyRequired => ErrorCategory::Validation,
+            Self::IdempotencyKeyReused | Self::ChangeInProgress => ErrorCategory::Conflict,
         }
     }
 }
@@ -200,6 +219,31 @@ impl IntoResponse for Error {
                 StatusCode::FORBIDDEN,
                 "cross_origin",
                 "the request did not come from the console",
+            ),
+            (Self::RoleRequired, _) => (
+                StatusCode::FORBIDDEN,
+                "role_required",
+                "your operator roles do not include this",
+            ),
+            (Self::ReasonRequired, _) => (
+                StatusCode::BAD_REQUEST,
+                "reason_required",
+                "say why, in 1 to 500 characters",
+            ),
+            (Self::IdempotencyKeyRequired, _) => (
+                StatusCode::BAD_REQUEST,
+                "idempotency_key_required",
+                "send an Idempotency-Key of 16 to 128 letters, digits, '-' or '_'",
+            ),
+            (Self::IdempotencyKeyReused, _) => (
+                StatusCode::CONFLICT,
+                "idempotency_key_reused",
+                "this Idempotency-Key was used for another change",
+            ),
+            (Self::ChangeInProgress, _) => (
+                StatusCode::CONFLICT,
+                "change_in_progress",
+                "this change is still being made; try again shortly",
             ),
             (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

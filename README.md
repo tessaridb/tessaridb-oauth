@@ -262,6 +262,14 @@ last role is taken away. `GET <ADMIN_URL>/admin/<company>/api/me` names the oper
 `POST <ADMIN_URL>/admin/<company>/signout` ends the session, accepted only from the console's own origin. Console
 requests are counted per client address under the `LOGIN_LIMIT` and `LOGIN_WINDOW_SECS` numbers.
 
+Every console route needs one operator role, and a refusal for a missing role is recorded. A change comes from the
+console's own origin as JSON carrying the operator's `reason` (1 to 500 characters) and an `Idempotency-Key` header (16
+to 128 letters, digits, `-` or `_`). A change is made once per operator and key; sent again within a day it gets the
+first answer back, and the same key with another change is refused. Every change is recorded as `admin_action` with
+the operator, the role, the change and the reason. `GET` and `PUT <ADMIN_URL>/admin/<company>/api/policy/two-factor`
+(role `policy`) read and change the company's two-factor policy; a change names the policy it replaces in `expected`,
+and when another change came first it is refused as `changed_meanwhile` and changes nothing.
+
 ### The audit trail
 
 Every outcome at the token and revocation endpoints, and every refusal at the authorization and UserInfo endpoints,

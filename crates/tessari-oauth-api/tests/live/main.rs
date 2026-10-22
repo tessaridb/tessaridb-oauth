@@ -12,6 +12,7 @@ mod account_me;
 mod account_password;
 mod account_sessions;
 mod admin_callback;
+mod admin_policy;
 mod admin_session;
 mod admin_signin;
 mod authenticator;

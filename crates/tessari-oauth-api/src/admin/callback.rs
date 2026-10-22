@@ -236,16 +236,9 @@ impl Return<'_> {
         Error::ConsoleRefused
     }
 
-    /// Append `event` to the trail; a trail that does not take it is logged, never answered.
+    /// Append `event` to the trail.
     async fn record(&self, event: &AuditEvent) {
-        if let Err(failure) = self.state.audit.record(self.tenant, event, self.now).await {
-            tracing::error!(
-                event = "audit_unrecorded",
-                tenant = self.tenant.as_str(),
-                category = ?failure.category(),
-                "an admin console event could not be appended to the audit trail"
-            );
-        }
+        self.state.record(self.tenant, event).await;
     }
 }
 

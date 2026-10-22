@@ -20,10 +20,29 @@ const OPERATOR: &str = "operator-9";
 /// An operator holding `users` and `audit`, signed in at the issuer under `issuer_secret` and at the console under
 /// `console_secret`, the console session naming the issuer session.
 async fn signed_in(server: &Server, issuer_secret: &str, console_secret: &str) -> AdminState {
+    signed_in_as(
+        server,
+        OPERATOR,
+        &[OperatorRole::Users, OperatorRole::Audit],
+        issuer_secret,
+        console_secret,
+    )
+    .await
+}
+
+/// `operator` holding `roles` at `acme`, signed in at the issuer under `issuer_secret` and at the console under
+/// `console_secret`.
+pub(crate) async fn signed_in_as(
+    server: &Server,
+    operator: &str,
+    roles: &[OperatorRole],
+    issuer_secret: &str,
+    console_secret: &str,
+) -> AdminState {
     let now = Timestamp::from_unix_secs(NOW);
     let acme = tenant("acme");
-    let user = UserId::parse(OPERATOR).expect("a user id");
-    for role in [OperatorRole::Users, OperatorRole::Audit] {
+    let user = UserId::parse(operator).expect("a user id");
+    for role in roles.iter().copied() {
         server
             .storage
             .operators
