@@ -172,6 +172,7 @@ async fn run(
         signing_algorithm: SIGNING_ALGORITHM,
         interactions: Arc::clone(&storage.interactions),
         users: Arc::clone(&storage.users),
+        enrolments: Arc::clone(&storage.enrolments),
         factors: Arc::clone(&storage.factors),
         policies: Arc::clone(&storage.policies),
         signins: Arc::clone(&storage.signins),

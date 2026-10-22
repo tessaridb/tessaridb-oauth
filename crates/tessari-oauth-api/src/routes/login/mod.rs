@@ -14,6 +14,7 @@
 
 mod begin;
 mod consent;
+mod enroll;
 mod factors;
 mod identify;
 mod passkey;
@@ -21,6 +22,7 @@ mod password;
 
 pub(super) use begin::begin;
 pub(super) use consent::{consent, decide, signed_in};
+pub(super) use enroll::enroll;
 pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
 pub(super) use passkey::{passkey, passkey_options, relying_party};

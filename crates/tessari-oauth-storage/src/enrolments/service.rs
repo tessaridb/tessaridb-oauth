@@ -49,6 +49,20 @@ impl EnrolmentService {
         self.repository.issue(&place, &code.digest(), &entity).await
     }
 
+    /// The user `code` would enrol in `tenant`, without spending it; `None` as for [`Self::redeem`].
+    ///
+    /// # Errors
+    ///
+    /// Store failures, and [`Error::Unreadable`] for a stored record of another shape.
+    pub async fn find(&self, tenant: &TenantId, code: &EnrolmentCode) -> Result<Option<UserId>> {
+        let place = self.tenancy.place(tenant)?;
+        self.repository
+            .find(&place, &code.digest())
+            .await?
+            .map(user)
+            .transpose()
+    }
+
     /// Spend `code` in `tenant`: the user it enrols, once; `None` for a code that was never issued, was spent, was
     /// replaced or has lapsed.
     ///
@@ -60,12 +74,15 @@ impl EnrolmentService {
         self.repository
             .redeem(&place, &code.digest())
             .await?
-            .map(|entity| {
-                UserId::parse(entity.user_id).map_err(|_| Error::Unreadable {
-                    record: "enrolment",
-                    reason: "user_id".to_owned(),
-                })
-            })
+            .map(user)
             .transpose()
     }
+}
+
+/// The user a stored code enrols.
+fn user(entity: EnrolmentEntity) -> Result<UserId> {
+    UserId::parse(entity.user_id).map_err(|_| Error::Unreadable {
+        record: "enrolment",
+        reason: "user_id".to_owned(),
+    })
 }

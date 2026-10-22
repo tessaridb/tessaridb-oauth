@@ -11,6 +11,7 @@ use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::consents::ConsentService;
+use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::factors::FactorService;
 use tessari_oauth_storage::interactions::InteractionService;
 use tessari_oauth_storage::keys::KeyService;
@@ -52,6 +53,8 @@ pub struct PublicState {
     pub interactions: Arc<InteractionService>,
     /// Accounts and their credentials.
     pub users: Arc<UserService>,
+    /// One-time codes that let a user an operator created set a first password.
+    pub enrolments: Arc<EnrolmentService>,
     /// Second factors.
     pub factors: Arc<FactorService>,
     /// Each tenant's two-factor policy.

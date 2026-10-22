@@ -38,6 +38,18 @@ impl EnrolmentRepository for TessaridbEnrolmentRepository {
         Ok(())
     }
 
+    async fn find(&self, place: &Place, digest: &str) -> Result<Option<EnrolmentEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM enrolments:$digest;",
+                vec![("digest".to_owned(), Value::from(digest))],
+            )
+            .await?;
+        answers::single(answers, "enrolment")
+    }
+
     async fn redeem(&self, place: &Place, digest: &str) -> Result<Option<EnrolmentEntity>> {
         // One delete that answers what it removed: two redemptions racing see the record once.
         let answers = self

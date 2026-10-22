@@ -111,6 +111,10 @@ pub fn public_router(state: PublicState) -> Router {
             post(login::passkey),
         )
         .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/enroll"),
+            post(login::enroll),
+        )
+        .route(
             &format!("/{{tenant}}{LOGIN_API_PATH}/consent"),
             get(login::consent).post(login::decide),
         )

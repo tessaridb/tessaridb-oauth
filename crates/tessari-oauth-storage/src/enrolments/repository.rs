@@ -12,6 +12,9 @@ pub(crate) trait EnrolmentRepository: Send + Sync {
     /// Remove every code of the entity's user and record `entity` under `digest`, in one transaction.
     async fn issue(&self, place: &Place, digest: &str, entity: &EnrolmentEntity) -> Result<()>;
 
+    /// The code under `digest`, left in place.
+    async fn find(&self, place: &Place, digest: &str) -> Result<Option<EnrolmentEntity>>;
+
     /// Delete the code under `digest`, answering what it held when there was one.
     async fn redeem(&self, place: &Place, digest: &str) -> Result<Option<EnrolmentEntity>>;
 }

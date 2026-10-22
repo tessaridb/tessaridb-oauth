@@ -181,6 +181,15 @@ in the link-local range (cloud metadata services among them) is never called, a 
 client has five seconds. A client that was not told is tried again after 5 s, then twice as long each time up to an
 hour, at most ten times. A session that simply expires tells nobody; its clients' own sessions should expire with it.
 
+### First password: `POST <issuer>/login/api/enroll`
+
+A user an operator created sets a first password here with `{"code": "<code>", "password": "<password>"}`, the
+one-time code the operator handed them. A code is kept only as its digest, lasts 72 hours, and a newer code for the
+same user replaces it; a code that was never issued, was spent, was replaced or has lapsed gets the same
+`400 code_rejected`. The password follows the rules for an account whose password is its only factor, and a refused
+password does not spend the code. An account that already has a password keeps it (`409 already_enrolled`). The
+answer is `204`; no session is opened, and the user then signs in as anyone does.
+
 ### Your account: `<issuer>/account/api/me`
 
 `GET <issuer>/account/api/me` answers the signed-in user's own account: the address they sign in with and whether it is
