@@ -22,12 +22,14 @@ use std::sync::Arc;
 use axum::Router;
 use axum::http::HeaderValue;
 use axum::routing::{get, post};
+use tessari_oauth_storage::ClientRemovalService;
 use tessari_oauth_storage::admin::AdminService;
 use tessari_oauth_storage::audit::AuditEvent;
 use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::{CompanyService, Served};
+use tessari_oauth_storage::consents::ConsentService;
 use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::policies::PolicyService;
@@ -54,6 +56,10 @@ pub struct AdminState {
     pub codes: Arc<CodeService>,
     /// Client registrations: the console's own, whose bindings a code is checked against.
     pub clients: Arc<ClientService>,
+    /// Removing a client with every grant and refresh family it held.
+    pub client_removals: Arc<ClientRemovalService>,
+    /// Users' grants to clients, counted when a client is shown.
+    pub consents: Arc<ConsentService>,
     /// Operator grants: a sign-in without one opens nothing.
     pub operators: Arc<OperatorService>,
     /// The audit trail.
@@ -168,6 +174,10 @@ pub fn admin_router(state: AdminState) -> Router {
         .route(
             "/admin/{company}/api/clients/{client}",
             get(clients_read::one),
+        )
+        .route(
+            "/admin/{company}/api/clients/{client}/remove",
+            post(clients::remove),
         )
         .route("/admin/{company}/api/operators", get(operators::list))
         .route(

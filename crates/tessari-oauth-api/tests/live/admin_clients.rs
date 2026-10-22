@@ -352,3 +352,149 @@ async fn a_registration_outside_the_rules_is_refused_and_nothing_is_written() {
         .expect("an answer");
     assert!(found.is_none(), "no refused registration was written");
 }
+
+fn removing(secret: &str, key: &str, client: &str) -> Request<Body> {
+    Request::post(format!("/admin/acme/api/clients/{client}/remove"))
+        .header(header::COOKIE, format!("__Host-tessari-admin={secret}"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::ORIGIN, CONSOLE)
+        .header("idempotency-key", key)
+        .body(Body::from(r#"{"reason":"storefront retired, ticket 9"}"#))
+        .expect("a request")
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_operator_removes_a_client_and_every_grant_and_family_it_held_ends_with_it() {
+    use tessari_oauth_core::consents::ConsentRequest;
+    use tessari_oauth_storage::consents::NewGrant;
+    use tessari_oauth_storage::refresh::{Holder, RefreshGrant};
+    use tessari_oauth_types::{RefreshToken, UserId};
+
+    let server = server(2).await;
+    let at = Timestamp::from_unix_secs(NOW);
+    server
+        .storage
+        .provision_company(&tenant("acme"), "https://id.example.com", CONSOLE, at)
+        .await
+        .expect("provisioned");
+    let state = signed_in_as(
+        &server,
+        "operator-c",
+        &[OperatorRole::Clients],
+        "issuer-c",
+        "console-c",
+    )
+    .await;
+    let portal = ClientId::parse("portal").expect("a client id");
+    for who in ["user-7", "user-8"] {
+        server
+            .storage
+            .consents
+            .grant(&NewGrant {
+                tenant: tenant("acme"),
+                user: UserId::parse(who).expect("a user id"),
+                client_id: portal.clone(),
+                request: ConsentRequest {
+                    scopes: ScopeSet::parse("api:read").expect("scopes"),
+                    resources: BTreeSet::new(),
+                },
+                policy_version: 1,
+                shown_version: "descriptions-v1".to_owned(),
+                at,
+            })
+            .await
+            .expect("granted");
+    }
+    let grant = RefreshGrant {
+        tenant: tenant("acme"),
+        user: UserId::parse("user-7").expect("a user id"),
+        client_id: portal.clone(),
+        scopes: ScopeSet::parse("api:read").expect("scopes"),
+        resources: BTreeSet::new(),
+        bound_to: None,
+    };
+    server
+        .storage
+        .refresh
+        .start(
+            &RefreshToken::from_secret("refresh-secret-portal".to_owned()),
+            &grant,
+            "family-portal",
+            at,
+        )
+        .await
+        .expect("started");
+
+    let shown = read(state.clone(), "/admin/acme/api/clients/portal", "console-c").await;
+    assert_eq!(shown.status, StatusCode::OK, "{:?}", shown.body);
+    assert_eq!(shown.body["holders"], 2, "the confirm panel's count");
+
+    let removed = send(
+        state.clone(),
+        removing("console-c", "remove-portal-001", "portal"),
+    )
+    .await;
+    assert_eq!(removed.status, StatusCode::OK, "{:?}", removed.body);
+    assert_eq!(removed.body["client_id"], "portal");
+    assert_eq!(removed.body["consents"], 2);
+    assert_eq!(removed.body["families"], 1);
+    assert!(removed.body["access_tokens_end_by"].as_u64() > Some(NOW));
+    let gone = server
+        .storage
+        .clients
+        .find(&tenant("acme"), &portal)
+        .await
+        .expect("an answer");
+    assert!(gone.is_none(), "the registration is gone");
+    let standing = server
+        .storage
+        .refresh
+        .revoke_standing(&tenant("acme"), &Holder::Client(&portal), "probe", at)
+        .await
+        .expect("counted");
+    assert_eq!(standing, 0, "no family of the client stands");
+    let trail = server
+        .storage
+        .audit
+        .read_after(&tenant("acme"), 0, 500)
+        .await
+        .expect("the trail reads");
+    assert!(trail.iter().any(|message| {
+        message.event.kind == AuditKind::AdminAction
+            && message.event.action.as_deref() == Some("clients.remove")
+            && message.event.reason.as_deref() == Some("storefront retired, ticket 9")
+    }));
+
+    let repeated = send(
+        state.clone(),
+        removing("console-c", "remove-portal-001", "portal"),
+    )
+    .await;
+    assert_eq!(repeated.status, StatusCode::OK);
+    assert_eq!(repeated.body, removed.body, "the kept answer");
+    let nothing = send(
+        state.clone(),
+        removing("console-c", "remove-portal-002", "portal"),
+    )
+    .await;
+    assert_eq!(nothing.status, StatusCode::NOT_FOUND, "{:?}", nothing.body);
+    assert_eq!(nothing.body["code"], "client_not_found");
+    let reserved = send(
+        state.clone(),
+        removing("console-c", "remove-console-01", "admin-console"),
+    )
+    .await;
+    assert_eq!(reserved.status, StatusCode::CONFLICT, "{:?}", reserved.body);
+    assert_eq!(reserved.body["code"], "client_reserved");
+    let console = server
+        .storage
+        .clients
+        .find(
+            &tenant("acme"),
+            &ClientId::parse("admin-console").expect("a client id"),
+        )
+        .await
+        .expect("an answer");
+    assert!(console.is_some(), "the console's own client stays");
+}

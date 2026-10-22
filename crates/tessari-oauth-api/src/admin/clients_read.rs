@@ -1,6 +1,7 @@
 //! A company's client registrations read in its console by an operator holding `clients`: a page at a time in id order
-//! behind a cursor and with no total, or the one registration an id names. The server's own console client is shown
-//! and marked as such; nothing about a client is secret, since the console registers no shared secrets.
+//! behind a cursor and with no total, or the one registration an id names, with how many users hold a grant to it.
+//! The server's own console client is shown and marked as such; nothing about a client is secret, since the console
+//! registers no shared secrets.
 
 use axum::Json;
 use axum::extract::rejection::QueryRejection;
@@ -45,6 +46,14 @@ pub(super) struct Shown {
     dpop_bound_access_tokens: bool,
     keys: usize,
     console: bool,
+}
+
+/// One registration with how many users hold a standing grant to it.
+#[derive(Serialize)]
+struct Held {
+    #[serde(flatten)]
+    client: Shown,
+    holders: usize,
 }
 
 /// A page of registrations, and the cursor of the next one when this one is full.
@@ -106,7 +115,19 @@ pub(super) async fn one(
             .map_err(Error::Store)?,
         Err(_) => None,
     };
-    Ok(found.map_or_else(missing, |client| Json(shown(&client)).into_response()))
+    let Some(client) = found else {
+        return Ok(missing());
+    };
+    let holders = state
+        .consents
+        .holders(&operator.tenant, &client.client_id)
+        .await
+        .map_err(Error::Store)?;
+    Ok(Json(Held {
+        client: shown(&client),
+        holders,
+    })
+    .into_response())
 }
 
 /// The answer for a client the company has not registered.

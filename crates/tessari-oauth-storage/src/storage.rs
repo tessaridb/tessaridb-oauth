@@ -7,6 +7,7 @@ use tessari_oauth_infrastructure::tessaridb::Database;
 use crate::Tenancy;
 use crate::admin::{AdminService, TessaridbAdminRepository};
 use crate::audit::{AuditService, TessaridbAuditRepository};
+use crate::client_removal::ClientRemovalService;
 use crate::clients::{ClientService, TessaridbClientRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
 use crate::companies::{CompanyService, TessaridbCompanyRepository};
@@ -37,6 +38,8 @@ pub struct Storage {
     pub tenants: Arc<TenantService>,
     /// Client registrations.
     pub clients: Arc<ClientService>,
+    /// Removing a client with everything it held.
+    pub client_removals: Arc<ClientRemovalService>,
     /// Authorization codes.
     pub codes: Arc<CodeService>,
     /// Pending authorizations.
@@ -107,21 +110,29 @@ impl Storage {
         let operator_repository = Arc::new(TessaridbOperatorRepository::new(database.clone()));
         let admin_repository = Arc::new(TessaridbAdminRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
+        let clients = Arc::new(ClientService::new(client_repository, tenancy.clone()));
+        let consents = Arc::new(ConsentService::new(consent_repository, tenancy.clone()));
+        let refresh = Arc::new(RefreshService::new(
+            refresh_repository,
+            tenancy.clone(),
+            Arc::clone(&audit),
+        ));
         Self {
             companies: Arc::new(CompanyService::new(company_repository, tenancy.clone())),
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
-            clients: Arc::new(ClientService::new(client_repository, tenancy.clone())),
+            client_removals: Arc::new(ClientRemovalService::new(
+                Arc::clone(&clients),
+                Arc::clone(&consents),
+                Arc::clone(&refresh),
+            )),
+            clients,
             codes: Arc::new(CodeService::new(code_repository, tenancy.clone())),
             interactions: Arc::new(InteractionService::new(
                 interaction_repository,
                 tenancy.clone(),
             )),
-            consents: Arc::new(ConsentService::new(consent_repository, tenancy.clone())),
-            refresh: Arc::new(RefreshService::new(
-                refresh_repository,
-                tenancy.clone(),
-                Arc::clone(&audit),
-            )),
+            consents,
+            refresh,
             replay: Arc::new(ReplayService::new(replay_repository, tenancy.clone())),
             keys: Arc::new(KeyService::new(key_repository, tenancy.clone())),
             subjects: Arc::new(SubjectService::new(secret_repository, tenancy.clone())),

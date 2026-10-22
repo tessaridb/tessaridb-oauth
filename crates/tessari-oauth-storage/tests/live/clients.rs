@@ -426,7 +426,8 @@ async fn removing_a_client_ends_every_grant_and_family_it_held_and_nothing_else(
     );
 
     let removed = storage
-        .remove_client(&tenant("acme"), &client("svc-1"), NOW)
+        .client_removals
+        .remove(&tenant("acme"), &client("svc-1"), NOW)
         .await
         .expect("removed");
     assert_eq!(
@@ -478,7 +479,8 @@ async fn removing_a_client_ends_every_grant_and_family_it_held_and_nothing_else(
         .expect("counted");
     assert_eq!(standing, 1, "another client's family stood");
     let again = storage
-        .remove_client(&tenant("acme"), &client("svc-1"), NOW)
+        .client_removals
+        .remove(&tenant("acme"), &client("svc-1"), NOW)
         .await
         .expect("answered");
     assert_eq!(
@@ -487,7 +489,8 @@ async fn removing_a_client_ends_every_grant_and_family_it_held_and_nothing_else(
         "a removal sent again finds nothing left to end"
     );
     let console = storage
-        .remove_client(&tenant("acme"), &client("admin-console"), NOW)
+        .client_removals
+        .remove(&tenant("acme"), &client("admin-console"), NOW)
         .await;
     assert!(
         matches!(&console, Err(error) if error.category() == ErrorCategory::Validation),

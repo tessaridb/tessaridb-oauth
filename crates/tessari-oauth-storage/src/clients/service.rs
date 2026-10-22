@@ -230,7 +230,7 @@ impl ClientService {
     }
 
     /// Delete the registration of `client` in `tenant`, answering whether there was one. Crate-only: removing a client
-    /// is [`crate::Storage::remove_client`], which also ends what the client held.
+    /// is [`crate::ClientRemovalService::remove`], which also ends what the client held.
     ///
     /// # Errors
     ///

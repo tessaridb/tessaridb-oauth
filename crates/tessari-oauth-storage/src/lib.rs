@@ -33,7 +33,7 @@ pub mod throttle;
 pub mod users;
 
 pub use bootstrap::Bootstrapped;
-pub use client_removal::Removed;
+pub use client_removal::{ClientRemovalService, Removed};
 pub use error::{Error, Result};
 pub use storage::Storage;
 pub use tenancy::Tenancy;

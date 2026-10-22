@@ -3,12 +3,15 @@
 //! the same id inherits nothing, and every refresh family it held is revoked. A removal sent again finds the
 //! registration gone and finishes whatever the first one left standing. The console's own client is not removed.
 
+use std::sync::Arc;
+
 use tessari_oauth_constants::ADMIN_CONSOLE_CLIENT;
 use tessari_oauth_types::{ClientId, TenantId, Timestamp};
 
-use crate::consents::Revoker;
-use crate::refresh::Holder;
-use crate::{Error, Result, Storage};
+use crate::clients::ClientService;
+use crate::consents::{ConsentService, Revoker};
+use crate::refresh::{Holder, RefreshService};
+use crate::{Error, Result};
 
 /// The reason a removed client's refresh families are recorded under.
 const CLIENT_REMOVED: &str = "client_removed";
@@ -24,14 +27,35 @@ pub struct Removed {
     pub families: usize,
 }
 
-impl Storage {
+/// Removes clients, through the three services whose records a client holds.
+pub struct ClientRemovalService {
+    clients: Arc<ClientService>,
+    consents: Arc<ConsentService>,
+    refresh: Arc<RefreshService>,
+}
+
+impl ClientRemovalService {
+    /// Remove clients through `clients`, `consents` and `refresh`.
+    #[must_use]
+    pub fn new(
+        clients: Arc<ClientService>,
+        consents: Arc<ConsentService>,
+        refresh: Arc<RefreshService>,
+    ) -> Self {
+        Self {
+            clients,
+            consents,
+            refresh,
+        }
+    }
+
     /// Remove `client` from `tenant` at `now` and end every grant and refresh family it held.
     ///
     /// # Errors
     ///
     /// [`Error::Invalid`] for the console's own client, with nothing changed; and the store's failures, after which
     /// sending the removal again completes it.
-    pub async fn remove_client(
+    pub async fn remove(
         &self,
         tenant: &TenantId,
         client: &ClientId,

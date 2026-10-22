@@ -204,6 +204,8 @@ async fn run(
         admin: Arc::clone(&storage.admin),
         codes: Arc::clone(&storage.codes),
         clients: Arc::clone(&storage.clients),
+        client_removals: Arc::clone(&storage.client_removals),
+        consents: Arc::clone(&storage.consents),
         operators: Arc::clone(&storage.operators),
         audit: Arc::clone(&storage.audit),
         sessions: Arc::clone(&storage.sessions),

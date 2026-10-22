@@ -316,13 +316,18 @@ order, at most 100 messages a page, `next` naming the position to read after; ea
 
 Clients (role `clients`): `GET <ADMIN_URL>/admin/<company>/api/clients?limit=&after=` lists the company's client
 registrations in id order (at most 100 a page, cursor = the last id) and `GET .../api/clients/<id>` reads one, each
-with its kind, method, redirect URIs, scope ceiling, resources, grants and key count; the console's own client is
-listed and marked. `POST .../api/clients` with `{"client_id", "redirect_uris", "scope_ceiling", "resources",
+with its kind, method, redirect URIs, scope ceiling, resources, grants and key count, and the one read also with
+`holders`, how many users hold a grant to it; the console's own client is listed and marked.
+`POST .../api/clients` with `{"client_id", "redirect_uris", "scope_ceiling", "resources",
 "auth_method", "assertion_alg", "jwks", "grant_types", "dpop_bound_access_tokens", "post_logout_redirect_uris",
 "backchannel_logout_uri", "reason"}` registers one through the same rules as every registration. Only `none` (a
 public client, always with PKCE) and `private_key_jwt` (with `EdDSA` or `ES256` and its public key) are offered, so no
 shared secret is ever made; `admin-console` is refused as `client_reserved` and a taken id as `client_taken`.
-Removing a client and changing one are not in the console yet.
+`POST .../api/clients/<id>/remove` with `{"reason"}` deletes the registration and ends what it held: every user's
+grant to it is revoked as `client_removed` (it drops out of their grants list) and every refresh family it held is
+revoked. The answer counts both and gives the time by which the access tokens it already holds stop working, at
+most five minutes on. Sending it again finishes a removal that stopped part way; one that finds nothing to end is
+`404 client_not_found`, and `admin-console` is `409 client_reserved`. Changing a client is not in the console yet.
 
 Operators: holding a role is what lets an operator give it. `GET <ADMIN_URL>/admin/<company>/api/operators` lists the
 current grants of the roles the viewer holds (cursor `<user>.<role>`, at most 100 a page).
