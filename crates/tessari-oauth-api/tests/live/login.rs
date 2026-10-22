@@ -27,11 +27,11 @@ use crate::token_fixture::{
     API, NOW, REDIRECT, Server, passwords, plenty, server, state, tenant, uncached,
 };
 
-const KNOWN: &str = "ada@example.com";
+pub(crate) const KNOWN: &str = "ada@example.com";
 const COOKIE: &str = "__Host-tessari-login";
 
 /// POST `body` to `step` of `acme`'s sign-in under `limit` from `peer`, carrying `cookie` when given.
-async fn post_from(
+pub(crate) async fn post_from(
     server: &Server,
     limit: Limit,
     peer: SocketAddr,
@@ -69,7 +69,7 @@ async fn post_limited(
     post_from(server, limit, peer, step, cookie, body).await
 }
 
-async fn post(
+pub(crate) async fn post(
     server: &Server,
     step: &str,
     cookie: Option<&str>,
@@ -109,7 +109,7 @@ fn cookie_value(begun: &Answer) -> String {
 }
 
 /// Begin a sign-in for a fresh pending authorization and return its cookie value.
-async fn begun(server: &Server) -> String {
+pub(crate) async fn begun(server: &Server) -> String {
     let interaction = pending(server).await;
     let answered = post(server, "begin", None, json!({ "interaction": interaction })).await;
     assert_eq!(answered.status, StatusCode::OK);
@@ -122,7 +122,7 @@ async fn identity(server: &Server, cookie: &str) -> Option<Identity> {
 }
 
 /// The sign-in under `cookie`, read straight from the store.
-async fn signin(server: &Server, cookie: &str) -> Signin {
+pub(crate) async fn signin(server: &Server, cookie: &str) -> Signin {
     server
         .storage
         .signins
@@ -136,7 +136,7 @@ async fn signin(server: &Server, cookie: &str) -> Signin {
         .expect("the sign-in is there")
 }
 
-async fn register(server: &Server, email: &str) -> UserId {
+pub(crate) async fn register(server: &Server, email: &str) -> UserId {
     let registered = server
         .storage
         .users
@@ -153,7 +153,7 @@ async fn register(server: &Server, email: &str) -> UserId {
     user
 }
 
-fn refused(answered: &Answer, status: StatusCode, code: &str, case: &str) {
+pub(crate) fn refused(answered: &Answer, status: StatusCode, code: &str, case: &str) {
     assert_eq!(answered.status, status, "{case}");
     assert_eq!(answered.body["code"], code, "{case}");
     assert!(

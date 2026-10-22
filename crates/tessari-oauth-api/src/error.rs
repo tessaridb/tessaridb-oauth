@@ -35,6 +35,10 @@ pub enum Error {
     /// The step does not belong where the sign-in stands, or the sign-in moved on while it was taken.
     #[error("the step does not belong here")]
     StepRefused,
+    /// The password does not prove the account the sign-in identified, or the sign-in identified nobody: one
+    /// failure for both, so the answer says nothing about which addresses have accounts.
+    #[error("the credentials were not accepted")]
+    CredentialsRejected,
 }
 
 impl Error {
@@ -49,6 +53,7 @@ impl Error {
             Self::Invalid => ErrorCategory::Validation,
             Self::SigninGone => ErrorCategory::NotFound,
             Self::StepRefused => ErrorCategory::Conflict,
+            Self::CredentialsRejected => ErrorCategory::Unauthorized,
         }
     }
 }
@@ -89,6 +94,11 @@ impl IntoResponse for Error {
                 StatusCode::CONFLICT,
                 "step_refused",
                 "this step does not belong where the sign-in stands",
+            ),
+            (Self::CredentialsRejected, _) => (
+                StatusCode::UNAUTHORIZED,
+                "credentials_rejected",
+                "the address or the password is not right",
             ),
             (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

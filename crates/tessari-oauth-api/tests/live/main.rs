@@ -7,6 +7,7 @@
 
 mod authorize;
 mod login;
+mod login_password;
 mod par;
 mod routes;
 mod throttle;

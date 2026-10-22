@@ -34,6 +34,10 @@ const LOGIN_GROUP: &str = "login";
 /// The counted name of a request with no peer address.
 const NO_ADDRESS: &str = "no-address";
 
+/// The name a request's client was counted under, left on the request for a route that counts more by it.
+#[derive(Clone)]
+pub(crate) struct ClientAddress(pub(crate) String);
+
 /// The name a client is counted under.
 fn client(request: &Request) -> String {
     let Some(ConnectInfo(peer)) = request.extensions().get::<ConnectInfo<SocketAddr>>() else {
@@ -100,10 +104,13 @@ async fn count(
     state: &PublicState,
     group: &'static str,
     limit: Limit,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Result<Response> {
     let client = client(&request);
+    request
+        .extensions_mut()
+        .insert(ClientAddress(client.clone()));
     let admission = state
         .throttle
         .admit(group, &client, limit, (state.clock)())

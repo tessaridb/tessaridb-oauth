@@ -202,7 +202,10 @@ At start the server provisions each tenant's database, makes a signing key for a
 checks every five minutes for keys due to rotate. Each read, authorization request, token request and sign-in step is
 counted per client address in TessariDB, under separate limits; past the limit the answer is `429` with
 `Retry-After`, every counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`, and when the store
-cannot count the request is refused with `503` rather than served. Logs are JSON on standard output, filtered by
+cannot count the request is refused with `503` rather than served. A wrong password is also counted against the
+address being signed in to, the client address and the pair of the two; past a few failures that key is held for a
+short, growing time that ends by itself (never a lockout), and a wrong password and an address with no account get
+the same `401`. Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.
 

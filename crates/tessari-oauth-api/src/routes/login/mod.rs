@@ -9,9 +9,11 @@
 
 mod begin;
 mod identify;
+mod password;
 
 pub(super) use begin::begin;
 pub(super) use identify::identify;
+pub(super) use password::password;
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
