@@ -23,6 +23,7 @@ mod refresh_grant;
 mod refresh_replay;
 mod refresh_revoke;
 mod replay;
+mod sessions;
 mod signer;
 mod signin_throttle;
 mod signins;

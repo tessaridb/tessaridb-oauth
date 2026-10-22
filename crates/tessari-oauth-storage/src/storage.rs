@@ -15,6 +15,7 @@ use crate::keys::{KeyService, TessaridbKeyRepository};
 use crate::passkeys::{PasskeyService, TessaridbPasskeyRepository};
 use crate::refresh::{RefreshService, TessaridbRefreshRepository};
 use crate::replay::{ReplayService, TessaridbReplayRepository};
+use crate::sessions::{SessionService, TessaridbSessionRepository};
 use crate::signins::{SigninService, TessaridbSigninRepository};
 use crate::subjects::{SubjectService, TessaridbSecretRepository};
 use crate::tenants::{TenantService, TessaridbTenantRepository};
@@ -52,6 +53,8 @@ pub struct Storage {
     pub passkeys: Arc<PasskeyService>,
     /// Sign-ins in progress.
     pub signins: Arc<SigninService>,
+    /// Sessions at this issuer.
+    pub sessions: Arc<SessionService>,
     /// The audit trail.
     pub audit: Arc<AuditService>,
 }
@@ -77,6 +80,8 @@ impl Storage {
         let passkey_repository = Arc::new(TessaridbPasskeyRepository::new(database.clone()));
 
         let signin_repository = Arc::new(TessaridbSigninRepository::new(database.clone()));
+
+        let session_repository = Arc::new(TessaridbSessionRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
         Self {
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
@@ -100,6 +105,7 @@ impl Storage {
             factors: Arc::new(FactorService::new(factor_repository, tenancy.clone())),
             passkeys: Arc::new(PasskeyService::new(passkey_repository, tenancy.clone())),
             signins: Arc::new(SigninService::new(signin_repository, tenancy.clone())),
+            sessions: Arc::new(SessionService::new(session_repository, tenancy.clone())),
             audit,
         }
     }

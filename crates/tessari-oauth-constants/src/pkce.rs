@@ -26,3 +26,11 @@ pub const REFRESH_IDLE_TTL_SECS: u64 = 1_209_600;
 
 /// Longest a refresh-token family lives however often it is used, in seconds: 30 days. After it, the user signs in.
 pub const REFRESH_ABSOLUTE_TTL_SECS: u64 = 2_592_000;
+
+/// Longest a session at this issuer stays signed in without a request, in seconds: 8 hours, a working day. Each
+/// request that finds it starts the clock again.
+pub const SESSION_IDLE_SECS: u64 = 28_800;
+
+/// Longest a session at this issuer lasts however often it is used, in seconds: 7 days. After it, the user signs in
+/// again; the table's own expiry is the same week.
+pub const SESSION_ABSOLUTE_SECS: u64 = 604_800;
