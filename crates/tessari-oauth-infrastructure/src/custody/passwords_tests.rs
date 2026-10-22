@@ -250,3 +250,18 @@ async fn hashes_beyond_the_concurrency_bound_wait_their_turn() {
         "three at one-at-a-time took {together:?}; one alone {alone:?}"
     );
 }
+
+#[test]
+fn the_sign_in_keys_come_from_the_pepper() {
+    let email = "ada@example.com";
+    assert_eq!(
+        passwords(1).signin_keys().account("acme", email),
+        passwords(1).signin_keys().account("acme", email),
+        "one pepper, one key"
+    );
+    assert_ne!(
+        passwords(1).signin_keys().account("acme", email),
+        passwords(2).signin_keys().account("acme", email),
+        "another pepper"
+    );
+}

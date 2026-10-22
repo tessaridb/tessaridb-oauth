@@ -22,6 +22,7 @@ use tokio::sync::Semaphore;
 use unicode_normalization::UnicodeNormalization;
 use zeroize::Zeroizing;
 
+use super::SigninKeys;
 use crate::{Error, Result};
 
 /// Permission bits that let anyone but the owner reach the file.
@@ -89,6 +90,7 @@ pub struct Passwords {
     /// A hash at the current cost that an unknown account is checked against, so it costs what a known one does.
     dummy: String,
     gate: Semaphore,
+    signin_keys: SigninKeys,
 }
 
 impl fmt::Debug for Passwords {
@@ -139,9 +141,16 @@ impl Passwords {
             random: SystemRandom::new(),
             dummy: String::new(),
             gate: Semaphore::new(concurrency.max(1)),
+            signin_keys: SigninKeys::from_pepper(&bytes)?,
         };
         passwords.dummy = passwords.hash_now(DUMMY_PASSWORD)?;
         Ok(Arc::new(passwords))
+    }
+
+    /// The keys a sign-in's failures are counted under, derived from the same pepper.
+    #[must_use]
+    pub const fn signin_keys(&self) -> &SigninKeys {
+        &self.signin_keys
     }
 
     /// `password` hashed for storage, as a PHC string.
