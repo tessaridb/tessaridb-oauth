@@ -48,6 +48,15 @@ pub enum Error {
     /// The change would leave the account with no way to sign in.
     #[error("the last way to sign in")]
     LastSignInMethod,
+    /// The account already holds the factor being enrolled.
+    #[error("already enrolled")]
+    AlreadyEnrolled,
+    /// Nothing is being enrolled for this session: never begun, lapsed, confirmed, or ended by a wrong code.
+    #[error("nothing pending")]
+    NothingPending,
+    /// The code does not come from the secret being enrolled.
+    #[error("the code was not accepted")]
+    CodeRejected,
 }
 
 impl Error {
@@ -66,6 +75,8 @@ impl Error {
             Self::SessionRequired => ErrorCategory::Unauthorized,
             Self::ReauthenticationRequired => ErrorCategory::Unauthorized,
             Self::LastSignInMethod => ErrorCategory::Conflict,
+            Self::AlreadyEnrolled | Self::NothingPending => ErrorCategory::Conflict,
+            Self::CodeRejected => ErrorCategory::Validation,
         }
     }
 }
@@ -126,6 +137,17 @@ impl IntoResponse for Error {
                 StatusCode::CONFLICT,
                 "last_sign_in_method",
                 "this is the account's last way to sign in",
+            ),
+            (Self::AlreadyEnrolled, _) => (
+                StatusCode::CONFLICT,
+                "already_enrolled",
+                "this account already has one",
+            ),
+            (Self::NothingPending, _) => (StatusCode::CONFLICT, "nothing_pending", "start again"),
+            (Self::CodeRejected, _) => (
+                StatusCode::BAD_REQUEST,
+                "code_rejected",
+                "the code was not accepted; start again",
             ),
             (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

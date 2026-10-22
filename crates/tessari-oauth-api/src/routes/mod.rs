@@ -6,6 +6,7 @@ mod account;
 mod account_factors;
 mod account_me;
 mod account_sessions;
+mod account_totp;
 mod authorize;
 mod browser;
 mod jwks;
@@ -127,6 +128,14 @@ pub fn public_router(state: PublicState) -> Router {
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/recovery-codes"),
             post(account_factors::issue_recovery_codes),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/totp/begin"),
+            post(account_totp::begin),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/totp/confirm"),
+            post(account_totp::confirm),
         )
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions"),

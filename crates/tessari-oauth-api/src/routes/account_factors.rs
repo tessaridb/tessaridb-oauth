@@ -140,7 +140,7 @@ pub(super) async fn issue_recovery_codes(
 }
 
 /// The passkeys of the user of `asking`, once its session may change that user's sign-in factors at `now`.
-async fn may_change(
+pub(super) async fn may_change(
     state: &PublicState,
     tenant: &TenantId,
     asking: &Session,
@@ -165,7 +165,7 @@ async fn may_change(
 
 /// After a change named `reason` to the factors of the user of `asking`: sign out the user's other sessions, revoke
 /// every refresh family, record it, and answer how many of each ended and when issued access tokens stop working.
-async fn changed(
+pub(super) async fn changed(
     state: &PublicState,
     tenant: &TenantId,
     asking: &Session,

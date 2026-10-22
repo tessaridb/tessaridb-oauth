@@ -170,7 +170,12 @@ otherwise `401 reauthentication_required`; the account's last way to sign in is 
 holds and is recorded, and the answer says when the access tokens already issued stop working.
 `POST <issuer>/account/api/recovery-codes` with `{}` replaces every unspent recovery code with ten new ones, under the
 same recent sign-in rule and with the same sign-outs: the codes are in that answer once and are never kept or
-recorded in the clear.
+recorded in the clear. An authenticator app is enrolled in two steps under the same rule: `POST
+<issuer>/account/api/totp/begin` with `{}` answers a new secret once, in base32 and as the `otpauth://` URI an app
+scans, and keeps it sealed for that session for ten minutes; `POST <issuer>/account/api/totp/confirm` with
+`{"code": "<six digits>"}` enrols it when the code comes from that secret, with the same sign-outs. A wrong code ends
+the attempt (`400 code_rejected`, then `409 nothing_pending`), and an account that has an app already gets
+`409 already_enrolled`.
 
 ### Your grants: `<issuer>/account/api/grants`
 

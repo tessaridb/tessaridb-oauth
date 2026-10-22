@@ -6,6 +6,7 @@
 use axum::http::StatusCode;
 use serde_json::json;
 use tessari_oauth_core::authentication::Method;
+use tessari_oauth_core::totp::code_at;
 use tessari_oauth_infrastructure::custody::recovery_digest;
 use tessari_oauth_storage::audit::AuditKind;
 use tessari_oauth_types::{SessionSecret, Timestamp, UserId, base64url};
@@ -307,5 +308,146 @@ async fn new_recovery_codes_replace_the_old_ones_once_shown_and_sign_out_the_res
     assert!(
         codes.iter().all(|code| !recorded.contains(code.as_str())),
         "no code is ever recorded"
+    );
+}
+
+/// The bytes of unpadded RFC 4648 base32 `text`.
+fn from_base32(text: &str) -> Vec<u8> {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    let mut bytes = Vec::new();
+    let mut buffer: u32 = 0;
+    let mut held: u32 = 0;
+    for character in text.bytes() {
+        let value = ALPHABET
+            .iter()
+            .position(|known| *known == character)
+            .expect("base32");
+        buffer = (buffer << 5) | u32::try_from(value).expect("five bits");
+        held = held.checked_add(5).expect("bits");
+        if held >= 8 {
+            held = held.checked_sub(8).expect("bits");
+            bytes.push(u8::try_from((buffer >> held) & 0xff).expect("a byte"));
+        }
+        buffer &= (1_u32 << held).checked_sub(1).expect("a mask");
+    }
+    bytes
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_authenticator_app_is_enrolled_by_a_code_from_the_secret_shown_once() {
+    let server = server(2).await;
+    let user = with_password(&server, "perlis@example.com").await;
+    let asking = session(&server, &user, "enrolling", &[Method::Password], 0).await;
+    let elsewhere = session(&server, &user, "a-laptop", &[Method::Password], 60).await;
+    let begin = || async {
+        call(
+            &server,
+            "POST",
+            "totp/begin",
+            Some(&asking),
+            Some(json!({})),
+        )
+        .await
+    };
+    let confirm = |code: String| {
+        let (server, asking) = (&server, asking.clone());
+        async move {
+            call(
+                server,
+                "POST",
+                "totp/confirm",
+                Some(&asking),
+                Some(json!({ "code": code })),
+            )
+            .await
+        }
+    };
+    let begun = begin().await;
+    assert_eq!(begun.status, StatusCode::OK, "{}", begun.body);
+    let secret = begun.body["secret"]
+        .as_str()
+        .expect("the secret")
+        .to_owned();
+    assert_eq!(secret.len(), 32, "160 bits in base32");
+    let uri = begun.body["uri"].as_str().expect("the URI");
+    assert!(
+        uri.starts_with("otpauth://totp/") && uri.contains(&format!("secret={secret}")),
+        "{uri}"
+    );
+    let right = format!("{:06}", code_at(&from_base32(&secret), NOW / 30));
+    let wrong = if right == "123456" {
+        "654321"
+    } else {
+        "123456"
+    };
+    let refused = confirm(wrong.to_owned()).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.body);
+    assert_eq!(refused.body["code"], "code_rejected");
+    let spent = confirm(right).await;
+    assert_eq!(
+        spent.body["code"], "nothing_pending",
+        "a wrong code ends the attempt"
+    );
+    let secret = begin().await.body["secret"]
+        .as_str()
+        .expect("a new secret")
+        .to_owned();
+    let right = format!("{:06}", code_at(&from_base32(&secret), NOW / 30));
+    let enrolled = confirm(right.clone()).await;
+    assert_eq!(enrolled.status, StatusCode::OK, "{}", enrolled.body);
+    assert_eq!(enrolled.body["sessions"], 1);
+    assert_eq!(enrolled.body["access_tokens_end_by"], NOW + 300);
+    let me = call(&server, "GET", "me", Some(&asking), None).await;
+    assert_eq!(me.body["factors"]["totp"], true);
+    assert_eq!(
+        call(&server, "GET", "me", Some(&elsewhere), None)
+            .await
+            .status,
+        StatusCode::UNAUTHORIZED
+    );
+    let factor = server
+        .storage
+        .factors
+        .totp(&tenant("acme"), &server.kek, &user)
+        .await
+        .expect("the store answers")
+        .expect("enrolled");
+    assert_eq!(
+        factor.secret.as_slice(),
+        from_base32(&secret),
+        "the secret shown is the secret enrolled"
+    );
+    assert_eq!(factor.last_step, NOW / 30, "the confirming code is spent");
+    let with_code = session(
+        &server,
+        &user,
+        "with-a-code",
+        &[Method::Password, Method::Totp],
+        0,
+    )
+    .await;
+    let again = call(
+        &server,
+        "POST",
+        "totp/begin",
+        Some(&with_code),
+        Some(json!({})),
+    )
+    .await;
+    assert_eq!(again.status, StatusCode::CONFLICT);
+    assert_eq!(again.body["code"], "already_enrolled");
+    let trail = format!(
+        "{:?}",
+        server
+            .storage
+            .audit
+            .read_after(&tenant("acme"), 0, 100)
+            .await
+            .expect("the trail reads")
+    );
+    assert!(
+        trail.contains("totp_enrolled") && !trail.contains(&secret),
+        "recorded, the secret never"
     );
 }
