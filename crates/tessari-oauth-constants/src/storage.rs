@@ -54,3 +54,8 @@ pub const PASSKEY_WRITE_ATTEMPTS: u32 = 8;
 /// Attempts at a sign-in-progress write (beginning, advancing a step, finishing) when the store answers `retry`,
 /// counting the first. A lost step is read back and answered as stale; one browser takes one step at a time.
 pub const SIGNIN_WRITE_ATTEMPTS: u32 = 8;
+
+/// Attempts at a counter write (a request or a sign-in failure counted, a hold set or cleared) when the store answers
+/// `retry`, counting the first. Simultaneous requests from one client write one counter, and each must land: a count
+/// that gave up would let the client through uncounted or answer it `503`.
+pub const THROTTLE_WRITE_ATTEMPTS: u32 = 8;

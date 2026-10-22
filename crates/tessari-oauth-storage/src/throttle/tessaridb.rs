@@ -69,23 +69,42 @@ impl ThrottleRepository for TessaridbThrottleRepository {
         }
     }
 
-    async fn hold(&self, place: &Place, key: &str, until: u64, seconds: u64) -> Result<()> {
+    async fn hold(
+        &self,
+        place: &Place,
+        key: &str,
+        from: Option<u64>,
+        until: u64,
+        seconds: u64,
+    ) -> Result<bool> {
         let until = i64::try_from(until).map_err(|_| unreadable("an instant beyond i64"))?;
         let seconds =
             i64::try_from(seconds).map_err(|_| unreadable("a lifetime beyond i64 seconds"))?;
-        // A `SET` replaces the whole version, so the expiry is restated with every write.
-        self.database
-            .run_at(
-                place,
-                "SET counters:$key = $until EXPIRE duration::from_secs($seconds);",
-                vec![
-                    ("key".to_owned(), Value::from(key)),
-                    ("until".to_owned(), Value::from(until)),
-                    ("seconds".to_owned(), Value::from(seconds)),
-                ],
-            )
-            .await?;
-        Ok(())
+        // A conditional `SET` reads and writes the key in one transaction and answers whether it wrote; a `SET`
+        // replaces the whole version, so the expiry is restated with every write.
+        let mut values = vec![
+            ("key".to_owned(), Value::from(key)),
+            ("until".to_owned(), Value::from(until)),
+            ("seconds".to_owned(), Value::from(seconds)),
+        ];
+        let statement = match from {
+            None => "SET counters:$key = $until IF ABSENT EXPIRE duration::from_secs($seconds);",
+            Some(from) => {
+                let from = i64::try_from(from).map_err(|_| unreadable("an instant beyond i64"))?;
+                values.push(("from".to_owned(), Value::from(from)));
+                "SET counters:$key = $until IF = $from EXPIRE duration::from_secs($seconds);"
+            }
+        };
+        let answers = self.database.run_at(place, statement, values).await?;
+        match answers.into_iter().next() {
+            Some(Answer::Value {
+                value: Value::Bool(written),
+                ..
+            }) => Ok(written),
+            _ => Err(unreadable(
+                "a conditional SET answered something other than whether it wrote",
+            )),
+        }
     }
 
     async fn held_until(&self, place: &Place, key: &str) -> Result<Option<u64>> {

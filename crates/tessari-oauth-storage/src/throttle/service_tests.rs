@@ -57,8 +57,8 @@ impl ThrottleRepository for Counts {
         Ok(self.answers.lock().expect("unpoisoned").remove(0))
     }
 
-    async fn hold(&self, _: &Place, _: &str, _: u64, _: u64) -> Result<()> {
-        Ok(())
+    async fn hold(&self, _: &Place, _: &str, _: Option<u64>, _: u64, _: u64) -> Result<bool> {
+        Ok(true)
     }
 
     async fn held_until(&self, _: &Place, _: &str) -> Result<Option<u64>> {
@@ -123,7 +123,7 @@ impl ThrottleRepository for Down {
         Err(down())
     }
 
-    async fn hold(&self, _: &Place, _: &str, _: u64, _: u64) -> Result<()> {
+    async fn hold(&self, _: &Place, _: &str, _: Option<u64>, _: u64, _: u64) -> Result<bool> {
         Err(down())
     }
 

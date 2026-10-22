@@ -7,15 +7,17 @@
 //! never an admission, so the caller refuses the request: the limit fails closed.
 //!
 //! Counters live in the region's own `throttle` database rather than in a tenant's, because the requests counted
-//! include ones naming tenants that do not exist.
+//! include ones naming tenants that do not exist. Simultaneous requests write one counter, and a write the store answers
+//! `retry` is made again, so each of them is counted.
 
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
+use tessari_oauth_constants::THROTTLE_WRITE_ATTEMPTS;
 use tessari_oauth_types::Timestamp;
 
 use super::repository::ThrottleRepository;
-use crate::{Result, Tenancy};
+use crate::{Result, Tenancy, retry};
 
 /// How many requests a client may make to a route group per window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,14 +98,12 @@ impl ThrottleService {
         // The rest of the window plus one more: the store judges expiry on its own clock, and one running ahead of
         // this process's must not end a count while this process still counts into it.
         let seconds = left.saturating_add(limit.window_secs.get());
-        let count = self
-            .repository
-            .count(
-                self.tenancy.throttle(),
-                &counter_key(group, index, client),
-                seconds,
-            )
-            .await?;
+        let key = counter_key(group, index, client);
+        let count = retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
+            self.repository
+                .count(self.tenancy.throttle(), &key, seconds)
+        })
+        .await?;
         Ok(if count > limit.requests.get() {
             Admission::Refused {
                 retry_after_secs: left,

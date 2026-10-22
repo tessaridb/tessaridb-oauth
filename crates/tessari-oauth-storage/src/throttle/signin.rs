@@ -4,14 +4,15 @@
 //! is past the key's free failures, a hold is written beside it — the instant it ends, under an expiry of the same
 //! length — so the store itself retires the hold and no hold can outlive its cap: nothing here is a lockout. A
 //! sign-in asks for the longest hold of its keys before it verifies anything. The counters are shared by every
-//! server process counting into the region, so running more processes does not multiply an attacker's attempts.
+//! server process counting into the region, so running more processes does not multiply an attacker's attempts, and
+//! a write the store answers `retry` is made again, so simultaneous failures are each counted.
 
-use tessari_oauth_constants::SIGNIN_MEMORY_SECS;
+use tessari_oauth_constants::{SIGNIN_MEMORY_SECS, THROTTLE_WRITE_ATTEMPTS};
 use tessari_oauth_core::signin::{SigninKey, hold_secs};
 use tessari_oauth_types::Timestamp;
 
 use super::ThrottleService;
-use crate::Result;
+use crate::{Error, Result, retry};
 
 /// The name of a kind of key inside a counter's key.
 const fn kind(key: SigninKey) -> &'static str {
@@ -42,19 +43,41 @@ impl ThrottleService {
     pub async fn signin_failed(&self, keys: &[(SigninKey, &str)], now: Timestamp) -> Result<()> {
         let place = self.tenancy.throttle();
         for &(key, value) in keys {
-            let failures = self
-                .repository
-                .count(place, &count_key(key, value), SIGNIN_MEMORY_SECS)
-                .await?;
+            let counted = count_key(key, value);
+            let failures = retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
+                self.repository.count(place, &counted, SIGNIN_MEMORY_SECS)
+            })
+            .await?;
             let hold = hold_secs(key, failures);
             if hold > 0 {
                 let until = now.unix_secs().saturating_add(hold);
-                self.repository
-                    .hold(place, &hold_key(key, value), until, hold)
-                    .await?;
+                self.lengthen(&hold_key(key, value), until, hold).await?;
             }
         }
         Ok(())
+    }
+
+    /// Make the hold under `key` end no earlier than `until`, living `seconds`. Simultaneous failures write one hold;
+    /// each writes only over the value it read, so a later write of a shorter hold never replaces a longer one.
+    async fn lengthen(&self, key: &str, until: u64, seconds: u64) -> Result<()> {
+        let place = self.tenancy.throttle();
+        for _ in 0..THROTTLE_WRITE_ATTEMPTS {
+            let held = self.repository.held_until(place, key).await?;
+            if held.is_some_and(|held| held >= until) {
+                return Ok(());
+            }
+            let written = retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
+                self.repository.hold(place, key, held, until, seconds)
+            })
+            .await?;
+            if written {
+                return Ok(());
+            }
+        }
+        Err(Error::Unreadable {
+            record: "sign-in hold",
+            reason: format!("still moving after {THROTTLE_WRITE_ATTEMPTS} attempts"),
+        })
     }
 
     /// The seconds left on the longest hold of `keys` at `now`, or none when no key is held.
@@ -89,11 +112,19 @@ impl ThrottleService {
     /// When the store is unavailable or refuses.
     pub async fn signin_succeeded(&self, account: &str) -> Result<()> {
         let place = self.tenancy.throttle();
-        self.repository
-            .forget(place, &count_key(SigninKey::Account, account))
+        for key in [
+            count_key(SigninKey::Account, account),
+            hold_key(SigninKey::Account, account),
+        ] {
+            retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
+                self.repository.forget(place, &key)
+            })
             .await?;
-        self.repository
-            .forget(place, &hold_key(SigninKey::Account, account))
-            .await
+        }
+        Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "signin_tests.rs"]
+mod tests;
