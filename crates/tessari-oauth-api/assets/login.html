@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Sign in</title>
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/pages.css">
+  <script src="assets/login.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to sign-in</a>
+  <main id="main" class="page" tabindex="-1">
+    <section class="card" aria-labelledby="title">
+      <header class="brand">
+        <img src="assets/mark.svg" alt="" width="32" height="32">
+        <span>TessariDB</span>
+      </header>
+      <h1 id="title">Sign in</h1>
+      <p id="status" class="status" role="status" aria-live="polite">Preparing your sign-in.</p>
+
+      <form id="identify" class="step" hidden novalidate>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input id="email" name="email" type="email" autocomplete="username webauthn" required
+                 aria-required="true" aria-describedby="email-error" spellcheck="false">
+          <p id="email-error" class="field-error" hidden></p>
+        </div>
+        <button type="submit" class="primary">Continue</button>
+      </form>
+
+      <form id="first_factor" class="step" hidden novalidate>
+        <p class="who">Signing in as <strong id="who"></strong></p>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="with-toggle">
+            <input id="password" name="password" type="password" autocomplete="current-password" required
+                   aria-required="true" aria-describedby="password-error">
+            <button type="button" id="reveal" class="quiet" aria-pressed="false" aria-controls="password">Show</button>
+          </div>
+          <p id="password-error" class="field-error" hidden></p>
+        </div>
+        <button type="submit" class="primary">Sign in</button>
+      </form>
+
+      <form id="second_factor" class="step" hidden novalidate>
+        <div class="field" id="code-field">
+          <label for="code">Code from your authenticator app</label>
+          <input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                 pattern="[0-9]{6}" maxlength="6" aria-describedby="code-error">
+          <p id="code-error" class="field-error" hidden></p>
+        </div>
+        <div class="field" id="recovery-field" hidden>
+          <label for="recovery">Recovery code</label>
+          <input id="recovery" name="recovery" type="text" autocomplete="one-time-code" spellcheck="false"
+                 aria-describedby="recovery-error">
+          <p id="recovery-error" class="field-error" hidden></p>
+        </div>
+        <button type="submit" class="primary">Verify</button>
+        <button type="button" id="use-recovery" class="quiet">Use a recovery code instead</button>
+      </form>
+
+      <div id="passkey-option" class="alternative" hidden>
+        <p class="divider"><span>or</span></p>
+        <button type="button" id="passkey" class="secondary">Sign in with a passkey</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

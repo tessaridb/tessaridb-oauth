@@ -1,5 +1,5 @@
 //! The headers every public answer carries, refusals included: no sniffing, no referrer, nothing may frame or load
-//! from a JSON document, and HTTPS only.
+//! from a JSON document, and HTTPS only. A page sets its own policy, which is kept; every other answer gets this one.
 
 use axum::http::{HeaderName, HeaderValue, header};
 use axum::response::Response;
@@ -26,10 +26,13 @@ pub(crate) fn no_store(mut response: Response) -> Response {
     response
 }
 
-/// Set the fixed headers on `response`, replacing any a handler set.
+/// Set the fixed headers on `response`, replacing any a handler set, except a page's own content policy.
 pub(crate) fn protect(mut response: Response) -> Response {
     let headers = response.headers_mut();
     for (name, value) in FIXED {
+        if name == header::CONTENT_SECURITY_POLICY && headers.contains_key(&name) {
+            continue;
+        }
         headers.insert(name, HeaderValue::from_static(value));
     }
     response

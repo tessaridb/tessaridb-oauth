@@ -1,12 +1,13 @@
-//! The public router: per tenant, the server metadata, the key set and UserInfo under the read limit, the authorization
-//! endpoint under its own, the token, revocation and pushed-request endpoints under theirs, and the sign-in steps
-//! under theirs, every body capped.
+//! The public router: per tenant, the server metadata, the key set, UserInfo and the sign-in and consent pages under
+//! the read limit, the authorization endpoint under its own, the token, revocation and pushed-request endpoints under
+//! theirs, and the sign-in steps under theirs, every body capped.
 
 mod authorize;
 mod browser;
 mod jwks;
 mod login;
 mod metadata;
+mod pages;
 mod resume;
 mod token;
 mod userinfo;
@@ -26,7 +27,12 @@ use crate::state::PublicState;
 /// The routes of the public listener over `state`. Unknown paths answer 404 with the same headers as every route.
 pub fn public_router(state: PublicState) -> Router {
     // Limits sit on the matched routes only: a path that matches nothing costs no store work, so it is not counted.
-    let reads = Router::new()
+    let pages = pages::ASSETS
+        .iter()
+        .fold(Router::new(), |router, (path, _, _)| {
+            router.route(&format!("/{{tenant}}{path}"), get(pages::asset))
+        });
+    let reads = pages
         .route(
             "/{tenant}/.well-known/oauth-authorization-server",
             get(metadata::metadata),

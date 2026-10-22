@@ -220,6 +220,15 @@ nothing and answers `access_denied`, and either answer is the redirect-URI addre
 authorization belongs to the browser that brought it to `/oauth2/authorize`, by the cookie `__Host-tessari-browser`
 (kept when the browser has one, drawn otherwise): another browser holding the request's id cannot sign in for it,
 answer its consent or receive its code.
+
+The sign-in and consent pages are served by the binary itself at `<issuer>/login` and `<issuer>/consent`, with
+their script, style and mark under `<issuer>/assets/`. They load nothing from anywhere else, talk only to this
+server, submit no form, cannot be framed, follow the system's light or dark theme and work from the keyboard alone;
+a passkey is offered wherever the browser supports one. Their TypeScript source is in
+`crates/tessari-oauth-api/pages/`, and its built output is committed to `crates/tessari-oauth-api/assets/`, so
+building the server needs no Node. After changing the source, `npm install` once and `npm run build` there;
+`npm run verify` type-checks, runs the page tests and fails when the committed assets differ from a rebuild.
+
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.

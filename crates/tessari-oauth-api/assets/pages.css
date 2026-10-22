@@ -1,0 +1,454 @@
+/*
+ * The TessariDB OAuth sign-in and consent pages. Mode: neo-grotesque, the family's calm product surface,
+ * dressed in TessariDB's own tokens (violet and its neutrals on hue 286) so the pages read as part of the same
+ * product as the S3 console. System fonts only: nothing is fetched from off this server.
+ *
+ * Three token tiers, never skipped: PRIMITIVE values, SEMANTIC roles (the only thing rules below read), COMPONENT
+ * values. A theme is a remap of the semantic tier: dark by the system preference unless light was chosen, or by
+ * `data-theme="dark"` on <html>; every semantic token is mapped in both.
+ */
+
+
+/* ─────────────────────────────────────────────────────────── 1. PRIMITIVE ── */
+
+:root {
+  --violet-300: oklch(0.8 0.11 289);
+  --violet-400: oklch(0.72 0.145 289);
+  --violet-500: oklch(0.647 0.137 289);
+  --violet-600: oklch(0.54 0.15 289);
+  --violet-a12: oklch(0.647 0.137 289 / 0.12);
+  --violet-a20: oklch(0.647 0.137 289 / 0.2);
+
+  --n-1000: oklch(0.13 0.009 286);
+  --n-950: oklch(0.16 0.011 286);
+  --n-900: oklch(0.18 0.013 286);
+  --n-850: oklch(0.2 0.015 286);
+  --n-800: oklch(0.24 0.016 286);
+  --n-700: oklch(0.28 0.018 286);
+  --n-500: oklch(0.52 0.022 286);
+  --n-450: oklch(0.62 0.02 286);
+  --n-400: oklch(0.7 0.018 286);
+  --n-200: oklch(0.93 0.01 286);
+  --n-150: oklch(0.95 0.008 286);
+  --n-100: oklch(0.97 0.006 286);
+  --n-50: oklch(0.985 0.003 286);
+  --n-0: oklch(1 0 0);
+
+  --green-400: oklch(0.76 0.14 155);
+  --green-600: oklch(0.5 0.13 155);
+  --amber-400: oklch(0.79 0.13 75);
+  --amber-600: oklch(0.52 0.11 75);
+  --red-400: oklch(0.7 0.17 25);
+  --red-600: oklch(0.53 0.19 25);
+
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 2.5rem;
+  --s-8: 3rem;
+
+  /* Type: four sizes on a compact ratio (about 1.333) for a calm form surface:
+     caption 12, labels 14, body 16, heading 28. */
+  --t-caption: 0.75rem;
+  --t-data: 0.875rem;
+  --t-body: 1rem;
+  --t-heading: 1.75rem;
+
+  /* Layers: one named scale, never a literal. */
+  --z-sticky: 20;
+  --z-toast: 50;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* Dials: quiet, near-static, airy enough to breathe. */
+  --dial-variance: 30;
+  --dial-motion: 25;
+  --dial-density: 55;
+
+  /* Motion: state feedback only, one short duration, a strong ease-out. */
+  --dur-fast: 120ms;
+  --dur-press: 160ms;
+  --ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ──────────────────────────────────────────────────────────── 2. SEMANTIC ── */
+
+/* Light. */
+:root {
+  color-scheme: light;
+  --surface: var(--n-100);
+  --surface-raised: var(--n-0);
+  --surface-sunken: var(--n-150);
+  --border: var(--n-200);
+  --border-strong: var(--n-450);
+  --text: var(--n-1000);
+  --text-muted: var(--n-500);
+  --accent: var(--violet-600);
+  --accent-hover: var(--violet-500);
+  --accent-text: var(--violet-600);
+  --accent-wash: var(--violet-a12);
+  --on-accent: var(--n-0);
+  --ok: var(--green-600);
+  --warn: var(--amber-600);
+  --bad: var(--red-600);
+  --on-bad: var(--n-0);
+  --focus: var(--violet-600);
+  --shadow: 0 1px 2px oklch(0.13 0.009 286 / 0.06);
+
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* Dark: the site's own surfaces. Written twice (system preference, explicit
+   choice) because CSS cannot name one block for two conditions. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: var(--n-950);
+    --surface-raised: var(--n-850);
+    --surface-sunken: var(--n-1000);
+    --border: var(--n-700);
+    --border-strong: var(--n-500);
+    --text: var(--n-200);
+    --text-muted: var(--n-400);
+    --accent: var(--violet-400);
+    --accent-hover: var(--violet-300);
+    --accent-text: var(--violet-300);
+    --accent-wash: var(--violet-a20);
+    --on-accent: var(--n-1000);
+    --ok: var(--green-400);
+    --warn: var(--amber-400);
+    --bad: var(--red-400);
+    --on-bad: var(--n-1000);
+    --focus: var(--violet-300);
+    --shadow: none;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: var(--n-950);
+  --surface-raised: var(--n-850);
+  --surface-sunken: var(--n-1000);
+  --border: var(--n-700);
+  --border-strong: var(--n-500);
+  --text: var(--n-200);
+  --text-muted: var(--n-400);
+  --accent: var(--violet-400);
+  --accent-hover: var(--violet-300);
+  --accent-text: var(--violet-300);
+  --accent-wash: var(--violet-a20);
+  --on-accent: var(--n-1000);
+  --ok: var(--green-400);
+  --warn: var(--amber-400);
+  --bad: var(--red-400);
+  --on-bad: var(--n-1000);
+  --focus: var(--violet-300);
+  --shadow: none;
+}
+
+/* ─────────────────────────────────────────────────────────── 3. COMPONENT ── */
+
+:root {
+  --control-height: 2.75rem; /* 44px: every field and button is a comfortable touch target */
+  --card-radius: var(--radius-lg);
+  --button-radius: var(--radius-pill); /* the product site's buttons are pills */
+  --control-radius: var(--radius-md);
+  --card-inset: var(--s-6);
+  --card-max: 26rem;
+  --page-inset: var(--s-7);
+  --field-gap: var(--s-2);
+  --stack: var(--s-5);
+  --focus-ring: 0 0 0 2px var(--surface-raised), 0 0 0 4px var(--focus);
+}
+
+@media (max-width: 48rem) {
+  :root {
+    --card-inset: var(--s-5);
+    --page-inset: var(--s-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dial-motion: 0;
+    --dur-fast: 0ms;
+    --dur-press: 0ms;
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────────── 4. RULES ── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--text);
+  font: var(--t-body) / 1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute;
+  inset-inline-start: var(--s-4);
+  inset-block-start: var(--s-4);
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--control-radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  transform: translateY(-200%);
+}
+
+.skip:focus-visible {
+  transform: none;
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--page-inset);
+  outline: none;
+}
+
+.card {
+  width: 100%;
+  max-width: var(--card-max);
+  padding: var(--card-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-block-end: var(--s-5);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--t-heading);
+  line-height: 1.15;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.status {
+  margin: 0 0 var(--stack);
+  color: var(--text-muted);
+}
+
+/* An empty status keeps its place in the document, so it is announced when it speaks, but takes no room. */
+.status:empty {
+  margin: 0;
+}
+
+.step,
+.alternative,
+#request,
+#resources-block {
+  display: grid;
+  gap: var(--stack);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.who {
+  margin: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.who strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.field {
+  display: grid;
+  gap: var(--field-gap);
+}
+
+label {
+  font-weight: 600;
+  font-size: var(--t-data);
+}
+
+input {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--control-radius);
+  background: var(--surface-sunken);
+  color: var(--text);
+  font: inherit;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+input:hover {
+  border-color: var(--text-muted);
+}
+
+input:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: var(--focus-ring);
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.with-toggle {
+  display: flex;
+  gap: var(--s-2);
+}
+
+.field-error {
+  display: flex;
+  gap: var(--s-2);
+  margin: 0;
+  color: var(--bad);
+  font-size: var(--t-data);
+}
+
+/* The error's icon: a glyph beside the words, so the state never rests on colour alone. */
+.field-error::before {
+  content: "!" / "";
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+  border-radius: var(--radius-pill);
+  background: var(--bad);
+  color: var(--on-bad);
+  font-weight: 700;
+  font-size: var(--t-caption);
+}
+
+button {
+  min-height: var(--control-height);
+  padding: 0 var(--s-5);
+  border: 1px solid transparent;
+  border-radius: var(--button-radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.secondary {
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--text);
+}
+
+.quiet {
+  padding: 0 var(--s-3);
+  background: transparent;
+  color: var(--accent-text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .secondary:hover:not(:disabled),
+  .quiet:hover:not(:disabled) {
+    background: var(--accent-wash);
+  }
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--t-data);
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-block-start: 1px solid var(--border);
+}
+
+.alternative {
+  margin-block-start: var(--s-4);
+}
+
+#resources-block {
+  gap: var(--s-2);
+}
+
+#request p {
+  margin: 0;
+}
+
+.asks {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding-inline-start: var(--s-5);
+  overflow-wrap: anywhere;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.95em;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
