@@ -25,6 +25,16 @@ pub enum Error {
         /// Seconds until the window ends.
         retry_after_secs: u64,
     },
+    /// The request could not be read: a body of another shape, or a value outside its grammar.
+    #[error("the request could not be read")]
+    Invalid,
+    /// The browser has no sign-in in progress here: no cookie, one this server never set, or a sign-in that lapsed
+    /// or finished.
+    #[error("no sign-in in progress")]
+    SigninGone,
+    /// The step does not belong where the sign-in stands, or the sign-in moved on while it was taken.
+    #[error("the step does not belong here")]
+    StepRefused,
 }
 
 impl Error {
@@ -36,6 +46,9 @@ impl Error {
             Self::Store(store) => store.category(),
             Self::Internal => ErrorCategory::Internal,
             Self::Throttled { .. } => ErrorCategory::Throttled,
+            Self::Invalid => ErrorCategory::Validation,
+            Self::SigninGone => ErrorCategory::NotFound,
+            Self::StepRefused => ErrorCategory::Conflict,
         }
     }
 }
@@ -61,11 +74,26 @@ impl IntoResponse for Error {
             )
                 .into_response();
         }
-        let (status, code, message) = match self.category() {
-            ErrorCategory::NotFound => {
+        let (status, code, message) = match (&self, self.category()) {
+            (Self::SigninGone, _) => (
+                StatusCode::GONE,
+                "signin_expired",
+                "the sign-in has expired; start again from the application",
+            ),
+            (Self::Invalid, _) => (
+                StatusCode::BAD_REQUEST,
+                "invalid_request",
+                "the request could not be read",
+            ),
+            (Self::StepRefused, _) => (
+                StatusCode::CONFLICT,
+                "step_refused",
+                "this step does not belong where the sign-in stands",
+            ),
+            (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")
             }
-            ErrorCategory::Unavailable | ErrorCategory::Timeout => (
+            (_, ErrorCategory::Unavailable | ErrorCategory::Timeout) => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "unavailable",
                 "try again later",

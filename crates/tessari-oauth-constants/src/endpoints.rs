@@ -6,6 +6,16 @@ pub const AUTHORIZATION_PATH: &str = "/oauth2/authorize";
 /// id as `interaction`.
 pub const LOGIN_PATH: &str = "/login";
 
+/// Where the sign-in page's steps are posted, appended to the issuer.
+pub const LOGIN_API_PATH: &str = "/login/api";
+
+/// The largest sign-in step body read, in bytes. A passkey assertion is the longest step and stays well under this.
+pub const LOGIN_BODY_MAX_BYTES: usize = 16 * 1024;
+
+/// The cookie that binds a sign-in in progress to the browser that began it. The `__Host-` prefix makes a browser
+/// keep it only when it is Secure, has Path `/` and names no domain (RFC 6265bis §4.1.3.2).
+pub const LOGIN_COOKIE: &str = "__Host-tessari-login";
+
 /// The largest authorization-request body read when the request is POSTed as a form (OpenID Connect Core
 /// §3.1.2.1), in bytes — the same handful of short parameters a query carries.
 pub const AUTHORIZE_BODY_MAX_BYTES: usize = 16 * 1024;

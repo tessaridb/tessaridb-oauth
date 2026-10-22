@@ -28,6 +28,9 @@ const TOKEN_GROUP: &str = "token";
 /// The route group of the authorization requests.
 const AUTHORIZE_GROUP: &str = "authorize";
 
+/// The route group of the sign-in steps.
+const LOGIN_GROUP: &str = "login";
+
 /// The counted name of a request with no peer address.
 const NO_ADDRESS: &str = "no-address";
 
@@ -80,6 +83,16 @@ pub(crate) async fn authorizations(
 ) -> Result<Response> {
     let limit = state.authorize_limit;
     count(&state, AUTHORIZE_GROUP, limit, request, next).await
+}
+
+/// Count the request under the sign-in limit, and refuse it past the limit or when the store cannot count.
+pub(crate) async fn logins(
+    State(state): State<PublicState>,
+    request: Request,
+    next: Next,
+) -> Result<Response> {
+    let limit = state.login_limit;
+    count(&state, LOGIN_GROUP, limit, request, next).await
 }
 
 /// Count the request in `group` under `limit`, then serve or refuse it.

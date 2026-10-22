@@ -188,6 +188,7 @@ first, for development only.
 | `READ_LIMIT`, `READ_WINDOW_SECS` | metadata, key-set and UserInfo requests one client address may make per window | `300`, `60` |
 | `TOKEN_LIMIT`, `TOKEN_WINDOW_SECS` | token requests one client address may make per window | `60`, `60` |
 | `AUTHORIZE_LIMIT`, `AUTHORIZE_WINDOW_SECS` | authorization requests one client address may make per window | `120`, `60` |
+| `LOGIN_LIMIT`, `LOGIN_WINDOW_SECS` | sign-in steps one client address may post per window | `30`, `60` |
 
 ```sh
 cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary
@@ -195,12 +196,12 @@ curl --cacert cert.pem https://localhost:8443/acme/.well-known/oauth-authorizati
 ```
 
 At start the server provisions each tenant's database, makes a signing key for any tenant without one and then
-checks every five minutes for keys due to rotate. Each read, authorization request and token request is counted per
-client address in TessariDB, under separate limits; past the limit the answer is `429` with `Retry-After`, every
-counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`, and when the store cannot count the request
-is refused with `503` rather than served. Logs are JSON on standard output, filtered by `RUST_LOG` (`info` by
-default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight finish within 25 seconds,
-and the process exits 0.
+checks every five minutes for keys due to rotate. Each read, authorization request, token request and sign-in step is
+counted per client address in TessariDB, under separate limits; past the limit the answer is `429` with
+`Retry-After`, every counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`, and when the store
+cannot count the request is refused with `503` rather than served. Logs are JSON on standard output, filtered by
+`RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
+finish within 25 seconds, and the process exits 0.
 
 ## Building and checking
 

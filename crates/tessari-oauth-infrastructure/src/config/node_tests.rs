@@ -73,6 +73,13 @@ fn a_complete_environment_is_read_with_the_documented_defaults() {
         ),
         (120, 60)
     );
+    assert_eq!(
+        (
+            config.login_limit.requests.get(),
+            config.login_limit.window_secs.get()
+        ),
+        (30, 60)
+    );
 }
 
 #[test]

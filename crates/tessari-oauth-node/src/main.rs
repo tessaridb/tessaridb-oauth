@@ -128,6 +128,10 @@ async fn run(
         audit: Arc::clone(&storage.audit),
         signing_algorithm: SIGNING_ALGORITHM,
         interactions: Arc::clone(&storage.interactions),
+        users: Arc::clone(&storage.users),
+        factors: Arc::clone(&storage.factors),
+        signins: Arc::clone(&storage.signins),
+        sessions: Arc::clone(&storage.sessions),
         read_limit: Limit {
             requests: config.read_limit.requests,
             window_secs: config.read_limit.window_secs,
@@ -139,6 +143,10 @@ async fn run(
         authorize_limit: Limit {
             requests: config.authorize_limit.requests,
             window_secs: config.authorize_limit.window_secs,
+        },
+        login_limit: Limit {
+            requests: config.login_limit.requests,
+            window_secs: config.login_limit.window_secs,
         },
         issuers: Arc::new(issuers),
         clock,

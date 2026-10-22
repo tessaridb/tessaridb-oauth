@@ -42,7 +42,7 @@ pub(crate) fn issuer(tenant: &str) -> String {
 /// clients: `portal`, registered for refresh tokens, and `kiosk`, which is not.
 pub(crate) struct Server {
     pub(crate) storage: Storage,
-    kek: Arc<Kek>,
+    pub(crate) kek: Arc<Kek>,
     /// `acme`'s published signing key.
     pub(crate) published: String,
 }
@@ -124,9 +124,14 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         throttle: Arc::clone(&storage.throttle),
         audit: Arc::clone(&storage.audit),
         interactions: Arc::clone(&storage.interactions),
+        users: Arc::clone(&storage.users),
+        factors: Arc::clone(&storage.factors),
+        signins: Arc::clone(&storage.signins),
+        sessions: Arc::clone(&storage.sessions),
         read_limit: plenty(),
         token_limit,
         authorize_limit: plenty(),
+        login_limit: plenty(),
         signing_algorithm: Algorithm::Es256,
         issuers: Arc::new(HashMap::from(
             ["acme", "initech"].map(|name| (tenant(name), issuer(name))),
