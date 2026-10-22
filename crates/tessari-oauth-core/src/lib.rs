@@ -17,6 +17,7 @@ pub mod factor_change;
 pub mod id_token;
 pub mod jose;
 pub mod keys;
+pub mod logout;
 mod params;
 pub mod password;
 pub mod refresh;
