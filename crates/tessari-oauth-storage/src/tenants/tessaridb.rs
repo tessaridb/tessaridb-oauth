@@ -38,7 +38,9 @@ use crate::Result;
 /// admin console under the digest of its sign-in cookie for the ten minutes (`ADMIN_SIGNIN_TTL_SECS`) a trip to the
 /// issuer may take; `admin_sessions` holds an admin console session under the digest of its cookie for at most the
 /// eight hours (`ADMIN_SESSION_ABSOLUTE_SECS`) it lasts; `admin_actions` holds an operator's change under its operator
-/// and idempotency key for the day a repeat of it is answered from.
+/// and idempotency key for the day a repeat of it is answered from. `groups` holds each group under its id with the
+/// roles it carries; `group_members` holds each membership under `<group id>.<user id>`, found for a group's member
+/// list by `by_group` and for a user's claims by `by_user`.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -132,7 +134,14 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      operator string REQUIRED, action string REQUIRED, request string REQUIRED, created_at int REQUIRED) \
      EXPIRE AFTER 24h; \
      DEFINE FIELD IF NOT EXISTS status ON admin_actions TYPE int; \
-     DEFINE FIELD IF NOT EXISTS answer ON admin_actions TYPE string;";
+     DEFINE FIELD IF NOT EXISTS answer ON admin_actions TYPE string; \
+     DEFINE TABLE IF NOT EXISTS groups (\
+     group_id string REQUIRED, tenant string REQUIRED, description string REQUIRED, roles array REQUIRED, \
+     created_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS group_members (\
+     group_id string REQUIRED, user_id string REQUIRED, added_at int REQUIRED, added_by string REQUIRED); \
+     DEFINE INDEX IF NOT EXISTS by_group ON group_members FIELDS group_id; \
+     DEFINE INDEX IF NOT EXISTS by_user ON group_members FIELDS user_id;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

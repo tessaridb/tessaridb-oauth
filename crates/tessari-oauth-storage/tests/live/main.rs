@@ -20,6 +20,7 @@ mod console;
 mod enrolments;
 mod factor_removal;
 mod factors;
+mod groups;
 mod interactions;
 mod interactions_finish;
 mod keys;

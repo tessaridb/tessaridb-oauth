@@ -14,6 +14,7 @@ pub use console::provision;
 pub mod enrolments;
 mod error;
 pub mod factors;
+pub mod groups;
 pub mod interactions;
 pub mod keys;
 pub mod logouts;

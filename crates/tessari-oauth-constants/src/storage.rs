@@ -114,6 +114,22 @@ pub const CLIENT_PAGE_MAX: u32 = 100;
 /// number.
 pub const CLIENT_PAGE_DEFAULT: u32 = 50;
 
+/// The most groups, or members of one group, one page of a company's lists holds.
+pub const GROUP_PAGE_MAX: u32 = 100;
+
+/// How many groups, or members of one group, one page holds when the console asks for no particular number.
+pub const GROUP_PAGE_DEFAULT: u32 = 50;
+
+/// The most groups one user may be a member of: every group is released in one claim, so the bound is what a claim
+/// may carry, and a membership past it is refused rather than a claim cut short.
+pub const GROUPS_PER_USER_MAX: u32 = 100;
+
+/// The most roles one group carries.
+pub const GROUP_ROLES_MAX: usize = 32;
+
+/// The longest description of a group, in characters.
+pub const GROUP_DESCRIPTION_MAX_CHARS: usize = 200;
+
 /// The most operator grants one page of a company's operator list holds.
 pub const OPERATOR_PAGE_MAX: u32 = 100;
 

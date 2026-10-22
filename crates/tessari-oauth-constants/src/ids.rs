@@ -10,6 +10,9 @@ pub const CLIENT_ID_MAX_LEN: usize = 255;
 /// unbounded; 64 holds a base64url-encoded 256-bit value with room to spare.
 pub const USER_ID_MAX_LEN: usize = 64;
 
+/// Longest group id or group role name, in bytes. Operators type them, so the bound is a name's, not a token's.
+pub const GROUP_NAME_MAX_LEN: usize = 64;
+
 /// The fewest characters a password may have when it is the only factor (NIST SP 800-63B-4 §3.1.1.2), counted in
 /// Unicode code points after normalisation.
 pub const PASSWORD_MIN_CHARS_ALONE: usize = 15;
