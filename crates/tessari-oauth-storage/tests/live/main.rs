@@ -19,6 +19,7 @@ mod interactions;
 mod interactions_finish;
 mod keys;
 mod passkeys;
+mod policies;
 mod refresh;
 mod refresh_cascade;
 mod refresh_grant;

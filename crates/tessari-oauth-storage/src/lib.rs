@@ -10,6 +10,7 @@ pub mod factors;
 pub mod interactions;
 pub mod keys;
 pub mod passkeys;
+pub mod policies;
 pub mod refresh;
 pub mod replay;
 mod retry;

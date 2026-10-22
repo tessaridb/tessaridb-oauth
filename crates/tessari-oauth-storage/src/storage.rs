@@ -13,6 +13,7 @@ use crate::factors::{FactorService, TessaridbFactorRepository};
 use crate::interactions::{InteractionService, TessaridbInteractionRepository};
 use crate::keys::{KeyService, TessaridbKeyRepository};
 use crate::passkeys::{PasskeyService, TessaridbPasskeyRepository};
+use crate::policies::{PolicyService, TessaridbPolicyRepository};
 use crate::refresh::{RefreshService, TessaridbRefreshRepository};
 use crate::replay::{ReplayService, TessaridbReplayRepository};
 use crate::sessions::{SessionService, TessaridbSessionRepository};
@@ -49,6 +50,8 @@ pub struct Storage {
     pub users: Arc<UserService>,
     /// Second factors.
     pub factors: Arc<FactorService>,
+    /// Each company's policies.
+    pub policies: Arc<PolicyService>,
     /// Passkeys and their challenges.
     pub passkeys: Arc<PasskeyService>,
     /// Sign-ins in progress.
@@ -77,6 +80,7 @@ impl Storage {
         let audit_repository = Arc::new(TessaridbAuditRepository::new(database.clone()));
         let user_repository = Arc::new(TessaridbUserRepository::new(database.clone()));
         let factor_repository = Arc::new(TessaridbFactorRepository::new(database.clone()));
+        let policy_repository = Arc::new(TessaridbPolicyRepository::new(database.clone()));
         let passkey_repository = Arc::new(TessaridbPasskeyRepository::new(database.clone()));
 
         let signin_repository = Arc::new(TessaridbSigninRepository::new(database.clone()));
@@ -103,6 +107,7 @@ impl Storage {
             throttle: Arc::new(ThrottleService::new(throttle_repository, tenancy.clone())),
             users: Arc::new(UserService::new(user_repository, tenancy.clone())),
             factors: Arc::new(FactorService::new(factor_repository, tenancy.clone())),
+            policies: Arc::new(PolicyService::new(policy_repository, tenancy.clone())),
             passkeys: Arc::new(PasskeyService::new(passkey_repository, tenancy.clone())),
             signins: Arc::new(SigninService::new(signin_repository, tenancy.clone())),
             sessions: Arc::new(SessionService::new(session_repository, tenancy.clone())),
