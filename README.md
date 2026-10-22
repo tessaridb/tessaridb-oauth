@@ -274,7 +274,9 @@ and when another change came first it is refused as `changed_meanwhile` and chan
 most 100 a page (50 unless `limit` says), with `next` naming the cursor of the following page while one may follow
 and no total; `?email=<address>` instead finds the one account that exact address signs in with, and
 `GET .../api/users/<user>` reads one account. Every address in these answers is masked to its first character and
-domain (`k***@acme.example`).
+domain (`k***@acme.example`). `POST .../api/users/<user>/email/reveal` (role `users`, from the console's origin, with
+a `reason`) shows one address whole, and is recorded as `admin_action` `users.reveal_email` with the operator and the
+reason before it is shown; when the record cannot be written, nothing is shown.
 
 `POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` and `.../enable` (role `users`) move an account between
 `active` and `disabled`, each only from the other status (`changed_meanwhile` otherwise, `user_not_found` for an account

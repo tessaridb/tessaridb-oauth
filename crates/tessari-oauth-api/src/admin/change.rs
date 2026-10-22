@@ -55,10 +55,7 @@ where
     let operator = signed_in(state, company, headers).await?;
     operator.require(state, role, action).await?;
     let sent: T = serde_json::from_slice(body).map_err(|_| Error::Invalid)?;
-    let reason = sent.reason().trim().to_owned();
-    if reason.is_empty() || reason.chars().count() > ADMIN_REASON_MAX_CHARS {
-        return Err(Error::ReasonRequired);
-    }
+    let reason = reason_of(&sent)?;
     let key = headers
         .get("idempotency-key")
         .and_then(|key| key.to_str().ok())
@@ -122,6 +119,15 @@ where
         )
         .await;
     answered(made.status, made.body)
+}
+
+/// The operator's reason `sent` carries, trimmed: 1 to 500 characters, or refused.
+pub(super) fn reason_of(sent: &impl Reasoned) -> Result<String> {
+    let reason = sent.reason().trim();
+    if reason.is_empty() || reason.chars().count() > ADMIN_REASON_MAX_CHARS {
+        return Err(Error::ReasonRequired);
+    }
+    Ok(reason.to_owned())
 }
 
 /// The answer `status` with the JSON `body`.

@@ -3,23 +3,47 @@
 //! is a separate, recorded act.
 
 use axum::Json;
+use axum::body::Bytes;
 use axum::extract::rejection::QueryRejection;
 use axum::extract::{Path, Query, State};
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use tessari_oauth_constants::{USER_PAGE_DEFAULT, USER_PAGE_MAX};
+use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::operators::OperatorRole;
 use tessari_oauth_storage::users::UserAccount;
 use tessari_oauth_types::{EmailAddress, UserId};
 
 use super::AdminState;
-use super::change::Refusal;
-use super::operator::signed_in;
+use super::change::{Reasoned, Refusal, reason_of};
+use super::operator::{from_console, signed_in};
 use crate::{Error, Result};
 
 /// The read the routes below name when it is refused.
 const READ: &str = "users.read";
+/// The act of showing one address whole.
+const REVEAL: &str = "users.reveal_email";
+
+/// Why an address is to be shown whole.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Reveal {
+    reason: String,
+}
+
+impl Reasoned for Reveal {
+    fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+/// One address, whole.
+#[derive(Serialize)]
+struct Revealed<'a> {
+    user: &'a str,
+    email: &'a str,
+}
 
 /// What a list asks for: a page after an account, or the account of one exact address.
 #[derive(Deserialize)]
@@ -108,17 +132,65 @@ pub(super) async fn one(
             .map_err(Error::Store)?,
         Err(_) => None,
     };
-    match found {
-        Some(account) => Ok(Json(shown(&account)).into_response()),
-        None => Ok((
-            axum::http::StatusCode::NOT_FOUND,
-            Json(Refusal {
-                code: "user_not_found",
-                message: "this company has no such account",
-            }),
-        )
-            .into_response()),
-    }
+    Ok(found.map_or_else(missing, |account| Json(shown(&account)).into_response()))
+}
+
+/// Show the address of the company's account `user` whole, recorded with the operator's reason before it is shown.
+pub(super) async fn reveal(
+    State(state): State<AdminState>,
+    Path((company, user)): Path<(String, String)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response> {
+    from_console(&state, &headers)?;
+    let operator = signed_in(&state, &company, &headers).await?;
+    operator
+        .require(&state, OperatorRole::Users, REVEAL)
+        .await?;
+    let sent: Reveal = serde_json::from_slice(&body).map_err(|_| Error::Invalid)?;
+    let reason = reason_of(&sent)?;
+    let found = match UserId::parse(user) {
+        Ok(user) => state
+            .users
+            .find(&operator.tenant, &user)
+            .await
+            .map_err(Error::Store)?,
+        Err(_) => None,
+    };
+    let Some(account) = found else {
+        return Ok(missing());
+    };
+    // The record is the control: an address nobody could later see revealed is not shown.
+    let event = AuditEvent {
+        actor: Some(operator.user.as_str().to_owned()),
+        user: Some(account.user.clone()),
+        role: Some(OperatorRole::Users),
+        action: Some(REVEAL.to_owned()),
+        reason: Some(reason),
+        ..AuditEvent::of(AuditKind::AdminAction)
+    };
+    state
+        .audit
+        .record(&operator.tenant, &event, (state.clock)())
+        .await
+        .map_err(Error::Store)?;
+    Ok(Json(Revealed {
+        user: account.user.as_str(),
+        email: account.email.as_str(),
+    })
+    .into_response())
+}
+
+/// The answer for an account the company does not have.
+fn missing() -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(Refusal {
+            code: "user_not_found",
+            message: "this company has no such account",
+        }),
+    )
+        .into_response()
 }
 
 /// `account` with its address masked.

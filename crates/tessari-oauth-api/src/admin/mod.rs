@@ -127,6 +127,10 @@ pub fn admin_router(state: AdminState) -> Router {
         .route("/admin/{company}/api/users", get(users_read::list))
         .route("/admin/{company}/api/users/{user}", get(users_read::one))
         .route(
+            "/admin/{company}/api/users/{user}/email/reveal",
+            post(users_read::reveal),
+        )
+        .route(
             "/admin/{company}/api/users/{user}/disable",
             post(users::disable),
         )
