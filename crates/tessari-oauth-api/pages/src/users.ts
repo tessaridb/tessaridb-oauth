@@ -2,32 +2,14 @@
 // it pages through the company's accounts in id order behind the server's cursor, with no total. An address is shown
 // masked as the server sends it.
 
-import { readRefusal } from "./console-read.ts";
-import { refusalText } from "./console-copy.ts";
+import { refusedOn, unreadable } from "./console-change.ts";
 import { type Screen, heading, labelled, link, make, show } from "./console-dom.ts";
-import { type Answer, call, say } from "./dom.ts";
+import { call, say } from "./dom.ts";
 import { actionsFor, openForm } from "./users-actions.ts";
 import { type User, readUser, readUsersPage, usersPath } from "./users-read.ts";
 
 /** What the next account view says once drawn: the outcome of the change that led to it. */
 let pending = "";
-
-/** Draw `answer`'s refusal on `screen`, or hand over to signing in when the session has ended. */
-export function refusedOn(screen: Screen, title: string, answer: Answer, what: string): void {
-  const refusal = readRefusal(answer.status, answer.body, answer.retryAfter);
-  if (refusal.kind === "signed_out") {
-    screen.signedOut();
-    return;
-  }
-  show(screen.view, heading(title), make("p", "notice", refusalText(refusal, what)));
-  say("");
-}
-
-/** Say on `screen` that the server answered in a shape the console cannot read. */
-export function unreadable(screen: Screen, title: string): void {
-  show(screen.view, heading(title), make("p", "notice", "The server answered in a shape the console cannot read."));
-  say("");
-}
 
 /** An account's state as a badge carrying its word, never its colour alone. */
 export function statusBadge(user: User): HTMLSpanElement {

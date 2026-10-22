@@ -3,71 +3,11 @@
 // confirmed with the account named; enabling is undone by disabling and is not. Showing an address whole is
 // recorded with the reason, and an enrolment code is shown once and never kept by the page.
 
-import { readRefusal } from "./console-read.ts";
-import { changeRefusalText, refusalText } from "./console-copy.ts";
+import { change, keys, notice, reasonField, reasonIn, refusedText } from "./console-change.ts";
 import { type Screen, button, labelled, make } from "./console-dom.ts";
-import { type Answer, call, say } from "./dom.ts";
-import { field } from "./flow.ts";
+import { type Answer, say } from "./dom.ts";
 import { type User } from "./users-read.ts";
-import { keyring, readDisabled, readIssued, readOpened, readRevealed, reasonOf } from "./users-change.ts";
-
-/** A form's keyring: one key per distinct body sent. */
-function keys(): (body: Record<string, string>) => string {
-  return keyring(() => crypto.randomUUID());
-}
-
-/** POST the change `body` to `path` under the key `keyFor` gives that body. */
-function change(path: string, keyFor: (body: Record<string, string>) => string, body: Record<string, string>) {
-  return call("POST", path, body, { "idempotency-key": keyFor(body) });
-}
-
-/** The words for a refused change `answer`, or null when the session has ended and `screen` signs out instead. */
-function refusedText(screen: Screen, answer: Answer): string | null {
-  const refusal = readRefusal(answer.status, answer.body, answer.retryAfter);
-  if (refusal.kind === "signed_out") {
-    screen.signedOut();
-    return null;
-  }
-  if (refusal.kind === "refused") {
-    return changeRefusalText(refusal.code);
-  }
-  const code = field(answer.body, "code");
-  return refusal.kind === "not_found" && code === "user_not_found"
-    ? "This account is no longer in this company."
-    : refusalText(refusal, "This account");
-}
-
-/** The reason field of a change form. */
-function reasonField(id: string): { input: HTMLInputElement; row: HTMLDivElement } {
-  const input = make("input", "");
-  input.type = "text";
-  input.required = true;
-  input.maxLength = 500;
-  input.autocomplete = "off";
-  return { input, row: labelled(id, "Reason (recorded with the change)", input) };
-}
-
-/** The reason typed into `input`, or null after saying what is missing in `notice`. */
-function reasonIn(input: HTMLInputElement, notice: HTMLParagraphElement): string | null {
-  const reason = reasonOf(input.value);
-  if (reason === null) {
-    notice.textContent = changeRefusalText("reason_required");
-    notice.hidden = false;
-    input.setAttribute("aria-invalid", "true");
-    input.focus();
-    return null;
-  }
-  input.removeAttribute("aria-invalid");
-  return reason;
-}
-
-/** A notice paragraph, hidden until it has something to say. */
-function notice(): HTMLParagraphElement {
-  const made = make("p", "notice");
-  made.setAttribute("role", "alert");
-  made.hidden = true;
-  return made;
-}
+import { readDisabled, readIssued, readOpened, readRevealed } from "./users-change.ts";
 
 /** The form opening an account for an address; the new account's view follows. */
 export function openForm(screen: Screen, opened: (user: string) => void): HTMLFormElement {
@@ -106,7 +46,9 @@ export function openForm(screen: Screen, opened: (user: string) => void): HTMLFo
         opened(made.user);
         return;
       }
-      const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer);
+      const text = answer.ok
+        ? "The server answered in a shape the console cannot read."
+        : refusedText(screen, answer, "This account");
       if (text !== null) {
         said.textContent = text;
         said.hidden = false;
@@ -130,7 +72,7 @@ export function actionsFor(
   const ring = { reveal: keys(), enrol: keys(), move: keys() };
 
   const refusedHere = (answer: Answer): void => {
-    const text = refusedText(screen, answer);
+    const text = refusedText(screen, answer, "This account");
     if (text !== null) {
       said.textContent = text;
       said.hidden = false;

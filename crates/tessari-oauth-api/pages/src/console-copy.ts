@@ -45,3 +45,19 @@ export function changeRefusalText(code: string): string {
       return "The server refused this change. Reload the view and try again.";
   }
 }
+
+/** The words for a grant or revocation the server refused with `code`. */
+export function operatorRefusalText(code: string): string {
+  switch (code) {
+    case "self_grant":
+      return "No operator grants a role to themselves. Ask another operator who holds the role.";
+    case "above_ceiling":
+      return "Accounts of this company may not hold this role.";
+    case "account_disabled":
+      return "This account is disabled. Enable it before granting it a role.";
+    case "not_granted":
+      return "This account does not hold this role any more. Reload the view to see the current grants.";
+    default:
+      return changeRefusalText(code);
+  }
+}

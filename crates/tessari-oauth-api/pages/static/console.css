@@ -239,6 +239,60 @@
   margin: 0;
 }
 
+.change-form .mono {
+  font-family: var(--mono);
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented legend {
+  inline-size: 100%;
+  margin-block-end: var(--s-1);
+  padding: 0;
+  font-weight: 500;
+}
+
+/* The radio stays in the accessibility tree and the tab order; only its pill label is drawn. */
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  inline-size: 1px;
+  block-size: 1px;
+}
+
+.segmented label {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--control-height);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.segmented input:checked + label {
+  border-color: var(--accent-text);
+  color: var(--accent-text);
+  background: var(--accent-wash);
+}
+
+.segmented input:focus-visible + label {
+  box-shadow: var(--focus-ring);
+}
+
+.segmented label:active {
+  transform: scale(0.97);
+}
+
 .console-status {
   position: fixed;
   inset-block-end: var(--s-4);

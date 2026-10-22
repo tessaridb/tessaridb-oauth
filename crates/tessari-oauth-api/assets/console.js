@@ -47,7 +47,7 @@
       case "users":
         return { kind: "users", email: query.get("email"), after: query.get("after") };
       case "operators":
-        return { kind: "operators" };
+        return { kind: "operators", after: query.get("after") };
       case "policy":
         return { kind: "policy" };
       case "audit": {
@@ -72,8 +72,8 @@
       return { kind: "not_found" };
     }
     if (status === 429) {
-      const seconds = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
-      return { kind: "throttled", seconds };
+      const seconds2 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
+      return { kind: "throttled", seconds: seconds2 };
     }
     if ((status === 400 || status === 403 || status === 409) && typeof code === "string") {
       return { kind: "refused", code };
@@ -192,43 +192,19 @@
         return "The server refused this change. Reload the view and try again.";
     }
   }
-
-  // src/users-read.ts
-  function usersPath(at) {
-    const email = at.email?.trim() ?? "";
-    if (email !== "") {
-      return `api/users?${new URLSearchParams({ email }).toString()}`;
+  function operatorRefusalText(code) {
+    switch (code) {
+      case "self_grant":
+        return "No operator grants a role to themselves. Ask another operator who holds the role.";
+      case "above_ceiling":
+        return "Accounts of this company may not hold this role.";
+      case "account_disabled":
+        return "This account is disabled. Enable it before granting it a role.";
+      case "not_granted":
+        return "This account does not hold this role any more. Reload the view to see the current grants.";
+      default:
+        return changeRefusalText(code);
     }
-    if (at.after !== null && at.after !== "") {
-      return `api/users?${new URLSearchParams({ after: at.after }).toString()}`;
-    }
-    return "api/users";
-  }
-  function readUser(body) {
-    const user = field(body, "user");
-    const email = field(body, "email");
-    const emailVerified = field(body, "email_verified");
-    const status = field(body, "status");
-    if (typeof user !== "string" || user === "" || typeof email !== "string" || typeof emailVerified !== "boolean" || status !== "active" && status !== "disabled") {
-      return null;
-    }
-    return { user, email, emailVerified, status };
-  }
-  function readUsersPage(body) {
-    const listed = field(body, "users");
-    const next = field(body, "next");
-    if (!Array.isArray(listed) || next !== void 0 && next !== null && typeof next !== "string") {
-      return null;
-    }
-    const users = [];
-    for (const item of listed) {
-      const read = readUser(item);
-      if (read === null) {
-        return null;
-      }
-      users.push(read);
-    }
-    return { users, next: typeof next === "string" ? next : null };
   }
 
   // src/users-change.ts
@@ -279,24 +255,20 @@
     };
   }
 
-  // src/users-actions.ts
+  // src/console-change.ts
   function keys() {
     return keyring(() => crypto.randomUUID());
   }
   function change(path, keyFor, body) {
-    return call("POST", path, body, { "idempotency-key": keyFor(body) });
+    return call("POST", path, body, { "idempotency-key": keyFor({ ...body, "@path": path }) });
   }
-  function refusedText(screen, answer) {
+  function refusedText(screen, answer, what, words = changeRefusalText) {
     const refusal = readRefusal(answer.status, answer.body, answer.retryAfter);
     if (refusal.kind === "signed_out") {
       screen.signedOut();
       return null;
     }
-    if (refusal.kind === "refused") {
-      return changeRefusalText(refusal.code);
-    }
-    const code = field(answer.body, "code");
-    return refusal.kind === "not_found" && code === "user_not_found" ? "This account is no longer in this company." : refusalText(refusal, "This account");
+    return refusal.kind === "refused" ? words(refusal.code) : refusalText(refusal, what);
   }
   function reasonField(id) {
     const input = make("input", "");
@@ -324,6 +296,324 @@
     made.hidden = true;
     return made;
   }
+  function refusedOn(screen, title, answer, what) {
+    const refusal = readRefusal(answer.status, answer.body, answer.retryAfter);
+    if (refusal.kind === "signed_out") {
+      screen.signedOut();
+      return;
+    }
+    show(screen.view, heading(title), make("p", "notice", refusalText(refusal, what)));
+    say("");
+  }
+  function unreadable(screen, title) {
+    show(screen.view, heading(title), make("p", "notice", "The server answered in a shape the console cannot read."));
+    say("");
+  }
+
+  // src/operators-read.ts
+  var DEFAULT_DAYS = 90;
+  var MAX_DAYS = 365;
+  function operatorsPath(after) {
+    return after === null ? "api/operators" : `api/operators?${new URLSearchParams({ after }).toString()}`;
+  }
+  function seconds(value) {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  function readGrant(value) {
+    const user = field(value, "user");
+    const role = field(value, "role");
+    const grantedBy = field(value, "granted_by");
+    const grantedAt = seconds(field(value, "granted_at"));
+    const expires = field(value, "expires_at");
+    const expiresAt = expires === null ? null : seconds(expires);
+    const reason = field(value, "reason");
+    if (typeof user !== "string" || user === "" || typeof role !== "string" || !isRole(role) || typeof grantedBy !== "string" || grantedAt === null || expires !== null && expiresAt === null || typeof reason !== "string") {
+      return null;
+    }
+    return { user, role, grantedBy, grantedAt, expiresAt, reason };
+  }
+  function readGrantsPage(body) {
+    const listed = field(body, "operators");
+    const next = field(body, "next");
+    if (!Array.isArray(listed) || next !== null && typeof next !== "string") {
+      return null;
+    }
+    const grants = [];
+    for (const value of listed) {
+      const grant = readGrant(value);
+      if (grant === null) {
+        return null;
+      }
+      grants.push(grant);
+    }
+    return { grants, next };
+  }
+  function readRevoked(body) {
+    const user = field(body, "user");
+    const role = field(body, "role");
+    return field(body, "revoked") === true && typeof user === "string" && typeof role === "string" ? { user, role } : null;
+  }
+  function daysOf(typed) {
+    const text = typed.trim();
+    if (text === "") {
+      return DEFAULT_DAYS;
+    }
+    if (!/^\d{1,3}$/.test(text)) {
+      return null;
+    }
+    const days = Number(text);
+    return days >= 1 && days <= MAX_DAYS ? days : null;
+  }
+
+  // src/operators.ts
+  var DAYS_WRONG = "Give a whole number of days from 1 to 365, or leave it empty for 90.";
+  function day(seconds2) {
+    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds2 * 1e3));
+  }
+  function rolePicker(roles) {
+    const group = make("fieldset", "segmented", make("legend", "", "Role"));
+    const inputs = [];
+    for (const [index, role] of roles.entries()) {
+      const input = make("input", "");
+      input.type = "radio";
+      input.name = "grant-role";
+      input.id = `grant-role-${role}`;
+      input.value = role;
+      input.checked = index === 0;
+      const label2 = make("label", "", role);
+      label2.htmlFor = input.id;
+      group.append(input, label2);
+      inputs.push([input, role]);
+    }
+    return { group, chosen: () => inputs.find(([input]) => input.checked)?.[1] ?? null };
+  }
+  function grantForm(screen, roles, granted) {
+    const keyFor = keys();
+    const account = make("input", "mono");
+    account.type = "text";
+    account.required = true;
+    account.autocomplete = "off";
+    account.spellcheck = false;
+    const days = make("input", "");
+    days.type = "text";
+    days.inputMode = "numeric";
+    days.placeholder = "90";
+    const picker = rolePicker(roles);
+    const reason = reasonField("grant-reason");
+    const said = notice();
+    const submit = make("button", "primary", "Grant the role");
+    submit.type = "submit";
+    const form = make(
+      "form",
+      "change-form",
+      make("h2", "", "Grant a role"),
+      labelled("grant-account", "Account id", account),
+      picker.group,
+      labelled("grant-days", "Days it lasts (1 to 365; empty for 90)", days),
+      reason.row,
+      said,
+      submit
+    );
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      said.hidden = true;
+      const user = account.value.trim();
+      const role = picker.chosen();
+      const valid = daysOf(days.value);
+      if (user === "" || role === null || valid === null) {
+        const wrong = user === "" ? account : days;
+        said.textContent = user === "" ? "Give the id of the account to grant the role to." : DAYS_WRONG;
+        said.hidden = false;
+        wrong.setAttribute("aria-invalid", "true");
+        wrong.focus();
+        return;
+      }
+      account.removeAttribute("aria-invalid");
+      days.removeAttribute("aria-invalid");
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      submit.disabled = true;
+      const path = `api/operators/${encodeURIComponent(user)}/grants/${encodeURIComponent(role)}`;
+      void change(path, keyFor, { reason: why, valid_days: valid }).then((answer) => {
+        submit.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        if (answer.ok) {
+          granted(`Granted ${role} to ${user} for ${valid} days.`);
+          return;
+        }
+        const text = refusedText(screen, answer, "That account", operatorRefusalText);
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    return form;
+  }
+  function grantsTable(screen, grants, revoked) {
+    const keyFor = keys();
+    const reason = reasonField("revoke-reason");
+    const said = notice();
+    const question = make("p", "");
+    let target = null;
+    const confirmPanel = make("div", "confirm", question, reason.row, said);
+    confirmPanel.hidden = true;
+    const head = make(
+      "tr",
+      "",
+      make("th", "", "Account"),
+      make("th", "", "Role"),
+      make("th", "", "Granted by"),
+      make("th", "", "Expires"),
+      make("th", "", "Reason"),
+      make("th", "", "Change")
+    );
+    for (const cell of head.children) {
+      cell.setAttribute("scope", "col");
+    }
+    const body = make("tbody", "");
+    for (const grant of grants) {
+      const revoke = button("Revoke", "quiet", () => {
+        target = grant;
+        question.replaceChildren(
+          "Revoke ",
+          make("code", "", grant.role),
+          " from ",
+          make("code", "", grant.user),
+          "? Their console stops offering what the role allows at once; another grant restores it."
+        );
+        said.hidden = true;
+        confirmPanel.hidden = false;
+        reason.input.focus();
+      });
+      body.append(
+        make(
+          "tr",
+          "",
+          make("td", "", make("code", "", grant.user)),
+          make("td", "", make("span", "pill", grant.role)),
+          make("td", "", make("code", "", grant.grantedBy)),
+          make("td", "", grant.expiresAt === null ? "Never" : day(grant.expiresAt)),
+          make("td", "", grant.reason),
+          make("td", "", revoke)
+        )
+      );
+    }
+    const keep = button("Keep it", "secondary", () => {
+      confirmPanel.hidden = true;
+      target = null;
+    });
+    const confirm = button("Revoke the role", "danger", () => {
+      const chosen = target;
+      const why = reasonIn(reason.input, said);
+      if (chosen === null || why === null) {
+        return;
+      }
+      const path = `api/operators/${encodeURIComponent(chosen.user)}/grants/${encodeURIComponent(chosen.role)}/revoke`;
+      void change(path, keyFor, { reason: why }).then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        const made = answer.ok ? readRevoked(answer.body) : null;
+        if (made !== null) {
+          revoked(`Revoked ${made.role} from ${made.user}.`);
+          return;
+        }
+        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That grant", operatorRefusalText);
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    confirmPanel.append(make("div", "actions", confirm, keep));
+    return [make("table", "grid", make("thead", "", head), body), confirmPanel];
+  }
+  async function operatorsView(screen, who, after, message = "") {
+    say("Loading the operators.");
+    const answer = await call("GET", operatorsPath(after));
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Operators", answer, "That page");
+      return;
+    }
+    const page = readGrantsPage(answer.body);
+    if (page === null) {
+      unreadable(screen, "Operators");
+      return;
+    }
+    const redraw = (said) => void operatorsView(screen, who, after, said);
+    const parts = [
+      heading("Operators"),
+      make("p", "lead", "Current grants of the roles you hold. Every grant expires; nobody grants a role to themselves.")
+    ];
+    if (page.grants.length === 0) {
+      parts.push(make("p", "empty", after === null ? "Nobody holds your roles yet." : "No more grants."));
+    } else {
+      parts.push(...grantsTable(screen, page.grants, redraw));
+    }
+    const paging = make("p", "paging");
+    if (after !== null) {
+      paging.append(link("#/operators", "First page"));
+    }
+    if (page.next !== null) {
+      paging.append(link(`#/operators?${new URLSearchParams({ after: page.next }).toString()}`, "Next page"));
+    }
+    if (paging.childElementCount > 0) {
+      parts.push(paging);
+    }
+    parts.push(
+      who.roles.length > 0 ? grantForm(screen, who.roles, redraw) : make("p", "muted", "You hold no roles, so you can grant none.")
+    );
+    show(screen.view, ...parts);
+    say(message);
+  }
+
+  // src/users-read.ts
+  function usersPath(at) {
+    const email = at.email?.trim() ?? "";
+    if (email !== "") {
+      return `api/users?${new URLSearchParams({ email }).toString()}`;
+    }
+    if (at.after !== null && at.after !== "") {
+      return `api/users?${new URLSearchParams({ after: at.after }).toString()}`;
+    }
+    return "api/users";
+  }
+  function readUser(body) {
+    const user = field(body, "user");
+    const email = field(body, "email");
+    const emailVerified = field(body, "email_verified");
+    const status = field(body, "status");
+    if (typeof user !== "string" || user === "" || typeof email !== "string" || typeof emailVerified !== "boolean" || status !== "active" && status !== "disabled") {
+      return null;
+    }
+    return { user, email, emailVerified, status };
+  }
+  function readUsersPage(body) {
+    const listed = field(body, "users");
+    const next = field(body, "next");
+    if (!Array.isArray(listed) || next !== void 0 && next !== null && typeof next !== "string") {
+      return null;
+    }
+    const users = [];
+    for (const item of listed) {
+      const read = readUser(item);
+      if (read === null) {
+        return null;
+      }
+      users.push(read);
+    }
+    return { users, next: typeof next === "string" ? next : null };
+  }
+
+  // src/users-actions.ts
   function openForm(screen, opened) {
     const keyFor = keys();
     const email = make("input", "");
@@ -360,7 +650,7 @@
           opened(made.user);
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer);
+        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "This account");
         if (text !== null) {
           said.textContent = text;
           said.hidden = false;
@@ -376,7 +666,7 @@
     const out = make("div", "");
     const ring = { reveal: keys(), enrol: keys(), move: keys() };
     const refusedHere = (answer) => {
-      const text = refusedText(screen, answer);
+      const text = refusedText(screen, answer, "This account");
       if (text !== null) {
         said.textContent = text;
         said.hidden = false;
@@ -495,19 +785,6 @@
 
   // src/users.ts
   var pending = "";
-  function refusedOn(screen, title, answer, what) {
-    const refusal = readRefusal(answer.status, answer.body, answer.retryAfter);
-    if (refusal.kind === "signed_out") {
-      screen.signedOut();
-      return;
-    }
-    show(screen.view, heading(title), make("p", "notice", refusalText(refusal, what)));
-    say("");
-  }
-  function unreadable(screen, title) {
-    show(screen.view, heading(title), make("p", "notice", "The server answered in a shape the console cannot read."));
-    say("");
-  }
   function statusBadge(user) {
     const badge = make("span", "badge", user.status === "active" ? "Active" : "Disabled");
     badge.dataset["state"] = user.status === "active" ? "ok" : "warn";
@@ -721,6 +998,9 @@
         return;
       case "user":
         void userView(screen, at.id);
+        return;
+      case "operators":
+        void operatorsView(screen, who, at.after);
         return;
       default:
         overview(who);

@@ -32,12 +32,13 @@ export type Route =
   | { kind: "overview" }
   | { kind: "users"; email: string | null; after: string | null }
   | { kind: "user"; id: string }
-  | { kind: "operators" }
+  | { kind: "operators"; after: string | null }
   | { kind: "policy" }
   | { kind: "audit"; after: number | null }
   | { kind: "companies" };
 
-function isRole(name: string): name is Role {
+/** Whether `name` is a role the console knows. */
+export function isRole(name: string): name is Role {
   return ROLES.some((role) => role === name);
 }
 
@@ -69,7 +70,7 @@ export function route(hash: string): Route {
     case "users":
       return { kind: "users", email: query.get("email"), after: query.get("after") };
     case "operators":
-      return { kind: "operators" };
+      return { kind: "operators", after: query.get("after") };
     case "policy":
       return { kind: "policy" };
     case "audit": {
