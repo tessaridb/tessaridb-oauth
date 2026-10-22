@@ -14,15 +14,16 @@ export function keys(): (body: Record<string, string | number>) => string {
 }
 
 /**
- * POST the change `body` to `path` under the key `keyFor` gives that path and body together, so one form changing
- * different records never sends two of them under one key.
+ * Send the change `body` to `path` (POST unless `method` says PUT) under the key `keyFor` gives that path and body
+ * together, so one form changing different records never sends two of them under one key.
  */
 export function change(
   path: string,
   keyFor: (request: Record<string, string | number>) => string,
   body: Record<string, string | number>,
+  method: "POST" | "PUT" = "POST",
 ): Promise<Answer> {
-  return call("POST", path, body, { "idempotency-key": keyFor({ ...body, "@path": path }) });
+  return call(method, path, body, { "idempotency-key": keyFor({ ...body, "@path": path }) });
 }
 
 /**

@@ -116,6 +116,23 @@
     input.id = id;
     return make("div", "field", label2, input);
   }
+  function segmented(legend, name, options, checked) {
+    const group = make("fieldset", "segmented", make("legend", "", legend));
+    const inputs = [];
+    for (const option of options) {
+      const input = make("input", "");
+      input.type = "radio";
+      input.name = name;
+      input.id = `${name}-${option}`;
+      input.value = option;
+      input.checked = option === checked;
+      const label2 = make("label", "", option);
+      label2.htmlFor = input.id;
+      group.append(input, label2);
+      inputs.push([input, option]);
+    }
+    return { group, chosen: () => inputs.find(([input]) => input.checked)?.[1] ?? null };
+  }
 
   // src/dom.ts
   function element(id, kind) {
@@ -259,8 +276,8 @@
   function keys() {
     return keyring(() => crypto.randomUUID());
   }
-  function change(path, keyFor, body) {
-    return call("POST", path, body, { "idempotency-key": keyFor({ ...body, "@path": path }) });
+  function change(path, keyFor, body, method = "POST") {
+    return call(method, path, body, { "idempotency-key": keyFor({ ...body, "@path": path }) });
   }
   function refusedText(screen, answer, what, words = changeRefusalText) {
     const refusal = readRefusal(answer.status, answer.body, answer.retryAfter);
@@ -307,6 +324,147 @@
   }
   function unreadable(screen, title) {
     show(screen.view, heading(title), make("p", "notice", "The server answered in a shape the console cannot read."));
+    say("");
+  }
+
+  // src/audit-read.ts
+  var FIELDS = [
+    ["client_id", "Client", "text"],
+    ["scopes", "Scopes", "scopes"],
+    ["user", "Account", "text"],
+    ["families", "Refresh families", "count"],
+    ["subject", "Subject", "text"],
+    ["audience", "Audience", "text"],
+    ["jti", "Token id", "text"],
+    ["auth_method", "Client authentication", "text"],
+    ["bound_to", "Bound to key", "text"],
+    ["reason", "Reason", "text"],
+    ["actor", "Operator", "text"],
+    ["role", "Role", "text"],
+    ["action", "Action", "text"]
+  ];
+  function auditPath(after) {
+    return after === null ? "api/audit" : `api/audit?after=${after}`;
+  }
+  function natural(value) {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  function readEvent(value) {
+    const position = natural(field(value, "position"));
+    const at = natural(field(value, "at"));
+    const kind = field(value, "kind");
+    if (position === null || at === null || typeof kind !== "string") {
+      return null;
+    }
+    const details = [];
+    for (const [key, label2, shape] of FIELDS) {
+      const raw = field(value, key);
+      if (raw === void 0) {
+        continue;
+      }
+      const text = shown(raw, shape);
+      if (text === null) {
+        return null;
+      }
+      details.push([label2, text]);
+    }
+    return { position, at, kind, details };
+  }
+  function shown(raw, shape) {
+    switch (shape) {
+      case "text":
+        return typeof raw === "string" ? raw : null;
+      case "scopes":
+        return Array.isArray(raw) && raw.every((scope) => typeof scope === "string") ? raw.join(" ") : null;
+      case "count": {
+        const count2 = natural(raw);
+        return count2 === null ? null : String(count2);
+      }
+    }
+  }
+  function readAuditPage(body) {
+    const listed = field(body, "events");
+    const next = field(body, "next");
+    if (!Array.isArray(listed) || next !== null && natural(next) === null) {
+      return null;
+    }
+    const events = [];
+    for (const value of listed) {
+      const event = readEvent(value);
+      if (event === null) {
+        return null;
+      }
+      events.push(event);
+    }
+    return { events, next: next === null ? null : natural(next) };
+  }
+
+  // src/audit.ts
+  function moment(seconds2) {
+    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium", timeStyle: "medium" }).format(
+      new Date(seconds2 * 1e3)
+    );
+  }
+  function row(event) {
+    const details = make("dl", "facts");
+    for (const [label2, value] of event.details) {
+      details.append(make("dt", "", label2), make("dd", "", make("code", "", value)));
+    }
+    return make(
+      "tr",
+      "",
+      make("td", "", make("code", "", String(event.position))),
+      make("td", "", moment(event.at)),
+      make("td", "", make("code", "", event.kind)),
+      make("td", "", event.details.length > 0 ? details : "")
+    );
+  }
+  async function auditView(screen, after) {
+    say("Loading the audit trail.");
+    const answer = await call("GET", auditPath(after));
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Audit trail", answer, "That page");
+      return;
+    }
+    const page = readAuditPage(answer.body);
+    if (page === null) {
+      unreadable(screen, "Audit trail");
+      return;
+    }
+    const parts = [
+      heading("Audit trail"),
+      make("p", "lead", "What was done in this company, oldest first, with the fields each event was recorded with.")
+    ];
+    if (page.events.length === 0) {
+      parts.push(make("p", "empty", after === null ? "Nothing has been recorded yet." : "No later events."));
+    } else {
+      const head = make(
+        "tr",
+        "",
+        make("th", "", "Position"),
+        make("th", "", "When"),
+        make("th", "", "Event"),
+        make("th", "", "Details")
+      );
+      for (const cell of head.children) {
+        cell.setAttribute("scope", "col");
+      }
+      parts.push(make("table", "grid", make("thead", "", head), make("tbody", "", ...page.events.map(row))));
+    }
+    const paging = make("p", "paging");
+    if (after !== null) {
+      paging.append(link("#/audit", "First page"));
+    }
+    if (page.next !== null) {
+      paging.append(link(`#/audit?after=${page.next}`, "Next page"));
+    }
+    if (paging.childElementCount > 0) {
+      parts.push(paging);
+    }
+    show(screen.view, ...parts);
     say("");
   }
 
@@ -370,23 +528,6 @@
   function day(seconds2) {
     return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds2 * 1e3));
   }
-  function rolePicker(roles) {
-    const group = make("fieldset", "segmented", make("legend", "", "Role"));
-    const inputs = [];
-    for (const [index, role] of roles.entries()) {
-      const input = make("input", "");
-      input.type = "radio";
-      input.name = "grant-role";
-      input.id = `grant-role-${role}`;
-      input.value = role;
-      input.checked = index === 0;
-      const label2 = make("label", "", role);
-      label2.htmlFor = input.id;
-      group.append(input, label2);
-      inputs.push([input, role]);
-    }
-    return { group, chosen: () => inputs.find(([input]) => input.checked)?.[1] ?? null };
-  }
   function grantForm(screen, roles, granted) {
     const keyFor = keys();
     const account = make("input", "mono");
@@ -398,7 +539,7 @@
     days.type = "text";
     days.inputMode = "numeric";
     days.placeholder = "90";
-    const picker = rolePicker(roles);
+    const picker = segmented("Role", "grant-role", roles, roles[0] ?? null);
     const reason = reasonField("grant-reason");
     const said = notice();
     const submit = make("button", "primary", "Grant the role");
@@ -575,6 +716,142 @@
     say(message);
   }
 
+  // src/policy-read.ts
+  var POLICIES = ["off", "optional", "required"];
+  function isPolicy(name) {
+    return POLICIES.some((policy) => policy === name);
+  }
+  function readPolicy(body) {
+    const policy = field(body, "policy");
+    return isPolicy(policy) ? policy : null;
+  }
+  function policyConsequence(from, to) {
+    if (from === to) {
+      return null;
+    }
+    switch (to) {
+      case "required":
+        return "Every account of this company must hold a second factor. Accounts without one enrol it at their next sign-in before they can continue.";
+      case "optional":
+        return from === "required" ? "Accounts may stop using a second factor; those that keep one still sign in with it." : "Accounts may add a second factor and then sign in with it; nobody is made to.";
+      case "off":
+        return "No account of this company is asked for a second factor: a password alone signs in, including for accounts that enrolled one.";
+    }
+  }
+  function confirmedBy(typed, company2) {
+    return typed.trim() === company2 && company2 !== "";
+  }
+
+  // src/policy.ts
+  var PATH = "api/policy/two-factor";
+  function badge(policy) {
+    const made = make("span", "badge", policy);
+    made.dataset["state"] = policy === "off" ? "warn" : "ok";
+    return made;
+  }
+  function changeForm(screen, company2, current, redraw) {
+    const keyFor = keys();
+    const picker = segmented("New policy", "two-factor", POLICIES, current);
+    const reason = reasonField("policy-reason");
+    const said = notice();
+    const consequence = make("p", "");
+    const typed = make("input", "mono");
+    typed.type = "text";
+    typed.autocomplete = "off";
+    typed.spellcheck = false;
+    const confirmPanel = make(
+      "div",
+      "confirm",
+      consequence,
+      labelled("policy-company", `Type the company id ${company2} to confirm`, typed)
+    );
+    confirmPanel.hidden = true;
+    picker.group.addEventListener("change", () => {
+      confirmPanel.hidden = true;
+    });
+    const review = button("Review the change", "primary", () => {
+      said.hidden = true;
+      const chosen = picker.chosen();
+      const effect = chosen === null ? null : policyConsequence(current, chosen);
+      if (effect === null) {
+        said.textContent = "That is already the policy. Choose another to change it.";
+        said.hidden = false;
+        return;
+      }
+      if (reasonIn(reason.input, said) === null) {
+        return;
+      }
+      consequence.textContent = effect;
+      confirmPanel.hidden = false;
+      typed.focus();
+    });
+    const apply = button("Change the policy", "danger", () => {
+      const chosen = picker.chosen();
+      const why = reasonIn(reason.input, said);
+      if (chosen === null || why === null) {
+        return;
+      }
+      if (!confirmedBy(typed.value, company2)) {
+        said.textContent = `Type ${company2} exactly to confirm.`;
+        said.hidden = false;
+        typed.setAttribute("aria-invalid", "true");
+        typed.focus();
+        return;
+      }
+      typed.removeAttribute("aria-invalid");
+      void change(PATH, keyFor, { expected: current, policy: chosen, reason: why }, "PUT").then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        const made = answer.ok ? readPolicy(answer.body) : null;
+        if (made !== null) {
+          redraw(`The two-factor policy is now ${made}.`);
+          return;
+        }
+        if (answer.status === 409) {
+          redraw(changeRefusalText("changed_meanwhile"));
+          return;
+        }
+        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "The policy");
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    const keep = button("Keep the policy", "secondary", () => {
+      confirmPanel.hidden = true;
+    });
+    confirmPanel.append(make("div", "actions", apply, keep));
+    const heading2 = make("h2", "", "Change it");
+    return make("section", "change-form", heading2, picker.group, reason.row, said, review, confirmPanel);
+  }
+  async function policyView(screen, company2, message = "") {
+    say("Loading the policy.");
+    const answer = await call("GET", PATH);
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Sign-in policy", answer, "The policy");
+      return;
+    }
+    const current = readPolicy(answer.body);
+    if (current === null) {
+      unreadable(screen, "Sign-in policy");
+      return;
+    }
+    const redraw = (said) => void policyView(screen, company2, said);
+    show(
+      screen.view,
+      heading("Sign-in policy"),
+      make("p", "lead", "Whether accounts of this company sign in with a second factor. Operators always do."),
+      make("dl", "facts", make("dt", "", "Two-factor"), make("dd", "", badge(current))),
+      changeForm(screen, company2, current, redraw)
+    );
+    say(message);
+  }
+
   // src/users-read.ts
   function usersPath(at) {
     const email = at.email?.trim() ?? "";
@@ -678,16 +955,16 @@
         return;
       }
       void change(`${base}/email/reveal`, ring.reveal, { reason: why }).then((answer) => {
-        const shown = answer.ok ? readRevealed(answer.body) : null;
+        const shown2 = answer.ok ? readRevealed(answer.body) : null;
         if (!screen.live()) {
           return;
         }
-        if (shown === null) {
+        if (shown2 === null) {
           refusedHere(answer);
           return;
         }
         ring.reveal = keys();
-        address.textContent = shown.email;
+        address.textContent = shown2.email;
         say("The whole address is shown, and the showing is recorded with your reason.");
       });
     });
@@ -786,9 +1063,9 @@
   // src/users.ts
   var pending = "";
   function statusBadge(user) {
-    const badge = make("span", "badge", user.status === "active" ? "Active" : "Disabled");
-    badge.dataset["state"] = user.status === "active" ? "ok" : "warn";
-    return badge;
+    const badge2 = make("span", "badge", user.status === "active" ? "Active" : "Disabled");
+    badge2.dataset["state"] = user.status === "active" ? "ok" : "warn";
+    return badge2;
   }
   function lookup(email) {
     const input = make("input", "");
@@ -1001,6 +1278,12 @@
         return;
       case "operators":
         void operatorsView(screen, who, at.after);
+        return;
+      case "policy":
+        void policyView(screen, company);
+        return;
+      case "audit":
+        void auditView(screen, at.after);
         return;
       default:
         overview(who);

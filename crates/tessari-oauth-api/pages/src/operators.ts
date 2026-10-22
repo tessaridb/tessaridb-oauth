@@ -15,7 +15,7 @@ import {
   refusedText,
   unreadable,
 } from "./console-change.ts";
-import { type Screen, button, heading, labelled, link, make, show } from "./console-dom.ts";
+import { type Screen, button, heading, labelled, link, make, segmented, show } from "./console-dom.ts";
 import { call, say } from "./dom.ts";
 import { type Grant, daysOf, operatorsPath, readGrantsPage, readRevoked } from "./operators-read.ts";
 
@@ -25,25 +25,6 @@ const DAYS_WRONG = "Give a whole number of days from 1 to 365, or leave it empty
 /** A date in seconds since the epoch, as the operator's locale writes a day. */
 function day(seconds: number): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(seconds * 1000));
-}
-
-/** A role picker for `roles`: one pill per role on a row, never a native select. */
-function rolePicker(roles: readonly Role[]): { group: HTMLFieldSetElement; chosen: () => Role | null } {
-  const group = make("fieldset", "segmented", make("legend", "", "Role"));
-  const inputs: [HTMLInputElement, Role][] = [];
-  for (const [index, role] of roles.entries()) {
-    const input = make("input", "");
-    input.type = "radio";
-    input.name = "grant-role";
-    input.id = `grant-role-${role}`;
-    input.value = role;
-    input.checked = index === 0;
-    const label = make("label", "", role);
-    label.htmlFor = input.id;
-    group.append(input, label);
-    inputs.push([input, role]);
-  }
-  return { group, chosen: () => inputs.find(([input]) => input.checked)?.[1] ?? null };
 }
 
 /** The form granting one of `roles`; `granted` redraws the view with the outcome. */
@@ -58,7 +39,7 @@ function grantForm(screen: Screen, roles: readonly Role[], granted: (message: st
   days.type = "text";
   days.inputMode = "numeric";
   days.placeholder = "90";
-  const picker = rolePicker(roles);
+  const picker = segmented("Role", "grant-role", roles, roles[0] ?? null);
   const reason = reasonField("grant-reason");
   const said = notice();
   const submit = make("button", "primary", "Grant the role");

@@ -58,3 +58,27 @@ export function labelled(id: string, text: string, input: HTMLInputElement): HTM
   input.id = id;
   return make("div", "field", label, input);
 }
+
+/** A choice among `options` drawn as one pill per option on a row, never a native select; `checked` starts chosen. */
+export function segmented<T extends string>(
+  legend: string,
+  name: string,
+  options: readonly T[],
+  checked: T | null,
+): { group: HTMLFieldSetElement; chosen: () => T | null } {
+  const group = make("fieldset", "segmented", make("legend", "", legend));
+  const inputs: [HTMLInputElement, T][] = [];
+  for (const option of options) {
+    const input = make("input", "");
+    input.type = "radio";
+    input.name = name;
+    input.id = `${name}-${option}`;
+    input.value = option;
+    input.checked = option === checked;
+    const label = make("label", "", option);
+    label.htmlFor = input.id;
+    group.append(input, label);
+    inputs.push([input, option]);
+  }
+  return { group, chosen: () => inputs.find(([input]) => input.checked)?.[1] ?? null };
+}
