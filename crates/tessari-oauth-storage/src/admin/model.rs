@@ -37,3 +37,21 @@ pub struct AdminSession {
     /// What the sign-in established, derived again from the methods it verified.
     pub assessment: Assessment,
 }
+
+/// What claiming an operator's change under its idempotency key found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Claim {
+    /// Nobody sent it before: make it, then finish or release the claim.
+    Fresh,
+    /// It was made: answer it again exactly as it was answered.
+    Answered {
+        /// The status it was answered with.
+        status: u16,
+        /// The body it was answered with.
+        answer: String,
+    },
+    /// It is being made by an earlier request that has not answered yet.
+    InFlight,
+    /// The key was used for another change.
+    Reused,
+}

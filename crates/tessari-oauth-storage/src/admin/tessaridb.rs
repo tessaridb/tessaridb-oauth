@@ -1,11 +1,11 @@
-//! The admin console's records on TessariDB: `admin_signins`, which the store expires after ten minutes, and
-//! `admin_sessions`, which it expires after eight hours.
+//! The admin console's records on TessariDB: `admin_signins`, which the store expires after ten minutes,
+//! `admin_sessions`, which it expires after eight hours, and `admin_actions`, which it expires after a day.
 
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
 use super::repository::AdminRepository;
-use super::{AdminSessionEntity, PendingSigninEntity};
+use super::{AdminActionEntity, AdminSessionEntity, PendingSigninEntity};
 use crate::{Result, answers};
 
 pub(crate) struct TessaridbAdminRepository {
@@ -118,5 +118,61 @@ impl AdminRepository for TessaridbAdminRepository {
             )
             .await?;
         answers::returned(answers, id, "admin session")
+    }
+
+    async fn claim(&self, place: &Place, id: &str, action: &AdminActionEntity) -> Result<()> {
+        self.database
+            .run_at(
+                place,
+                "CREATE admin_actions:$id = \
+                 { operator: $operator, action: $action, request: $request, created_at: $at };",
+                vec![
+                    ("id".to_owned(), Value::from(id)),
+                    ("operator".to_owned(), Value::from(action.operator.as_str())),
+                    ("action".to_owned(), Value::from(action.action.as_str())),
+                    ("request".to_owned(), Value::from(action.request.as_str())),
+                    ("at".to_owned(), Value::from(action.created_at)),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn action(&self, place: &Place, id: &str) -> Result<Option<AdminActionEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM admin_actions:$id;",
+                vec![("id".to_owned(), Value::from(id))],
+            )
+            .await?;
+        answers::single(answers, "admin action")
+    }
+
+    async fn finish(&self, place: &Place, id: &str, status: i64, answer: &str) -> Result<()> {
+        self.database
+            .run_at(
+                place,
+                "UPDATE admin_actions:$id SET status = $status, answer = $answer;",
+                vec![
+                    ("id".to_owned(), Value::from(id)),
+                    ("status".to_owned(), Value::from(status)),
+                    ("answer".to_owned(), Value::from(answer)),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn release(&self, place: &Place, id: &str) -> Result<()> {
+        self.database
+            .run_at(
+                place,
+                "DELETE admin_actions:$id;",
+                vec![("id".to_owned(), Value::from(id))],
+            )
+            .await?;
+        Ok(())
     }
 }

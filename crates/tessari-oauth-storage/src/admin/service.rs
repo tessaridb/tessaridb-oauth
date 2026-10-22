@@ -13,10 +13,14 @@ use tessari_oauth_constants::{
     ADMIN_SESSION_ABSOLUTE_SECS, ADMIN_SESSION_IDLE_SECS, SIGNIN_WRITE_ATTEMPTS,
 };
 use tessari_oauth_core::authentication::{Method, assess};
-use tessari_oauth_types::{SessionSecret, SigninBinding, TenantId, Timestamp, UserId};
+use tessari_oauth_types::{
+    ErrorCategory, IdempotencyKey, SessionSecret, SigninBinding, TenantId, Timestamp, UserId,
+};
 
 use super::repository::AdminRepository;
-use super::{AdminSession, AdminSessionEntity, PendingSignin, PendingSigninEntity};
+use super::{
+    AdminActionEntity, AdminSession, AdminSessionEntity, Claim, PendingSignin, PendingSigninEntity,
+};
 use crate::{Error, Result, Tenancy, retry};
 
 fn unreadable(reason: &str) -> Error {
@@ -206,5 +210,87 @@ impl AdminService {
         )
         .await?;
         Ok(taken.is_some())
+    }
+
+    /// Claim `operator`'s change `action`, sent with the request digest `request` under `key` in `tenant` at `now`.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, and [`Error::Unreadable`] for a record this service did not write.
+    pub async fn claim(
+        &self,
+        tenant: &TenantId,
+        operator: &UserId,
+        key: &IdempotencyKey,
+        action: &str,
+        request: &str,
+        now: Timestamp,
+    ) -> Result<Claim> {
+        let place = self.tenancy.place(tenant)?;
+        let id = key.record_id(operator);
+        let claimed = AdminActionEntity {
+            operator: operator.as_str().to_owned(),
+            action: action.to_owned(),
+            request: request.to_owned(),
+            status: None,
+            answer: None,
+            created_at: unix_secs(now)?,
+        };
+        match self.repository.claim(&place, &id, &claimed).await {
+            Ok(()) => return Ok(Claim::Fresh),
+            // Claimed before: what it holds decides.
+            Err(refused) if refused.category() == ErrorCategory::Conflict => {}
+            Err(failure) => return Err(failure),
+        }
+        let Some(kept) = self.repository.action(&place, &id).await? else {
+            // Released or lapsed between the two reads: the earlier change is not standing in the way.
+            return Ok(Claim::InFlight);
+        };
+        if kept.operator != claimed.operator || kept.action != action || kept.request != request {
+            return Ok(Claim::Reused);
+        }
+        Ok(match (kept.status, kept.answer) {
+            (Some(status), Some(answer)) => Claim::Answered {
+                status: u16::try_from(status).map_err(|_| unreadable("status"))?,
+                answer,
+            },
+            _ => Claim::InFlight,
+        })
+    }
+
+    /// Record that `operator`'s change under `key` in `tenant` was answered with `status` and `answer`.
+    ///
+    /// # Errors
+    ///
+    /// Store failures.
+    pub async fn finish(
+        &self,
+        tenant: &TenantId,
+        operator: &UserId,
+        key: &IdempotencyKey,
+        status: u16,
+        answer: &str,
+    ) -> Result<()> {
+        let place = self.tenancy.place(tenant)?;
+        self.repository
+            .finish(&place, &key.record_id(operator), i64::from(status), answer)
+            .await
+    }
+
+    /// Give back `operator`'s claim under `key` in `tenant` for a change that was not made, so it may be sent again.
+    ///
+    /// # Errors
+    ///
+    /// Store failures.
+    pub async fn release(
+        &self,
+        tenant: &TenantId,
+        operator: &UserId,
+        key: &IdempotencyKey,
+    ) -> Result<()> {
+        let place = self.tenancy.place(tenant)?;
+        self.repository
+            .release(&place, &key.record_id(operator))
+            .await
     }
 }

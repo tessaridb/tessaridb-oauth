@@ -27,3 +27,9 @@ pub const EMAIL_MAX_LEN: usize = 254;
 
 /// The longest local part of an email address, in bytes (RFC 5321 §4.5.3.1.1).
 pub const EMAIL_LOCAL_MAX_LEN: usize = 64;
+
+/// The fewest characters an `Idempotency-Key` may have: enough that two operators' keys do not meet by chance.
+pub const IDEMPOTENCY_KEY_MIN_LEN: usize = 16;
+
+/// The most characters an `Idempotency-Key` may have.
+pub const IDEMPOTENCY_KEY_MAX_LEN: usize = 128;

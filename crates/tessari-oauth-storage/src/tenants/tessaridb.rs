@@ -37,7 +37,8 @@ use crate::Result;
 /// with who gave it, why and until when, found for its holder by `by_user`. `admin_signins` holds a sign-in to the
 /// admin console under the digest of its sign-in cookie for the ten minutes (`ADMIN_SIGNIN_TTL_SECS`) a trip to the
 /// issuer may take; `admin_sessions` holds an admin console session under the digest of its cookie for at most the
-/// eight hours (`ADMIN_SESSION_ABSOLUTE_SECS`) it lasts.
+/// eight hours (`ADMIN_SESSION_ABSOLUTE_SECS`) it lasts; `admin_actions` holds an operator's change under its operator
+/// and idempotency key for the day a repeat of it is answered from.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -125,7 +126,12 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      EXPIRE AFTER 10m; \
      DEFINE TABLE IF NOT EXISTS admin_sessions (\
      user_id string REQUIRED, sid string REQUIRED, methods array REQUIRED, auth_time int REQUIRED, \
-     seen_at int REQUIRED) EXPIRE AFTER 8h;";
+     seen_at int REQUIRED) EXPIRE AFTER 8h; \
+     DEFINE TABLE IF NOT EXISTS admin_actions (\
+     operator string REQUIRED, action string REQUIRED, request string REQUIRED, created_at int REQUIRED) \
+     EXPIRE AFTER 24h; \
+     DEFINE FIELD IF NOT EXISTS status ON admin_actions TYPE int; \
+     DEFINE FIELD IF NOT EXISTS answer ON admin_actions TYPE string;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

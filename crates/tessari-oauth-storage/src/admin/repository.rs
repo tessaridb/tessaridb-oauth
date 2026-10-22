@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
 
-use super::{AdminSessionEntity, PendingSigninEntity};
+use super::{AdminActionEntity, AdminSessionEntity, PendingSigninEntity};
 use crate::Result;
 
 /// Admin sign-ins in progress and admin sessions.
@@ -26,4 +26,16 @@ pub(crate) trait AdminRepository: Send + Sync {
 
     /// Delete the session under `id`, answering what it held when there was one.
     async fn end(&self, place: &Place, id: &str) -> Result<Option<AdminSessionEntity>>;
+
+    /// Write `action` under `id`, refused when one exists.
+    async fn claim(&self, place: &Place, id: &str, action: &AdminActionEntity) -> Result<()>;
+
+    /// The change under `id`, when there is one.
+    async fn action(&self, place: &Place, id: &str) -> Result<Option<AdminActionEntity>>;
+
+    /// Record the answer the change under `id` was given.
+    async fn finish(&self, place: &Place, id: &str, status: i64, answer: &str) -> Result<()>;
+
+    /// Delete the change under `id`.
+    async fn release(&self, place: &Place, id: &str) -> Result<()>;
 }
