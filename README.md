@@ -286,6 +286,14 @@ hours, shown in that answer only and kept only as its digest; the same request s
 a new code replaces the earlier one. A code is refused for an account that already has a password
 (`already_enrolled`: an enrolment never replaces a password) or is disabled (`account_disabled`).
 
+Operators: holding a role is what lets an operator give it. `GET <ADMIN_URL>/admin/<company>/api/operators` lists the
+current grants of the roles the viewer holds (cursor `<user>.<role>`, at most 100 a page).
+`POST .../api/operators/<user>/grants/<role>` with `{"reason", "valid_days"}` grants a role the operator holds to an
+active account of the company for `valid_days` (90 unless given, at most 365; no grant made in the console is
+permanent), recorded with who gave it; a grant to oneself is refused as `self_grant`. `POST
+.../grants/<role>/revoke` with a `reason` takes it away (`not_granted` when it was not held), and the console of an
+operator with no role left ends at their next request.
+
 `POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` and `.../enable` (role `users`) move an account between
 `active` and `disabled`, each only from the other status (`changed_meanwhile` otherwise, `user_not_found` for an account
 the company does not have). Disabling ends every session of the account, telling its clients through the back

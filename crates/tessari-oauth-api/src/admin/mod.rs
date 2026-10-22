@@ -5,6 +5,7 @@ mod callback;
 mod change;
 mod enrolment;
 mod operator;
+mod operators;
 mod policy;
 mod session;
 mod signin;
@@ -133,6 +134,15 @@ pub fn admin_router(state: AdminState) -> Router {
             get(users_read::list).post(users::create),
         )
         .route("/admin/{company}/api/users/{user}", get(users_read::one))
+        .route("/admin/{company}/api/operators", get(operators::list))
+        .route(
+            "/admin/{company}/api/operators/{user}/grants/{role}",
+            post(operators::grant),
+        )
+        .route(
+            "/admin/{company}/api/operators/{user}/grants/{role}/revoke",
+            post(operators::revoke),
+        )
         .route(
             "/admin/{company}/api/users/{user}/enrolment",
             post(enrolment::enrol),
