@@ -149,3 +149,40 @@ async fn a_claimed_delivery_is_held_and_finished_once() {
         Ok(false)
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_retried_delivery_keeps_only_the_clients_still_untold_and_waits_its_delay() {
+    let storage = fresh(&acme(), 2).await;
+    opened(&storage, "cookie-1", &["portal", "kiosk"]).await;
+    opened(&storage, "cookie-2", &["portal"]).await;
+    for value in ["cookie-1", "cookie-2"] {
+        storage
+            .sessions
+            .end(&acme(), &SessionSecret::from_secret(value))
+            .await
+            .expect("ended");
+    }
+    let mut taken = storage.logouts.claim(&acme(), 10).await.expect("claimed");
+    taken.sort_by_key(|delivery| delivery.clients.len());
+    let (later, now) = (&taken[0], &taken[1]);
+    assert_eq!(
+        storage
+            .logouts
+            .retry(&acme(), &now.id, &[client("portal")], 0)
+            .await,
+        Ok(())
+    );
+    assert_eq!(
+        storage
+            .logouts
+            .retry(&acme(), &later.id, &later.clients, 60)
+            .await,
+        Ok(())
+    );
+    let again = storage.logouts.claim(&acme(), 10).await.expect("claimed");
+    assert_eq!(again.len(), 1, "the delayed one is not due");
+    assert_eq!(again[0].id, now.id);
+    assert_eq!(again[0].clients, vec![client("portal")]);
+    assert_eq!(again[0].attempts, 2);
+}

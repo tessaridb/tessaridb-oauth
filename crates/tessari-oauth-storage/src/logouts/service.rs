@@ -47,6 +47,29 @@ impl LogoutService {
             .collect()
     }
 
+    /// Keep only `clients` on `tenant`'s delivery `id`, the ones still to be told, and release it to be claimed again
+    /// `after_secs` from now.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, among them the refusal of a release whose hold already lapsed and was taken by another claim.
+    pub async fn retry(
+        &self,
+        tenant: &TenantId,
+        id: &str,
+        clients: &[ClientId],
+        after_secs: u64,
+    ) -> Result<()> {
+        let place = self.tenancy.place(tenant)?;
+        let clients: Vec<String> = clients
+            .iter()
+            .map(|client| client.as_str().to_owned())
+            .collect();
+        self.repository
+            .retry(&place, id, &clients, after_secs)
+            .await
+    }
+
     /// Delete `tenant`'s delivery `id`, once; `false` when there was none.
     ///
     /// # Errors
