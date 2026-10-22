@@ -20,12 +20,13 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 </div>
 
 > [!NOTE]
-> **It issues tokens to clients, but nobody can sign in through it yet.**
+> **Users can sign in through it, but nobody can create an account through it yet.**
 > The binary serves each tenant's server metadata (RFC 8414) and key set (RFC 7517) over TLS, its authorization,
-> pushed authorization request, token, revocation and UserInfo endpoints, and rotates the tenants' signing keys.
-> The sign-in page the authorization endpoint hands over to, the account portal and the admin panel are not served
-> yet. No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
-> page describes what the project is for, not a working system.
+> pushed authorization request, token, revocation and UserInfo endpoints, the sign-in and consent pages, ID tokens,
+> and the account API a signed-in user reads and manages their own sessions and grants with, and it rotates the
+> tenants' signing keys. Accounts and their factors are not yet created or changed through any served surface; the
+> account portal page and the admin panel come next. No release has been cut. Apart from the [Status](#status)
+> section and the endpoints described below, this page describes what the project is for, not a working system.
 
 ## What it is for
 
@@ -62,9 +63,9 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize`, `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials), `/oauth2/revoke`, `/oauth2/userinfo` (subject only); signing-key rotation; per-address limits; the audit trail |
-| Built, not served yet | user accounts with unique addresses; new-password rules; password hashing (Argon2id over a peppered HMAC, at a measured cost); TOTP (RFC 6238) with each code accepted once; recovery codes, each spent once; sign-in holds per account, address and credential pair that back off and never lock out; passkeys — registration and assertion checks for EdDSA, ES256 and RS256 keys, credentials kept one owner per id, counters advanced by compare-and-set, challenges spent once |
-| Planned | the sign-in page and its ceremony, the account portal, the admin panel, a two-factor policy per tenant, companies with their own administrators, more regions |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only); the sign-in page with password, TOTP, recovery-code and passkey steps, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail |
+| Built, not served yet | creating accounts and enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
+| Planned | the account portal page, the admin panel, a two-factor policy per tenant, companies with their own administrators, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
 ## How it behaves
