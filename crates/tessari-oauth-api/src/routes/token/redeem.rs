@@ -110,6 +110,19 @@ pub(super) async fn redeem(
     } else {
         None
     };
+    if id_token.is_some() {
+        // The session now has a client to tell when it ends (OpenID Connect Back-Channel Logout 1.0).
+        state
+            .sessions
+            .record_client(
+                tenant,
+                &redemption.user,
+                &issued.authentication.sid,
+                &redemption.client_id,
+            )
+            .await
+            .map_err(Error::Store)?;
+    }
     let answer = Issued::new(
         signed.token,
         refresh_token.as_ref(),

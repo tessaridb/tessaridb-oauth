@@ -19,6 +19,9 @@ pub(crate) trait SessionRepository: Send + Sync {
     /// Record that the session under `id` was found at `seen_at`.
     async fn touch(&self, place: &Place, id: &str, seen_at: i64) -> Result<()>;
 
+    /// Add `client` to the clients of the session under `id`, unless it is there.
+    async fn add_client(&self, place: &Place, id: &str, client: &str) -> Result<()>;
+
     /// Delete the session under `id`, answering what it held when there was one.
     async fn take(&self, place: &Place, id: &str) -> Result<Option<SessionEntity>>;
 

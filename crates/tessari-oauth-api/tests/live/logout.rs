@@ -281,3 +281,63 @@ async fn a_form_post_ends_the_session_as_a_get_does() {
         "the session is over"
     );
 }
+
+/// The clients the session under the cookie value `value` was signed in to with an ID token.
+async fn session_clients(server: &Server, value: &str) -> Vec<String> {
+    server
+        .storage
+        .sessions
+        .find(
+            &tenant("acme"),
+            &SessionSecret::from_secret(value.to_owned()),
+            Timestamp::from_unix_secs(NOW),
+        )
+        .await
+        .expect("the store answers")
+        .expect("a live session")
+        .clients
+        .iter()
+        .map(|client| client.as_str().to_owned())
+        .collect()
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_session_remembers_each_client_it_issued_an_id_token_to_and_no_other() {
+    let server = server(2).await;
+    let (session, sid, user) = browser(&server, "turing@example.com").await;
+    assert!(session_clients(&server, &session).await.is_empty());
+    let issued = IssuedCode {
+        tenant: tenant("acme"),
+        client_id: ClientId::parse("kiosk").expect("a client id"),
+        user: user.clone(),
+        redirect_uri: REDIRECT.to_owned(),
+        challenge: Challenge::of(VERIFIER).expect("a challenge"),
+        scopes: ScopeSet::parse("api:read").expect("scopes"),
+        resources: BTreeSet::from([Resource::parse(API).expect("a resource")]),
+        expires_at: Timestamp::from_unix_secs(NOW + 60),
+        authentication: CodeAuthentication {
+            auth_time: Timestamp::from_unix_secs(NOW - 60),
+            methods: vec![Method::Password],
+            sid: sid.clone(),
+        },
+        nonce: None,
+    };
+    server
+        .storage
+        .codes
+        .issue(
+            &AuthorizationCode::from_secret("code-without-openid"),
+            &issued,
+        )
+        .await
+        .expect("issued");
+    let answered = post(&server, "acme", &redemption("kiosk", "code-without-openid")).await;
+    assert_eq!(answered.status, StatusCode::OK, "{}", answered.body);
+    assert!(
+        session_clients(&server, &session).await.is_empty(),
+        "no ID token, nobody to tell"
+    );
+    id_token(&server, "acme", "portal", &user, &sid).await;
+    assert_eq!(session_clients(&server, &session).await, vec!["portal"]);
+}

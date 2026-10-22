@@ -15,6 +15,8 @@ pub struct SessionEntity {
     pub auth_time: i64,
     /// Unix seconds the session was last found by a request.
     pub seen_at: i64,
+    /// The clients it was signed in to with an ID token, each once; absent until the first.
+    pub clients: Option<Vec<String>>,
 }
 
 impl FromRecord for SessionEntity {
@@ -25,6 +27,7 @@ impl FromRecord for SessionEntity {
             methods: row.take("methods")?,
             auth_time: row.take("auth_time")?,
             seen_at: row.take("seen_at")?,
+            clients: row.take("clients")?,
         })
     }
 }

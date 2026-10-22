@@ -74,6 +74,20 @@ impl SessionRepository for TessaridbSessionRepository {
         Ok(())
     }
 
+    async fn add_client(&self, place: &Place, id: &str, client: &str) -> Result<()> {
+        self.database
+            .run_at(
+                place,
+                "UPDATE sessions:$id SET clients = array::distinct(array::append(clients ?? [], $client));",
+                vec![
+                    ("id".to_owned(), Value::from(id)),
+                    ("client".to_owned(), Value::from(client)),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn take(&self, place: &Place, id: &str) -> Result<Option<SessionEntity>> {
         let answers = self
             .database

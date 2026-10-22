@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tessari_oauth_constants::{SESSION_ABSOLUTE_SECS, SESSION_IDLE_SECS, SIGNIN_WRITE_ATTEMPTS};
 use tessari_oauth_core::authentication::{Method, assess};
 use tessari_oauth_infrastructure::custody::token_id;
-use tessari_oauth_types::{SessionSecret, TenantId, Timestamp, UserId};
+use tessari_oauth_types::{ClientId, SessionSecret, TenantId, Timestamp, UserId};
 
 use super::entity::ListedSessionEntity;
 use super::repository::SessionRepository;
@@ -83,6 +83,7 @@ impl SessionService {
                 .collect(),
             auth_time: signed_in,
             seen_at: signed_in,
+            clients: None,
         };
         retry::bounded(SIGNIN_WRITE_ATTEMPTS, retry::on_store_retry, || {
             self.repository.create(&place, &id, &session)
@@ -124,7 +125,15 @@ impl SessionService {
             Ok(()) | Err(Error::Store(tessari_oauth_infrastructure::Error::Refused { .. })) => {}
             Err(failure) => return Err(failure),
         }
+        let clients = kept
+            .clients
+            .unwrap_or_default()
+            .into_iter()
+            .map(ClientId::parse)
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|_| unreadable("clients"))?;
         Ok(Some(Session {
+            clients,
             user,
             sid: kept.sid,
             methods,
@@ -187,6 +196,32 @@ impl SessionService {
         }
         listed.sort_by_key(|session| session.auth_time.unix_secs());
         Ok(listed)
+    }
+
+    /// Record that `user`'s session in `tenant` whose public id is `sid` signed in to `client` with an ID token, once;
+    /// `false` when `user` has no session by that id.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, and [`Error::Unreadable`] for a record id this service did not write.
+    pub async fn record_client(
+        &self,
+        tenant: &TenantId,
+        user: &UserId,
+        sid: &str,
+        client: &ClientId,
+    ) -> Result<bool> {
+        let place = self.tenancy.place(tenant)?;
+        let held = self.repository.list_for_user(&place, user.as_str()).await?;
+        let Some(found) = held.into_iter().find(|listed| listed.session.sid == sid) else {
+            return Ok(false);
+        };
+        let id = answers::text_id(&found.spelled, "session")?;
+        retry::bounded(SIGNIN_WRITE_ATTEMPTS, retry::on_store_retry, || {
+            self.repository.add_client(&place, &id, client.as_str())
+        })
+        .await?;
+        Ok(true)
     }
 
     /// End `user`'s session in `tenant` whose public id is `sid`, once; `false` when `user` has none by that id.

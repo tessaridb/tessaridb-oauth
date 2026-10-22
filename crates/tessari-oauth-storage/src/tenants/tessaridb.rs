@@ -96,6 +96,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS sessions (\
      user_id string REQUIRED, sid string REQUIRED, methods array REQUIRED, auth_time int REQUIRED, \
      seen_at int REQUIRED) EXPIRE AFTER 7d; \
+     DEFINE FIELD IF NOT EXISTS clients ON sessions TYPE array; \
      DEFINE INDEX IF NOT EXISTS by_user ON sessions FIELDS user_id;";
 
 pub(crate) struct TessaridbTenantRepository {

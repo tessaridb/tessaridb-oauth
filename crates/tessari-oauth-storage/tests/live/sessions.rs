@@ -5,7 +5,7 @@
 use tessari_oauth_constants::{SESSION_ABSOLUTE_SECS, SESSION_IDLE_SECS};
 use tessari_oauth_core::authentication::{Method, assess};
 use tessari_oauth_storage::Storage;
-use tessari_oauth_types::{SessionSecret, TenantId, Timestamp, UserId};
+use tessari_oauth_types::{ClientId, SessionSecret, TenantId, Timestamp, UserId};
 
 use crate::fresh;
 
@@ -166,4 +166,53 @@ async fn a_session_has_a_public_id_of_its_own_that_names_no_cookie() {
     );
     assert_ne!(first, "cookie-1");
     assert_ne!(first, secret("cookie-1").digest(), "not the record's id");
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_session_keeps_each_client_it_signed_in_once_even_when_two_record_at_once() {
+    let storage = fresh(&tenant("acme"), 4).await;
+    opened(&storage).await;
+    let acme = tenant("acme");
+    let user = UserId::parse("user-1").expect("a user id");
+    let found = storage
+        .sessions
+        .find(&acme, &secret("cookie-1"), at(1))
+        .await
+        .expect("answered")
+        .expect("a live session");
+    let portal = ClientId::parse("portal").expect("a client id");
+    let kiosk = ClientId::parse("kiosk").expect("a client id");
+    let (first, second) = tokio::join!(
+        storage
+            .sessions
+            .record_client(&acme, &user, &found.sid, &portal),
+        storage
+            .sessions
+            .record_client(&acme, &user, &found.sid, &kiosk),
+    );
+    assert_eq!((first, second), (Ok(true), Ok(true)));
+    assert_eq!(
+        storage
+            .sessions
+            .record_client(&acme, &user, &found.sid, &portal)
+            .await,
+        Ok(true)
+    );
+    let held = storage
+        .sessions
+        .find(&acme, &secret("cookie-1"), at(2))
+        .await
+        .expect("answered")
+        .expect("a live session");
+    let mut clients = held.clients.clone();
+    clients.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+    assert_eq!(clients, vec![kiosk, portal], "each once, neither lost");
+    assert_eq!(
+        storage
+            .sessions
+            .record_client(&acme, &user, "no-such-session", &held.clients[0])
+            .await,
+        Ok(false)
+    );
 }

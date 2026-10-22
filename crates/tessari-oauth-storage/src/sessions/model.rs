@@ -1,7 +1,7 @@
 //! A session as the service hands it out.
 
 use tessari_oauth_core::authentication::{Assessment, Method};
-use tessari_oauth_types::{Timestamp, UserId};
+use tessari_oauth_types::{ClientId, Timestamp, UserId};
 
 /// A user's session at this issuer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,6 +16,8 @@ pub struct Session {
     pub methods: Vec<Method>,
     /// What the sign-in established, derived again from the methods it verified.
     pub assessment: Assessment,
+    /// The clients it was signed in to with an ID token, each once.
+    pub clients: Vec<ClientId>,
 }
 
 /// A live session as its user's own list shows it: its public id and what is known about it, never its cookie.
