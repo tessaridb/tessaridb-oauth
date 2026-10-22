@@ -125,6 +125,10 @@ pub fn public_router(state: PublicState) -> Router {
             post(account_factors::remove_passkey),
         )
         .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/recovery-codes"),
+            post(account_factors::issue_recovery_codes),
+        )
+        .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions"),
             get(account_sessions::sessions),
         )

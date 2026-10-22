@@ -168,6 +168,9 @@ second factor gives (a password alone does not change an account that holds a pa
 otherwise `401 reauthentication_required`; the account's last way to sign in is refused with
 `409 last_sign_in_method`. A removal signs out every other session of the user, revokes every refresh family the user
 holds and is recorded, and the answer says when the access tokens already issued stop working.
+`POST <issuer>/account/api/recovery-codes` with `{}` replaces every unspent recovery code with ten new ones, under the
+same recent sign-in rule and with the same sign-outs: the codes are in that answer once and are never kept or
+recorded in the clear.
 
 ### Your grants: `<issuer>/account/api/grants`
 

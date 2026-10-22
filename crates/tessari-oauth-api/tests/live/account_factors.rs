@@ -6,6 +6,7 @@
 use axum::http::StatusCode;
 use serde_json::json;
 use tessari_oauth_core::authentication::Method;
+use tessari_oauth_infrastructure::custody::recovery_digest;
 use tessari_oauth_storage::audit::AuditKind;
 use tessari_oauth_types::{SessionSecret, Timestamp, UserId, base64url};
 
@@ -186,4 +187,125 @@ async fn the_last_way_to_sign_in_is_not_removed() {
     assert_eq!(refused.status, StatusCode::CONFLICT, "{}", refused.body);
     assert_eq!(refused.body["code"], "last_sign_in_method");
     assert_eq!(held(&server, &user).await, [only]);
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn new_recovery_codes_replace_the_old_ones_once_shown_and_sign_out_the_rest() {
+    let server = server(2).await;
+    let user = with_password(&server, "knuth@example.com").await;
+    let at = Timestamp::from_unix_secs(NOW);
+    server
+        .storage
+        .factors
+        .enroll_totp(&tenant("acme"), &server.kek, &user, &[5; 20], at)
+        .await
+        .expect("enrolled");
+    let old = recovery_digest("7K3M-9QXZ-AB12-CD34").expect("a recovery code");
+    server
+        .storage
+        .factors
+        .issue_recovery_codes(&tenant("acme"), &user, std::slice::from_ref(&old), at)
+        .await
+        .expect("issued");
+    let weak = session(&server, &user, "password-only", &[Method::Password], 0).await;
+    let issue = |session: String| {
+        let server = &server;
+        async move {
+            call(
+                server,
+                "POST",
+                "recovery-codes",
+                Some(&session),
+                Some(json!({})),
+            )
+            .await
+        }
+    };
+    let refused = issue(weak).await;
+    assert_eq!(
+        refused.body["code"], "reauthentication_required",
+        "an app is enrolled, a password alone is not enough"
+    );
+    let asking = session(
+        &server,
+        &user,
+        "with-a-code",
+        &[Method::Password, Method::Totp],
+        0,
+    )
+    .await;
+    let elsewhere = session(
+        &server,
+        &user,
+        "a-desktop",
+        &[Method::Password, Method::Totp],
+        60,
+    )
+    .await;
+    let issued = issue(asking.clone()).await;
+    assert_eq!(issued.status, StatusCode::OK, "{}", issued.body);
+    let codes: Vec<String> = issued.body["codes"]
+        .as_array()
+        .expect("the codes")
+        .iter()
+        .map(|code| code.as_str().expect("a code").to_owned())
+        .collect();
+    assert_eq!(codes.len(), 10);
+    assert_eq!(
+        codes
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        10,
+        "each distinct"
+    );
+    assert_eq!(
+        issued.body["sessions"], 2,
+        "the password-only session and the desktop"
+    );
+    assert_eq!(issued.body["access_tokens_end_by"], NOW + 300);
+    let spend = |digest: String| {
+        let server = &server;
+        let user = user.clone();
+        async move {
+            server
+                .storage
+                .factors
+                .spend_recovery_code(&tenant("acme"), &user, &digest)
+                .await
+                .expect("the store answers")
+        }
+    };
+    assert!(!spend(old).await, "the old code no longer signs in");
+    let first = codes.first().expect("a code");
+    assert!(
+        spend(recovery_digest(first).expect("a recovery code")).await,
+        "a new one does"
+    );
+    let me = call(&server, "GET", "me", Some(&asking), None).await;
+    assert_eq!(me.body["factors"]["recovery_codes"], 9);
+    assert_eq!(
+        call(&server, "GET", "me", Some(&elsewhere), None)
+            .await
+            .status,
+        StatusCode::UNAUTHORIZED
+    );
+    let trail = server
+        .storage
+        .audit
+        .read_after(&tenant("acme"), 0, 100)
+        .await
+        .expect("the trail reads");
+    let reasons: Vec<Option<String>> = trail
+        .iter()
+        .filter(|record| record.event.kind == AuditKind::FactorChanged)
+        .map(|record| record.event.reason.clone())
+        .collect();
+    assert_eq!(reasons, [Some("recovery_codes_issued".to_owned())]);
+    let recorded = format!("{trail:?}");
+    assert!(
+        codes.iter().all(|code| !recorded.contains(code.as_str())),
+        "no code is ever recorded"
+    );
 }
