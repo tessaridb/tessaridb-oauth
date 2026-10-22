@@ -12,6 +12,7 @@ mod pkce;
 mod scopes;
 mod storage;
 mod throttle;
+mod totp;
 
 pub use encoding::{BASE64URL_ALPHABET, SHA256_BASE64URL_LEN};
 pub use endpoints::{
@@ -51,3 +52,4 @@ pub use storage::{
     STORE_SIGNIN_CONCURRENCY,
 };
 pub use throttle::THROTTLE_SPACE_MAX_KEYS;
+pub use totp::{TOTP_DIGITS, TOTP_SECRET_BYTES, TOTP_SKEW_STEPS, TOTP_STEP_SECS};
