@@ -148,6 +148,42 @@ impl InteractionService {
         to_request(entity).map(Some)
     }
 
+    /// Take the pending authorization kept as `id` in `tenant` at `now`, once, when its code is issued. A pushed one
+    /// its browser never brought, a lapsed one and another tenant's are taken and not handed out.
+    ///
+    /// # Errors
+    ///
+    /// When the store is unavailable, refuses, or holds a row this crate cannot read.
+    pub async fn finish(
+        &self,
+        tenant: &TenantId,
+        id: &str,
+        now: Timestamp,
+    ) -> Result<Option<AuthorizationRequest>> {
+        let place = self.tenancy.place(tenant)?;
+        let taken = retry::bounded(INTERACTION_CLAIM_ATTEMPTS, retry::on_store_retry, || {
+            self.repository.take(&place, id)
+        })
+        .await;
+        let entity = match taken {
+            Ok(Some(entity)) => entity,
+            Ok(None) => return Ok(None),
+            // A delete that keeps meeting other requests' deletes of the same record: when it is gone, one of them
+            // took it.
+            Err(refusal @ Error::Store(tessari_oauth_infrastructure::Error::Refused { .. })) => {
+                return match self.repository.find(&place, id).await? {
+                    Some(_) => Err(refusal),
+                    None => Ok(None),
+                };
+            }
+            Err(failure) => return Err(failure),
+        };
+        if entity.claimed_at.is_none() || !current(&entity, tenant, INTERACTION_TTL_SECS, now)? {
+            return Ok(None);
+        }
+        to_request(entity).map(Some)
+    }
+
     async fn keep(
         &self,
         tenant: &TenantId,

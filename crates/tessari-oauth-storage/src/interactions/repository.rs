@@ -1,4 +1,4 @@
-//! What the interaction service needs from a backend: write one, read one by id, claim a pushed one.
+//! What the interaction service needs from a backend: write one, read one by id, claim a pushed one, take one.
 
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
@@ -25,4 +25,7 @@ pub(crate) trait InteractionRepository: Send + Sync {
         client_id: &str,
         at: i64,
     ) -> Result<Option<InteractionEntity>>;
+
+    /// Delete the interaction at `id`, answering it as it stood; nothing when there was none.
+    async fn take(&self, place: &Place, id: &str) -> Result<Option<InteractionEntity>>;
 }

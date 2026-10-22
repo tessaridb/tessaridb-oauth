@@ -97,4 +97,16 @@ impl InteractionRepository for TessaridbInteractionRepository {
             .await?;
         answers::returned(answers, id, "interaction")
     }
+
+    async fn take(&self, place: &Place, id: &str) -> Result<Option<InteractionEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "DELETE interactions:$id RETURN BEFORE;",
+                vec![("id".to_owned(), text(id))],
+            )
+            .await?;
+        answers::returned(answers, id, "interaction")
+    }
 }
