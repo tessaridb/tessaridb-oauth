@@ -232,3 +232,107 @@ async fn no_company_is_made_outside_the_system_console_or_without_companies() {
         .expect("an answer");
     assert!(made.is_none(), "a refused request made a company");
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_suspended_company_stops_being_served_until_resumed_and_system_is_never_suspended() {
+    let server = server(2).await;
+    let state = system_console(&server, "platform-3", &[OperatorRole::Companies]).await;
+    let created = send(
+        state.clone(),
+        post(
+            "/admin/system/api/companies",
+            "console-s",
+            "create-globex-05",
+            GLOBEX,
+        ),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.body);
+    let why = r#"{"reason":"unpaid invoice 9"}"#;
+    let path = |id: &str, what: &str| format!("/admin/system/api/companies/{id}/{what}");
+
+    let suspended = send(
+        state.clone(),
+        post(
+            &path("globex", "suspend"),
+            "console-s",
+            "suspend-globex-1",
+            why,
+        ),
+    )
+    .await;
+    assert_eq!(suspended.status, StatusCode::OK, "{:?}", suspended.body);
+    assert_eq!(suspended.body["status"], "suspended");
+    assert!(
+        state.served.issuer(&tenant("globex")).is_none(),
+        "still served"
+    );
+    let again = send(
+        state.clone(),
+        post(
+            &path("globex", "suspend"),
+            "console-s",
+            "suspend-globex-2",
+            why,
+        ),
+    )
+    .await;
+    assert_eq!(again.status, StatusCode::CONFLICT);
+    assert_eq!(again.body["code"], "changed_meanwhile");
+
+    let resumed = send(
+        state.clone(),
+        post(
+            &path("globex", "resume"),
+            "console-s",
+            "resume-globex-01",
+            why,
+        ),
+    )
+    .await;
+    assert_eq!(resumed.status, StatusCode::OK, "{:?}", resumed.body);
+    assert_eq!(resumed.body["status"], "active");
+    assert!(
+        state.served.issuer(&tenant("globex")).is_some(),
+        "not served"
+    );
+    let resumed_again = send(
+        state.clone(),
+        post(
+            &path("globex", "resume"),
+            "console-s",
+            "resume-globex-02",
+            why,
+        ),
+    )
+    .await;
+    assert_eq!(resumed_again.status, StatusCode::CONFLICT);
+    assert_eq!(resumed_again.body["code"], "changed_meanwhile");
+
+    let system = send(
+        state.clone(),
+        post(
+            &path("system", "suspend"),
+            "console-s",
+            "suspend-system-01",
+            why,
+        ),
+    )
+    .await;
+    assert_eq!(system.status, StatusCode::CONFLICT);
+    assert_eq!(system.body["code"], "system_company");
+    assert!(state.served.issuer(&tenant("system")).is_some());
+    let nowhere = send(
+        state,
+        post(
+            &path("nowhere", "suspend"),
+            "console-s",
+            "suspend-nowhere-1",
+            why,
+        ),
+    )
+    .await;
+    assert_eq!(nowhere.status, StatusCode::NOT_FOUND);
+    assert_eq!(nowhere.body["code"], "company_not_found");
+}

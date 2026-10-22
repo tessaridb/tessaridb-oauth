@@ -148,6 +148,14 @@ pub fn admin_router(state: AdminState) -> Router {
             "/admin/{company}/api/companies",
             get(companies::list).post(companies::create),
         )
+        .route(
+            "/admin/{company}/api/companies/{id}/suspend",
+            post(companies::suspend),
+        )
+        .route(
+            "/admin/{company}/api/companies/{id}/resume",
+            post(companies::resume),
+        )
         .route("/admin/{company}/api/operators", get(operators::list))
         .route(
             "/admin/{company}/api/operators/{user}/grants/{role}",

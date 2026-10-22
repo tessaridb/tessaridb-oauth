@@ -290,7 +290,9 @@ Companies are made in the `system` console, by an operator holding `companies` (
 `GET <ADMIN_URL>/admin/system/api/companies` lists them, at most 100 a page; `POST` there with `{"id", "name",
 "reason"}` creates a company, makes its database and its console's client, and serves its issuer at once (`201`); an
 id already in use is refused as `company_taken`, except a company whose creation stopped before it was served, which
-the same request completes.
+the same request completes. `POST .../api/companies/<id>/suspend` and `.../resume` (with a `reason`) stop and restart
+serving a company's issuer on this node at once and on the others at their next directory refresh; each moves only
+from the other status (`changed_meanwhile`), and `system` is never suspended (`system_company`).
 
 `GET <ADMIN_URL>/admin/<company>/api/audit?after=<position>&limit=` (role `audit`) reads the company's audit trail in
 order, at most 100 messages a page, `next` naming the position to read after; each message carries its `position`,

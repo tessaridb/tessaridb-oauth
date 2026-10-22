@@ -9,7 +9,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
-use tessari_oauth_constants::COMPANY_PAGE_MAX;
+use tessari_oauth_constants::{COMPANY_PAGE_MAX, SYSTEM_COMPANY};
 use tessari_oauth_storage::companies::{Company, CompanyStatus, Created};
 use tessari_oauth_storage::operators::OperatorRole;
 use tessari_oauth_storage::provision;
@@ -24,6 +24,10 @@ use crate::{Error, Result};
 const READ: &str = "companies.read";
 /// The change `POST .../api/companies` names.
 const CREATE: &str = "companies.create";
+/// The change `POST .../api/companies/{id}/suspend` names.
+const SUSPEND: &str = "companies.suspend";
+/// The change `POST .../api/companies/{id}/resume` names.
+const RESUME: &str = "companies.resume";
 
 /// A page asked for: after a company, and how many.
 #[derive(Deserialize)]
@@ -169,6 +173,126 @@ pub(super) async fn create(
         },
     )
     .await
+}
+
+/// A move of a company between served and not: why.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Moving {
+    reason: String,
+}
+
+impl Reasoned for Moving {
+    fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+/// Stop serving the active company `id`; `system` is never suspended, since that would lock every operator out.
+pub(super) async fn suspend(
+    State(state): State<AdminState>,
+    Path((company, id)): Path<(String, String)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response> {
+    let moving = state.clone();
+    apply(
+        &state,
+        (&company, &headers, &body),
+        (OperatorRole::Companies, SUSPEND),
+        |_, _: Moving| async move {
+            if id == SYSTEM_COMPANY {
+                return refused(StatusCode::CONFLICT, "system_company");
+            }
+            moved(
+                &moving,
+                &id,
+                CompanyStatus::Active,
+                CompanyStatus::Suspended,
+            )
+            .await
+        },
+    )
+    .await
+}
+
+/// Serve the suspended company `id` again.
+pub(super) async fn resume(
+    State(state): State<AdminState>,
+    Path((company, id)): Path<(String, String)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response> {
+    let moving = state.clone();
+    apply(
+        &state,
+        (&company, &headers, &body),
+        (OperatorRole::Companies, RESUME),
+        |_, _: Moving| async move {
+            moved(
+                &moving,
+                &id,
+                CompanyStatus::Suspended,
+                CompanyStatus::Active,
+            )
+            .await
+        },
+    )
+    .await
+}
+
+/// Move the company `id` from `from` to `to` and serve what is active now; refused when it is not in `from`.
+async fn moved(
+    state: &AdminState,
+    id: &str,
+    from: CompanyStatus,
+    to: CompanyStatus,
+) -> Result<Made> {
+    let Ok(id) = TenantId::parse(id) else {
+        return refused(StatusCode::NOT_FOUND, "company_not_found");
+    };
+    let made = state
+        .companies
+        .transition(&id, from, to)
+        .await
+        .map_err(Error::Store)?;
+    if !made {
+        let found = state.companies.find(&id).await.map_err(Error::Store)?;
+        return match found {
+            Some(_) => refused(StatusCode::CONFLICT, "changed_meanwhile"),
+            None => refused(StatusCode::NOT_FOUND, "company_not_found"),
+        };
+    }
+    state
+        .served
+        .replace(state.companies.active().await.map_err(Error::Store)?);
+    let company = state
+        .companies
+        .find(&id)
+        .await
+        .map_err(Error::Store)?
+        .ok_or(Error::Internal)?;
+    Ok(Made {
+        status: StatusCode::OK,
+        body: serde_json::to_string(&shown(company)).map_err(|_| Error::Internal)?,
+        shown: None,
+        user: None,
+    })
+}
+
+/// A move not made, for the reason `code` names.
+fn refused(status: StatusCode, code: &'static str) -> Result<Made> {
+    let message = match code {
+        "system_company" => "the system company is never suspended",
+        "company_not_found" => "there is no such company",
+        _ => "the company is not in the status this move starts from; read it again",
+    };
+    Ok(Made {
+        status,
+        body: serde_json::to_string(&Refusal { code, message }).map_err(|_| Error::Internal)?,
+        shown: None,
+        user: None,
+    })
 }
 
 /// `company` as the console shows it.
