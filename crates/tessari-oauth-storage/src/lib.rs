@@ -16,6 +16,7 @@ pub mod subjects;
 mod tenancy;
 pub mod tenants;
 pub mod throttle;
+pub mod users;
 
 pub use error::{Error, Result};
 pub use storage::Storage;

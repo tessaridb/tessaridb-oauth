@@ -21,6 +21,9 @@ use crate::Result;
 /// order and never lets anyone rewrite or delete; a message is kept for 400 days.
 /// `clients` holds each client's registration under its id; every read is by id. `secrets` holds the tenant's sealed
 /// secrets under the id naming their purpose — the pairwise salt.
+/// `users` holds each account under its random id; `user_emails` holds the address an account signs in with under the
+/// address itself, so an address belongs to one account and sign-in finds it by id; `credentials` holds an account's
+/// password hash under the account's id.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -53,7 +56,13 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      resources array REQUIRED, auth_method string REQUIRED, \
      assertion_alg string, grant_types array REQUIRED, jwks array REQUIRED, dpop_bound_access_tokens bool REQUIRED, \
      registered_at int REQUIRED); \
-     DEFINE TABLE IF NOT EXISTS secrets (sealed string REQUIRED, created_at int REQUIRED);";
+     DEFINE TABLE IF NOT EXISTS secrets (sealed string REQUIRED, created_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS users (\
+     user_id string REQUIRED, tenant string REQUIRED, status string REQUIRED, created_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS user_emails (\
+     address string REQUIRED, user_id string REQUIRED, verified_at int, verified_by string); \
+     DEFINE TABLE IF NOT EXISTS credentials (\
+     user_id string REQUIRED, hash string REQUIRED, pepper int REQUIRED, updated_at int REQUIRED);";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

@@ -25,6 +25,7 @@ mod signer;
 mod subjects;
 mod throttle;
 mod tls;
+mod users;
 
 use tessari_oauth_infrastructure::tessaridb::StoreConfig;
 use tessari_oauth_storage::Storage;
