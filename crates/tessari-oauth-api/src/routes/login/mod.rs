@@ -23,7 +23,7 @@ pub(super) use begin::begin;
 pub(super) use consent::{consent, decide, signed_in};
 pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
-pub(super) use passkey::{passkey, passkey_options};
+pub(super) use passkey::{passkey, passkey_options, relying_party};
 pub(super) use password::password;
 
 use axum::Json;

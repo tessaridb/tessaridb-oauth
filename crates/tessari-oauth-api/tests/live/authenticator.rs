@@ -47,6 +47,40 @@ impl Authenticator {
         }
     }
 
+    /// The body of a registration (`webauthn.create`) over `challenge` from `origin`: the client data, and a `none`
+    /// attestation object whose authenticator data carries this credential, user present and verified.
+    pub(crate) fn create(&self, challenge: &str, origin: &str) -> Value {
+        let client_data = format!(
+            r#"{{"type":"webauthn.create","challenge":"{challenge}","origin":"{origin}","crossOrigin":false}}"#
+        );
+        let mut data = digest(&SHA256, RP_ID.as_bytes()).as_ref().to_vec();
+        // User present, user verified, backup eligible, attested credential data included.
+        data.push(UP | UV | 0x08 | 0x40);
+        data.extend_from_slice(&0_u32.to_be_bytes());
+        data.extend_from_slice(&[0; 16]);
+        let id_len = u16::try_from(self.credential_id.len()).expect("a short id");
+        data.extend_from_slice(&id_len.to_be_bytes());
+        data.extend_from_slice(&self.credential_id);
+        data.extend_from_slice(&self.registered().public_key);
+        // CBOR {"fmt": "none", "attStmt": {}, "authData": data}.
+        let mut object = vec![0xa3, 0x63];
+        object.extend_from_slice(b"fmt");
+        object.push(0x64);
+        object.extend_from_slice(b"none");
+        object.push(0x67);
+        object.extend_from_slice(b"attStmt");
+        object.push(0xa0);
+        object.push(0x68);
+        object.extend_from_slice(b"authData");
+        object.push(0x58);
+        object.push(u8::try_from(data.len()).expect("under 256 bytes"));
+        object.extend_from_slice(&data);
+        json!({
+            "client_data_json": base64url::encode(client_data.as_bytes()),
+            "attestation_object": base64url::encode(&object),
+        })
+    }
+
     /// The step's body for an assertion over `challenge` from `origin` with `flags` and `count`.
     pub(crate) fn assert(&self, challenge: &str, origin: &str, flags: u8, count: u32) -> Value {
         let client_data = format!(

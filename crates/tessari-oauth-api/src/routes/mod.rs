@@ -5,6 +5,7 @@
 mod account;
 mod account_factors;
 mod account_me;
+mod account_passkeys;
 mod account_sessions;
 mod account_totp;
 mod authorize;
@@ -121,6 +122,14 @@ pub fn public_router(state: PublicState) -> Router {
             post(account::revoke),
         )
         .route(&format!("/{{tenant}}{ACCOUNT_API_PATH}/me"), get(account_me::me))
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/options"),
+            post(account_passkeys::options),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/register"),
+            post(account_passkeys::register),
+        )
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/remove"),
             post(account_factors::remove_passkey),

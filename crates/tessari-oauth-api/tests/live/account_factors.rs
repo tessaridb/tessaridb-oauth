@@ -451,3 +451,119 @@ async fn an_authenticator_app_is_enrolled_by_a_code_from_the_secret_shown_once()
         "recorded, the secret never"
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_passkey_is_registered_once_against_a_challenge_issued_to_the_same_user() {
+    let server = server(2).await;
+    let user = with_password(&server, "kay@example.com").await;
+    let other = with_password(&server, "engelbart@example.com").await;
+    let asking = session(&server, &user, "registering", &[Method::Password], 0).await;
+    let elsewhere = session(&server, &user, "a-phone", &[Method::Password], 60).await;
+    let theirs = session(&server, &other, "theirs", &[Method::Password], 0).await;
+    let options = |session: String| {
+        let server = &server;
+        async move {
+            call(
+                server,
+                "POST",
+                "passkeys/options",
+                Some(&session),
+                Some(json!({})),
+            )
+            .await
+        }
+    };
+    let register = |session: String, body: serde_json::Value| {
+        let server = &server;
+        async move {
+            call(
+                server,
+                "POST",
+                "passkeys/register",
+                Some(&session),
+                Some(body),
+            )
+            .await
+        }
+    };
+    let offered = options(asking.clone()).await;
+    assert_eq!(offered.status, StatusCode::OK, "{}", offered.body);
+    assert_eq!(offered.body["rp_id"], crate::authenticator::RP_ID);
+    assert_eq!(offered.body["user"]["name"], "kay@example.com");
+    assert_eq!(offered.body["exclude"], json!([]));
+    let challenge = offered.body["challenge"]
+        .as_str()
+        .expect("a challenge")
+        .to_owned();
+    let their_challenge = options(theirs).await.body["challenge"]
+        .as_str()
+        .expect("theirs")
+        .to_owned();
+    let device = Authenticator::new(b"kays-new-key");
+    let crossed = register(
+        asking.clone(),
+        device.create(&their_challenge, crate::authenticator::ORIGIN),
+    )
+    .await;
+    assert_eq!(
+        crossed.body["code"], "nothing_pending",
+        "another user's challenge registers nothing"
+    );
+    let added = register(
+        asking.clone(),
+        device.create(&challenge, crate::authenticator::ORIGIN),
+    )
+    .await;
+    assert_eq!(added.status, StatusCode::OK, "{}", added.body);
+    let id = base64url::encode(&device.credential_id);
+    assert_eq!(added.body["id"], id);
+    assert_eq!(added.body["sessions"], 1);
+    assert_eq!(held(&server, &user).await, std::slice::from_ref(&id));
+    assert!(held(&server, &other).await.is_empty());
+    assert_eq!(
+        call(&server, "GET", "me", Some(&elsewhere), None)
+            .await
+            .status,
+        StatusCode::UNAUTHORIZED
+    );
+    let strong = session(&server, &user, "signed-in-by-passkey", &[UV], 0).await;
+    let replayed = register(
+        strong,
+        device.create(&challenge, crate::authenticator::ORIGIN),
+    )
+    .await;
+    assert_eq!(
+        replayed.body["code"], "nothing_pending",
+        "a challenge registers once"
+    );
+    let fresh = options(session(&server, &user, "strong-again", &[UV], 0).await).await;
+    let second = Authenticator::new(b"kays-second-key");
+    let weak = register(
+        asking.clone(),
+        second.create(
+            fresh.body["challenge"].as_str().expect("a challenge"),
+            crate::authenticator::ORIGIN,
+        ),
+    )
+    .await;
+    assert_eq!(
+        weak.body["code"], "reauthentication_required",
+        "registering checks the session too"
+    );
+    let stronger = options(asking).await;
+    assert_eq!(
+        stronger.body["code"], "reauthentication_required",
+        "a passkey is held now: a password alone adds none"
+    );
+    let trail = format!(
+        "{:?}",
+        server
+            .storage
+            .audit
+            .read_after(&tenant("acme"), 0, 100)
+            .await
+            .expect("the trail")
+    );
+    assert!(trail.contains("passkey_added"));
+}

@@ -175,7 +175,11 @@ recorded in the clear. An authenticator app is enrolled in two steps under the s
 scans, and keeps it sealed for that session for ten minutes; `POST <issuer>/account/api/totp/confirm` with
 `{"code": "<six digits>"}` enrols it when the code comes from that secret, with the same sign-outs. A wrong code ends
 the attempt (`400 code_rejected`, then `409 nothing_pending`), and an account that has an app already gets
-`409 already_enrolled`.
+`409 already_enrolled`. A passkey is added the same way: `POST <issuer>/account/api/passkeys/options` with `{}`
+answers a registration challenge issued to that user alone, with the user's own passkeys to exclude and the user
+verification it requires, and `POST <issuer>/account/api/passkeys/register` with the browser's `client_data_json`
+and `attestation_object` spends that challenge once, checks the response against this issuer's relying party and
+origin, stores the passkey and signs out the other sessions.
 
 ### Your grants: `<issuer>/account/api/grants`
 

@@ -83,7 +83,7 @@ pub(in crate::routes) async fn passkey_options(
 }
 
 /// The relying-party id and the origin a passkey for `issuer` is made for: its host, and its scheme, host and port.
-fn relying_party(issuer: &str) -> Result<(String, String)> {
+pub(in crate::routes) fn relying_party(issuer: &str) -> Result<(String, String)> {
     let url = url::Url::parse(issuer).map_err(|_| Error::Internal)?;
     let host = url.host_str().ok_or(Error::Internal)?.to_owned();
     Ok((host, url.origin().ascii_serialization()))
