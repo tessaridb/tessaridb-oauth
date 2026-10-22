@@ -43,3 +43,13 @@ pub(super) fn check(
     }
     Ok(())
 }
+
+/// The challenge `json` names, when it is client data at all.
+pub(super) fn challenge(json: &[u8]) -> Option<Vec<u8>> {
+    let data: ClientData = serde_json::from_slice(json).ok()?;
+    base64url::decode(&data.challenge).ok()
+}
+
+#[cfg(test)]
+#[path = "client_data_tests.rs"]
+mod tests;

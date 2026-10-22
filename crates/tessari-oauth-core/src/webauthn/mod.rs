@@ -167,6 +167,14 @@ pub fn assert(
     })
 }
 
+/// The challenge an assertion's client data names, so the ceremony that issued it can be found; `None` for client
+/// data that is unreadable or larger than any browser sends. Finding it proves nothing: [`assert`] checks it.
+#[must_use]
+pub fn challenge_of(client_data_json: &[u8]) -> Option<Vec<u8>> {
+    within_limit(&[client_data_json]).ok()?;
+    client_data::challenge(client_data_json)
+}
+
 /// Refuse a response part larger than any authenticator sends, before any of it is parsed.
 fn within_limit(parts: &[&[u8]]) -> Result<(), WebauthnRefused> {
     if parts
