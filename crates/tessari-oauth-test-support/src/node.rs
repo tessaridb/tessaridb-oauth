@@ -69,7 +69,7 @@ pub fn plain_node() -> Result<StoreConfig, Error> {
 }
 
 /// Storage on the node `config` names, over a pool of `connections`, for a region nobody else uses; nothing
-/// provisioned yet. The region's namespace is removed when the calling test ends.
+/// provisioned yet. The first call of a process removes the namespaces earlier runs left.
 ///
 /// # Errors
 ///
@@ -78,6 +78,6 @@ pub fn fresh_storage(config: StoreConfig, connections: usize) -> Result<Storage,
     let database = Database::new(config.clone(), connections).map_err(Error::Pool)?;
     let region = unique("live");
     let tenancy = Tenancy::for_region(&region).map_err(Error::Region)?;
-    crate::removed_at_end(&config, format!("oauth_{region}"));
+    crate::earlier_runs_removed(&config);
     Ok(Storage::new(&database, &tenancy))
 }

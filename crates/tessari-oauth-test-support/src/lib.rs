@@ -5,6 +5,6 @@ mod cleanup;
 mod kek;
 mod node;
 
-pub use cleanup::removed_at_end;
+pub use cleanup::earlier_runs_removed;
 pub use kek::{fresh_kek, fresh_passwords};
 pub use node::{Error, fresh_storage, need, plain_node, unique};

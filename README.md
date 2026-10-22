@@ -342,8 +342,8 @@ TESSARIDB_OAUTH_TEST_STORE=127.0.0.1:39601 TESSARIDB_OAUTH_TEST_USER=oauth \
   TESSARIDB_OAUTH_TEST_PASSWORD="$PASSWORD" cargo test -p tessari-oauth-storage --test live -- --ignored
 ```
 
-Each test works in a namespace of its own, removed when the test ends, passed or failed; the first test of a run
-also removes what an interrupted earlier run left behind. The suite can run repeatedly against one node. The two TLS
+Each test works in a namespace of its own; a run removes the namespaces earlier runs left before its first test
+starts, so the node holds at most one run's. The suite can run repeatedly against one node. The two TLS
 tests also need a node serving TLS (`TESSARIDB_OAUTH_TEST_TLS_STORE`), the PEM of the authority that signed its
 certificate (`TESSARIDB_OAUTH_TEST_TLS_AUTHORITY`) and the PEM of an unrelated one
 (`TESSARIDB_OAUTH_TEST_TLS_OTHER_AUTHORITY`).

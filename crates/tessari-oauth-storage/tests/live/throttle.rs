@@ -6,7 +6,7 @@ use std::num::NonZeroU64;
 use tessari_oauth_infrastructure::tessaridb::{Answer, Database, Place, Value};
 use tessari_oauth_storage::throttle::{Admission, Limit};
 use tessari_oauth_storage::{Storage, Tenancy};
-use tessari_oauth_test_support::{plain_node, removed_at_end, unique};
+use tessari_oauth_test_support::{earlier_runs_removed, plain_node, unique};
 use tessari_oauth_types::Timestamp;
 
 const NOW: u64 = 1_800_000_010;
@@ -22,9 +22,9 @@ fn limit(requests: u64, window_secs: u64) -> Limit {
 /// region's namespace.
 pub(crate) async fn prepared(connections: usize) -> (Storage, Database, String) {
     let node = plain_node().expect("the plain node is named");
+    earlier_runs_removed(&node);
     let database = Database::new(node.clone(), connections).expect("a pool");
     let region = unique("live");
-    removed_at_end(&node, format!("oauth_{region}"));
     let tenancy = Tenancy::for_region(&region).expect("a region");
     let storage = Storage::new(&database, &tenancy);
     storage.throttle.prepare().await.expect("prepared");

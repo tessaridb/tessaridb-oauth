@@ -1,7 +1,7 @@
-//! Every region namespace a live test makes is removed when that test ends, returned or failed, so a run leaves the
-//! test node with the namespaces it found. The first namespace a process makes also removes the ones a run that is no
-//! longer running left behind: `oauth_live<pid>x<rest>` whose process is gone. Nothing this harness did not name is
-//! touched.
+//! The region namespaces a live run makes are removed by the next run, before any of its tests starts: the first
+//! fixture a process builds removes every `oauth_live<pid>x<rest>` whose process is gone, and every other fixture
+//! waits for that. Removing them during a run instead would put catalog changes beside the tests' own writes and
+//! turn their races into failures. Nothing this harness did not name is touched.
 
 use std::future::Future;
 use std::sync::Once;
@@ -13,57 +13,21 @@ const PREFIX: &str = "oauth_live";
 
 static SWEPT: Once = Once::new();
 
-/// Removes `namespace` with everything in it when the calling test ends, returned or failed. Must be called inside
-/// the test's runtime; outside one there is no end to wait for, and the namespace is named on stderr instead.
-pub fn removed_at_end(config: &StoreConfig, namespace: String) {
-    let Ok(runtime) = tokio::runtime::Handle::try_current() else {
-        report(format_args!(
-            "the live suite cannot remove namespace {namespace}: no runtime to outlive"
-        ));
-        return;
-    };
+/// Removes, once per process and before the caller goes on, the namespaces of live runs that are no longer running.
+pub fn earlier_runs_removed(config: &StoreConfig) {
     SWEPT.call_once(|| {
         let config = config.clone();
         on_own_runtime(async move { sweep(config).await });
     });
-    let removal = Removal {
-        config: config.clone(),
-        namespace,
-    };
-    // The runtime drops this task, and the removal with it, when the test's body has returned or unwound.
-    runtime.spawn(async move {
-        let _removal = removal;
-        std::future::pending::<()>().await;
-    });
 }
 
-/// Removes `namespace` when dropped.
-struct Removal {
-    config: StoreConfig,
-    namespace: String,
-}
-
-impl Drop for Removal {
-    fn drop(&mut self) {
-        let config = self.config.clone();
-        let namespace = std::mem::take(&mut self.namespace);
-        on_own_runtime(async move {
-            if let Err(message) = remove(&config, &namespace).await {
-                report(format_args!(
-                    "the live suite could not remove namespace {namespace}: {message}"
-                ));
-            }
-        });
-    }
-}
-
-/// Runs `work` to completion on a thread and runtime of its own: the test's runtime is shutting down, or busy, and a
-/// drop cannot await. One teardown at a time on one connection needs no more than a single-threaded runtime.
+/// Runs `work` to completion on a thread and runtime of its own, from a synchronous fixture inside a test's runtime,
+/// which cannot block on it. One removal at a time on one connection needs no more than a single-threaded runtime.
 fn on_own_runtime(work: impl Future<Output = ()> + Send + 'static) {
-    // bgv-allow(raw-thread-spawn): a drop cannot await, and the test's runtime is shutting down; one thread hosts
-    // one teardown and is joined before the drop returns.
+    // bgv-allow(raw-thread-spawn): a synchronous fixture inside a test's runtime cannot block on that runtime; one
+    // thread hosts the sweep and is joined before the fixture goes on.
     let finished = std::thread::spawn(move || {
-        // bgv-allow(current-thread-runtime): one teardown on one connection, run from that drop.
+        // bgv-allow(current-thread-runtime): one sweep on one connection, run from that fixture.
         match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
