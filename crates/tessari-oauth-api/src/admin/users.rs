@@ -1,7 +1,7 @@
-//! A company's user accounts in its console: disabled and enabled by an operator holding `users`, each move made only
-//! from the status the account is in. Disabling ends everything the account holds at once: its sessions (each one's
-//! clients told through the back channel), its refresh families, and with its issuer sessions any console session of
-//! its own. Enabling gives back only the right to sign in.
+//! A company's user accounts in its console: opened, disabled and enabled by an operator holding `users`, each move
+//! made only from the status the account is in. Disabling ends everything the account holds at once: its sessions
+//! (each one's clients told through the back channel), its refresh families, and with its issuer sessions any console
+//! session of its own. Enabling gives back only the right to sign in.
 
 use axum::body::Bytes;
 use axum::extract::{Path, State};
@@ -11,13 +11,16 @@ use serde::{Deserialize, Serialize};
 use tessari_oauth_constants::ACCESS_TOKEN_TTL_SECS;
 use tessari_oauth_storage::operators::OperatorRole;
 use tessari_oauth_storage::refresh::Holder;
-use tessari_oauth_storage::users::UserStatus;
-use tessari_oauth_types::{TenantId, Timestamp, UserId};
+use tessari_oauth_storage::users::{Registered, UserStatus};
+use tessari_oauth_types::{EmailAddress, TenantId, Timestamp, UserId};
 
 use super::AdminState;
 use super::change::{Made, Reasoned, Refusal, apply};
+use super::users_read::masked;
 use crate::{Error, Result};
 
+/// The change `POST .../api/users` names.
+const CREATE: &str = "users.create";
 /// The change `POST .../api/users/{id}/disable` names.
 const DISABLE: &str = "users.disable";
 /// The change `POST .../api/users/{id}/enable` names.
@@ -38,6 +41,28 @@ impl Reasoned for Move {
     }
 }
 
+/// An account to open: the address it signs in with, and why.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Opening {
+    email: String,
+    reason: String,
+}
+
+impl Reasoned for Opening {
+    fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+/// An account opened: whose, its address masked, and its status.
+#[derive(Serialize)]
+struct Opened<'a> {
+    user: &'a str,
+    email: String,
+    status: &'static str,
+}
+
 /// An account enabled: whose, and its status now.
 #[derive(Serialize)]
 struct Enabled<'a> {
@@ -54,6 +79,54 @@ struct Disabled<'a> {
     sessions: usize,
     families: usize,
     access_tokens_end_by: u64,
+}
+
+/// Open an account of `company` for the address the request names; an address already taken is refused.
+pub(super) async fn create(
+    State(state): State<AdminState>,
+    Path(company): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response> {
+    let users = std::sync::Arc::clone(&state.users);
+    let now = (state.clock)();
+    apply(
+        &state,
+        (&company, &headers, &body),
+        (OperatorRole::Users, CREATE),
+        |operator, sent: Opening| async move {
+            let email = EmailAddress::parse(sent.email.as_str()).map_err(|_| Error::Invalid)?;
+            match users
+                .register(&operator.tenant, &email, now)
+                .await
+                .map_err(Error::Store)?
+            {
+                Registered::Created(user) => {
+                    let body = serde_json::to_string(&Opened {
+                        user: user.as_str(),
+                        email: masked(&email),
+                        status: UserStatus::Active.name(),
+                    })
+                    .map_err(|_| Error::Internal)?;
+                    Ok(Made {
+                        status: StatusCode::CREATED,
+                        body,
+                        user: Some(user),
+                    })
+                }
+                Registered::AddressTaken => Ok(Made {
+                    status: StatusCode::CONFLICT,
+                    body: serde_json::to_string(&Refusal {
+                        code: "email_taken",
+                        message: "an account of this company already signs in with this address",
+                    })
+                    .map_err(|_| Error::Internal)?,
+                    user: None,
+                }),
+            }
+        },
+    )
+    .await
 }
 
 /// Disable the account `user` of `company`, only while it is active, and end everything it holds.

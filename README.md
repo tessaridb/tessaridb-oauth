@@ -278,6 +278,10 @@ domain (`k***@acme.example`). `POST .../api/users/<user>/email/reveal` (role `us
 a `reason`) shows one address whole, and is recorded as `admin_action` `users.reveal_email` with the operator and the
 reason before it is shown; when the record cannot be written, nothing is shown.
 
+`POST <ADMIN_URL>/admin/<company>/api/users` (role `users`) with `{"email", "reason"}` opens an active account that
+signs in with that address and answers `201` with its id and the address masked; an address the company already
+has is refused as `email_taken`. The account has no password until its user enrols.
+
 `POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` and `.../enable` (role `users`) move an account between
 `active` and `disabled`, each only from the other status (`changed_meanwhile` otherwise, `user_not_found` for an account
 the company does not have). Disabling ends every session of the account, telling its clients through the back

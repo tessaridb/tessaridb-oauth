@@ -204,7 +204,7 @@ fn shown(account: &UserAccount) -> Shown {
 }
 
 /// `email` with all of its local part but the first character hidden: `k***@acme.example`.
-fn masked(email: &EmailAddress) -> String {
+pub(super) fn masked(email: &EmailAddress) -> String {
     let address = email.as_str();
     let (local, domain) = address.rsplit_once('@').unwrap_or((address, ""));
     let first: String = local.chars().take(1).collect();

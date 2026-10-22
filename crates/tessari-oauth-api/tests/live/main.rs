@@ -16,6 +16,7 @@ mod admin_policy;
 mod admin_session;
 mod admin_signin;
 mod admin_users;
+mod admin_users_create;
 mod admin_users_read;
 mod authenticator;
 mod authorize;
