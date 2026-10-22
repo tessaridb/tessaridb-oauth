@@ -56,6 +56,18 @@ impl ThrottleRepository for Counts {
             .push((place.clone(), key.to_owned(), seconds));
         Ok(self.answers.lock().expect("unpoisoned").remove(0))
     }
+
+    async fn hold(&self, _: &Place, _: &str, _: u64, _: u64) -> Result<()> {
+        Ok(())
+    }
+
+    async fn held_until(&self, _: &Place, _: &str) -> Result<Option<u64>> {
+        Ok(None)
+    }
+
+    async fn forget(&self, _: &Place, _: &str) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[tokio::test]
@@ -108,6 +120,18 @@ impl ThrottleRepository for Down {
     }
 
     async fn count(&self, _: &Place, _: &str, _: u64) -> Result<u64> {
+        Err(down())
+    }
+
+    async fn hold(&self, _: &Place, _: &str, _: u64, _: u64) -> Result<()> {
+        Err(down())
+    }
+
+    async fn held_until(&self, _: &Place, _: &str) -> Result<Option<u64>> {
+        Err(down())
+    }
+
+    async fn forget(&self, _: &Place, _: &str) -> Result<()> {
         Err(down())
     }
 }

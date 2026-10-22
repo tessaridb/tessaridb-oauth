@@ -44,8 +44,8 @@ pub enum Admission {
 /// Request counters per route group and client.
 #[derive(Clone)]
 pub struct ThrottleService {
-    repository: Arc<dyn ThrottleRepository>,
-    tenancy: Tenancy,
+    pub(super) repository: Arc<dyn ThrottleRepository>,
+    pub(super) tenancy: Tenancy,
 }
 
 /// The window `now` falls in under `limit`, and the seconds left in it (at least one).

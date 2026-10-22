@@ -2,6 +2,7 @@
 
 mod repository;
 mod service;
+mod signin;
 mod tessaridb;
 
 pub use service::{Admission, Limit, ThrottleService};

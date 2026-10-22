@@ -20,7 +20,7 @@ fn limit(requests: u64, window_secs: u64) -> Limit {
 
 /// Storage over a pool of `connections` for a fresh region with its counters prepared, the database handle, and the
 /// region's namespace.
-async fn prepared(connections: usize) -> (Storage, Database, String) {
+pub(crate) async fn prepared(connections: usize) -> (Storage, Database, String) {
     let database =
         Database::new(plain_node().expect("the plain node is named"), connections).expect("a pool");
     let region = unique("live");

@@ -14,4 +14,13 @@ pub(crate) trait ThrottleRepository: Send + Sync {
 
     /// Add one to the counter `key`, created to live `seconds` when absent, answering its new count.
     async fn count(&self, place: &Place, key: &str, seconds: u64) -> Result<u64>;
+
+    /// Write `until` under `key`, living `seconds`.
+    async fn hold(&self, place: &Place, key: &str, until: u64, seconds: u64) -> Result<()>;
+
+    /// The value under `key`, when there is one that has not expired.
+    async fn held_until(&self, place: &Place, key: &str) -> Result<Option<u64>>;
+
+    /// Remove `key`, whether or not it is there.
+    async fn forget(&self, place: &Place, key: &str) -> Result<()>;
 }
