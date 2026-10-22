@@ -34,7 +34,7 @@ use crate::Result;
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
-     redeemed_at int); \
+     auth_time int REQUIRED, methods array REQUIRED, sid string REQUIRED, nonce string, redeemed_at int); \
      DEFINE TABLE IF NOT EXISTS consents (\
      tenant string REQUIRED, user_id string REQUIRED, client_id string REQUIRED, scopes array REQUIRED, \
      resources array REQUIRED, policy_version int REQUIRED, shown_version string REQUIRED, \

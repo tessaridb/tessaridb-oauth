@@ -3,7 +3,8 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use tessari_oauth_core::codes::IssuedCode;
+use tessari_oauth_core::authentication::Method;
+use tessari_oauth_core::codes::{CodeAuthentication, IssuedCode};
 use tessari_oauth_storage::codes::Consumed;
 use tessari_oauth_types::{
     AuthorizationCode, Challenge, ClientId, ErrorCategory, Resource, ScopeSet, TenantId, Timestamp,
@@ -36,7 +37,36 @@ pub(crate) fn issued() -> IssuedCode {
             Resource::parse("https://api.example.com/billing").expect("a resource"),
         ]),
         expires_at: Timestamp::from_unix_secs(EXPIRES),
+        authentication: CodeAuthentication {
+            auth_time: Timestamp::from_unix_secs(NOW),
+            methods: vec![
+                Method::Password,
+                Method::Passkey {
+                    user_verified: false,
+                },
+            ],
+            sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
+        },
+        nonce: Some("n-0S6_WzA2Mj".to_owned()),
     }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_code_keeps_how_its_user_signed_in_and_an_absent_nonce_stays_absent() {
+    let storage = fresh(&tenant(), 2).await;
+    let spent = AuthorizationCode::from_secret("no-nonce-code-secret");
+    let without = IssuedCode {
+        nonce: None,
+        ..issued()
+    };
+    storage.codes.issue(&spent, &without).await.expect("issued");
+    let consumed = storage
+        .codes
+        .consume(&tenant(), &spent, Timestamp::from_unix_secs(NOW))
+        .await
+        .expect("answered");
+    assert_eq!(consumed, Consumed::Fresh(without));
 }
 
 #[tokio::test]

@@ -23,6 +23,10 @@ fn spent_row() -> CodeEntity {
         scopes: vec!["openid".to_owned()],
         resources: vec!["https://api.example.com/orders".to_owned()],
         expires_at: 1_800_000_060,
+        auth_time: 1_800_000_000,
+        methods: vec!["pwd".to_owned()],
+        sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
+        nonce: None,
         redeemed_at: Some(1_800_000_000),
     }
 }

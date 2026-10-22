@@ -126,6 +126,7 @@ impl SessionService {
         Ok(Some(Session {
             user,
             sid: kept.sid,
+            methods,
             auth_time: Timestamp::from_unix_secs(auth_time),
             assessment,
         }))

@@ -21,6 +21,14 @@ pub struct CodeEntity {
     pub resources: Vec<String>,
     /// Unix seconds after which the code no longer redeems.
     pub expires_at: i64,
+    /// Unix seconds of the user's sign-in.
+    pub auth_time: i64,
+    /// The methods the sign-in verified, by name, in order.
+    pub methods: Vec<String>,
+    /// The public id of the session the sign-in opened.
+    pub sid: String,
+    /// The authorization request's `nonce`, when it carried one.
+    pub nonce: Option<String>,
     /// Unix seconds of the redemption; absent while the code is unspent.
     pub redeemed_at: Option<i64>,
 }
@@ -36,6 +44,10 @@ impl FromRecord for CodeEntity {
             scopes: row.take("scopes")?,
             resources: row.take("resources")?,
             expires_at: row.take("expires_at")?,
+            auth_time: row.take("auth_time")?,
+            methods: row.take("methods")?,
+            sid: row.take("sid")?,
+            nonce: row.take("nonce")?,
             redeemed_at: row.take("redeemed_at")?,
         })
     }

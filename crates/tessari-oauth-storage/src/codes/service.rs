@@ -13,7 +13,8 @@
 use std::sync::Arc;
 
 use tessari_oauth_constants::CODE_SPEND_ATTEMPTS;
-use tessari_oauth_core::codes::IssuedCode;
+use tessari_oauth_core::authentication::Method;
+use tessari_oauth_core::codes::{CodeAuthentication, IssuedCode};
 use tessari_oauth_types::{
     AuthorizationCode, Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp, UserId,
 };
@@ -64,12 +65,28 @@ fn to_entity(code: &IssuedCode) -> Result<CodeEntity> {
             .collect(),
         expires_at: i64::try_from(code.expires_at.unix_secs())
             .map_err(|_| unreadable("expiry beyond i64"))?,
+        auth_time: i64::try_from(code.authentication.auth_time.unix_secs())
+            .map_err(|_| unreadable("sign-in beyond i64"))?,
+        methods: code
+            .authentication
+            .methods
+            .iter()
+            .map(|method| method.name().to_owned())
+            .collect(),
+        sid: code.authentication.sid.clone(),
+        nonce: code.nonce.clone(),
         redeemed_at: None,
     })
 }
 
 fn to_model(row: CodeEntity) -> Result<IssuedCode> {
     let seconds = u64::try_from(row.expires_at).map_err(|_| unreadable("negative expiry"))?;
+    let signed_in = u64::try_from(row.auth_time).map_err(|_| unreadable("negative sign-in"))?;
+    let methods = row
+        .methods
+        .iter()
+        .map(|name| Method::named(name).ok_or_else(|| unreadable("methods")))
+        .collect::<Result<Vec<_>>>()?;
     Ok(IssuedCode {
         tenant: TenantId::parse(row.tenant).map_err(|_| unreadable("tenant"))?,
         client_id: ClientId::parse(row.client_id).map_err(|_| unreadable("client_id"))?,
@@ -84,6 +101,12 @@ fn to_model(row: CodeEntity) -> Result<IssuedCode> {
             .collect::<std::result::Result<_, _>>()
             .map_err(|_| unreadable("resources"))?,
         expires_at: Timestamp::from_unix_secs(seconds),
+        authentication: CodeAuthentication {
+            auth_time: Timestamp::from_unix_secs(signed_in),
+            methods,
+            sid: row.sid,
+        },
+        nonce: row.nonce,
     })
 }
 

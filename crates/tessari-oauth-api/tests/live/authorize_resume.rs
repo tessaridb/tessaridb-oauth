@@ -10,9 +10,14 @@ use axum::extract::ConnectInfo;
 use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tessari_oauth_api::public_router;
+use tessari_oauth_core::authentication::Method;
+use tessari_oauth_core::codes::CodeAuthentication;
 use tessari_oauth_core::consents::ConsentRequest;
+use tessari_oauth_storage::codes::Consumed;
 use tessari_oauth_storage::consents::NewGrant;
-use tessari_oauth_types::{ClientId, Resource, ScopeSet, Timestamp, UserId};
+use tessari_oauth_types::{
+    AuthorizationCode, ClientId, Resource, ScopeSet, SessionSecret, Timestamp, UserId,
+};
 use tower::ServiceExt;
 
 use crate::login::{post, signin};
@@ -235,4 +240,73 @@ async fn the_answer_carries_the_state_the_client_sent() {
         .map(|(_, value)| value.into_owned())
         .collect();
     assert_eq!(state, ["af0ifjsldkj"]);
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn the_code_records_how_the_user_signed_in_and_the_nonce_the_client_sent() {
+    let server = server(2).await;
+    let (interaction, _, user) = signed_in(&server, "lovelace@example.com").await;
+    consented(&server, &user).await;
+    let now = Timestamp::from_unix_secs(NOW);
+    // A session of the same user opened an hour earlier with two methods, so its facts differ from the moment the
+    // code is issued and from a password-only sign-in.
+    let session = "an-earlier-session-of-lovelace".to_owned();
+    server
+        .storage
+        .sessions
+        .create(
+            &tenant("acme"),
+            &SessionSecret::from_secret(session.clone()),
+            &user,
+            &[Method::Password, Method::Totp],
+            Timestamp::from_unix_secs(NOW - 3_600),
+        )
+        .await
+        .expect("opened");
+    let mut request = server
+        .storage
+        .interactions
+        .find(&tenant("acme"), &interaction, &browser(), now)
+        .await
+        .expect("the store answers")
+        .expect("pending");
+    request.nonce = Some("n-0S6_WzA2Mj".to_owned());
+    let with_nonce = server
+        .storage
+        .interactions
+        .open(&tenant("acme"), &request, &browser(), now)
+        .await
+        .expect("kept");
+    let answered = get(&server, &resume_path(&with_nonce), Some(&session)).await;
+    let code = sent_to(&answered)
+        .query_pairs()
+        .find(|(name, _)| name == "code")
+        .map(|(_, value)| value.into_owned())
+        .expect("a code");
+    let opened = server
+        .storage
+        .sessions
+        .find(&tenant("acme"), &SessionSecret::from_secret(session), now)
+        .await
+        .expect("the store answers")
+        .expect("the session");
+    let consumed = server
+        .storage
+        .codes
+        .consume(&tenant("acme"), &AuthorizationCode::from_secret(code), now)
+        .await
+        .expect("the store answers");
+    let Consumed::Fresh(issued) = consumed else {
+        panic!("a fresh code");
+    };
+    assert_eq!(
+        issued.authentication,
+        CodeAuthentication {
+            auth_time: Timestamp::from_unix_secs(NOW - 3_600),
+            methods: vec![Method::Password, Method::Totp],
+            sid: opened.sid,
+        }
+    );
+    assert_eq!(issued.nonce.as_deref(), Some("n-0S6_WzA2Mj"));
 }

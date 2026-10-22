@@ -31,6 +31,12 @@ fn issued() -> IssuedCode {
         scopes: ScopeSet::parse("openid").expect("fixture"),
         resources: BTreeSet::from([resource(ORDERS)]),
         expires_at: Timestamp::from_unix_secs(ISSUED_AT + AUTHORIZATION_CODE_TTL_SECS),
+        authentication: crate::codes::CodeAuthentication {
+            auth_time: Timestamp::from_unix_secs(ISSUED_AT),
+            methods: vec![crate::authentication::Method::Password],
+            sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
+        },
+        nonce: None,
     }
 }
 

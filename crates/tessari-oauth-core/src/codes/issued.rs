@@ -4,6 +4,8 @@ use std::collections::BTreeSet;
 
 use tessari_oauth_types::{Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp, UserId};
 
+use crate::authentication::Method;
+
 /// An issued authorization code's bindings. Stored under the code's hash; the code itself is never stored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssuedCode {
@@ -23,4 +25,20 @@ pub struct IssuedCode {
     pub resources: BTreeSet<Resource>,
     /// The instant after which the code no longer redeems.
     pub expires_at: Timestamp,
+    /// How the user signed in before the code was issued, which an ID token redeemed from it states.
+    pub authentication: CodeAuthentication,
+    /// The authorization request's `nonce`, echoed unchanged in the ID token.
+    pub nonce: Option<String>,
+}
+
+/// The sign-in behind a code: when it happened, the methods it verified (from which its `acr` and `amr` are derived
+/// again when they are stated), and the session it opened, by that session's public id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeAuthentication {
+    /// When the user signed in.
+    pub auth_time: Timestamp,
+    /// The methods the sign-in verified, in order.
+    pub methods: Vec<Method>,
+    /// The session's public id.
+    pub sid: String,
 }

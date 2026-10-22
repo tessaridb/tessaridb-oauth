@@ -178,6 +178,12 @@ pub(crate) async fn issue_scoped(
         scopes: ScopeSet::parse(scopes).expect("scopes"),
         resources: BTreeSet::from([Resource::parse(API).expect("a resource")]),
         expires_at: Timestamp::from_unix_secs(expires_at),
+        authentication: tessari_oauth_core::codes::CodeAuthentication {
+            auth_time: Timestamp::from_unix_secs(NOW),
+            methods: vec![tessari_oauth_core::authentication::Method::Password],
+            sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
+        },
+        nonce: None,
     };
     server
         .storage

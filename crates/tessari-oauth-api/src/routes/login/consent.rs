@@ -18,7 +18,8 @@ use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_core::consents::{ConsentRequest, Coverage};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::consents::NewGrant;
-use tessari_oauth_types::{BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp, UserId};
+use tessari_oauth_storage::sessions::Session;
+use tessari_oauth_types::{BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp};
 
 use super::super::browser::held;
 use super::super::resume::issued;
@@ -72,7 +73,7 @@ pub(in crate::routes) async fn consent(
         .ok_or(Error::Invalid)?;
     let browser = held(&headers).ok_or(Error::SigninGone)?;
     let request = pending(&state, &tenant, (&id, &browser), now).await?;
-    let user = signed_in(&state, &tenant, &headers, now).await?;
+    let user = signed_in(&state, &tenant, &headers, now).await?.user;
     let coverage = state
         .consents
         .check(
@@ -115,7 +116,8 @@ pub(in crate::routes) async fn decide(
     let now = (state.clock)();
     let browser = held(&headers).ok_or(Error::SigninGone)?;
     let request = pending(&state, &tenant, (&answered.interaction, &browser), now).await?;
-    let user = signed_in(&state, &tenant, &headers, now).await?;
+    let session = signed_in(&state, &tenant, &headers, now).await?;
+    let user = session.user.clone();
     let target = match answered.decision {
         Decision::Allow => {
             let grant = NewGrant {
@@ -140,7 +142,7 @@ pub(in crate::routes) async fn decide(
                 &tenant,
                 issuer,
                 (&answered.interaction, &browser),
-                user,
+                session,
                 now,
             )
             .await?
@@ -177,13 +179,13 @@ async fn pending(
         .ok_or(Error::SigninGone)
 }
 
-/// The user of the session the request's cookie names in `tenant` at `now`.
+/// The session the request's cookie names in `tenant` at `now`.
 async fn signed_in(
     state: &PublicState,
     tenant: &TenantId,
     headers: &HeaderMap,
     now: Timestamp,
-) -> Result<UserId> {
+) -> Result<Session> {
     let Some(value) = cookie(headers, SESSION_COOKIE) else {
         return Err(Error::SessionRequired);
     };
@@ -192,7 +194,6 @@ async fn signed_in(
         .find(tenant, &SessionSecret::from_secret(value), now)
         .await
         .map_err(Error::Store)?
-        .map(|session| session.user)
         .ok_or(Error::SessionRequired)
 }
 

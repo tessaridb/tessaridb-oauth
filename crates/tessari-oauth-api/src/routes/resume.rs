@@ -16,12 +16,12 @@ use serde::Deserialize;
 use tessari_oauth_constants::{
     AUTHORIZATION_CODE_TTL_SECS, CONSENT_PATH, CONSENT_POLICY_VERSION, LOGIN_PATH, SESSION_COOKIE,
 };
-use tessari_oauth_core::codes::IssuedCode;
+use tessari_oauth_core::codes::{CodeAuthentication, IssuedCode};
 use tessari_oauth_core::consents::{ConsentRequest, Coverage};
 use tessari_oauth_infrastructure::custody::random_secret;
+use tessari_oauth_storage::sessions::Session;
 use tessari_oauth_types::{
-    AuthorizationCode, BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp, UserId,
-    base64url,
+    AuthorizationCode, BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp, base64url,
 };
 
 use super::authorize::{page, see_other};
@@ -88,7 +88,7 @@ pub(super) async fn resume(
         .map_err(Error::Store)?;
     match coverage {
         Coverage::Covered => {
-            match issued(&state, &tenant, issuer, (&id, &browser), session.user, now).await? {
+            match issued(&state, &tenant, issuer, (&id, &browser), session, now).await? {
                 Some(target) => see_other(&target),
                 None => Ok(page(ErrorCode::InvalidRequest)),
             }
@@ -97,14 +97,15 @@ pub(super) async fn resume(
     }
 }
 
-/// Take the pending authorization `id` that `browser` brought in `tenant` for `user` at `now`, once, and answer the address of its redirect
-/// URI carrying a fresh code; `None` when another request took it first.
+/// Take the pending authorization `id` that `browser` brought in `tenant` for the user of `session` at `now`, once,
+/// and answer the address of its redirect URI carrying a fresh code that records how that user signed in; `None` when
+/// another request took it first.
 pub(super) async fn issued(
     state: &PublicState,
     tenant: &TenantId,
     issuer: &str,
     (id, browser): (&str, &BrowserBinding),
-    user: UserId,
+    session: Session,
     now: Timestamp,
 ) -> Result<Option<String>> {
     let Some(request) = state
@@ -124,12 +125,18 @@ pub(super) async fn issued(
     let issued = IssuedCode {
         tenant: tenant.clone(),
         client_id: request.client_id,
-        user,
+        user: session.user,
         redirect_uri: request.redirect_uri.clone(),
         challenge: request.challenge,
         scopes: request.scopes,
         resources: request.resources,
         expires_at: Timestamp::from_unix_secs(expires_at),
+        authentication: CodeAuthentication {
+            auth_time: session.auth_time,
+            methods: session.methods,
+            sid: session.sid,
+        },
+        nonce: request.nonce,
     };
     state
         .codes

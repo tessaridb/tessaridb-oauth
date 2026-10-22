@@ -2,4 +2,4 @@
 
 mod issued;
 
-pub use issued::IssuedCode;
+pub use issued::{CodeAuthentication, IssuedCode};

@@ -66,6 +66,12 @@ async fn issue_for(server: &Server, code: &str, scopes: &str, resource: &str) {
         scopes: ScopeSet::parse(scopes).expect("scopes"),
         resources: BTreeSet::from([Resource::parse(resource).expect("a resource")]),
         expires_at: Timestamp::from_unix_secs(NOW + 60),
+        authentication: tessari_oauth_core::codes::CodeAuthentication {
+            auth_time: Timestamp::from_unix_secs(NOW),
+            methods: vec![tessari_oauth_core::authentication::Method::Password],
+            sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
+        },
+        nonce: None,
     };
     server
         .storage
