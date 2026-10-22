@@ -162,6 +162,13 @@ enrolled, how many recovery codes are left, and each passkey by its credential i
 whether it may be synced. No secret, hash or key is part of it. Like the routes below it needs the session cookie,
 is counted under the account limit and is never cached.
 
+`POST <issuer>/account/api/passkeys/remove` with `{"id": "<credential id>"}` removes one of the user's own passkeys.
+Changing how an account signs in needs a sign-in from the last ten minutes that reached the level the account's
+second factor gives (a password alone does not change an account that holds a passkey or an authenticator app),
+otherwise `401 reauthentication_required`; the account's last way to sign in is refused with
+`409 last_sign_in_method`. A removal signs out every other session of the user, revokes every refresh family the user
+holds and is recorded, and the answer says when the access tokens already issued stop working.
+
 ### Your grants: `<issuer>/account/api/grants`
 
 A signed-in user reads the grants they gave with `GET <issuer>/account/api/grants`: for each client still holding

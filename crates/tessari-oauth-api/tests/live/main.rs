@@ -5,6 +5,7 @@
 
 #![cfg(test)]
 
+mod account_factors;
 mod account_grants;
 mod account_me;
 mod account_sessions;

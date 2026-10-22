@@ -121,7 +121,7 @@ pub(super) async fn end_all(
     let user = signed_in(&state, &tenant, &headers, now).await?.user;
     let sessions = state
         .sessions
-        .end_all(&tenant, &user, now)
+        .end_all(&tenant, &user, None, now)
         .await
         .map_err(Error::Store)?;
     let families = state

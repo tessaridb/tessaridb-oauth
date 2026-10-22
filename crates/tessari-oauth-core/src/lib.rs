@@ -13,6 +13,7 @@ pub mod consents;
 pub mod discovery;
 pub mod dpop;
 mod error;
+pub mod factor_change;
 pub mod id_token;
 pub mod jose;
 pub mod keys;

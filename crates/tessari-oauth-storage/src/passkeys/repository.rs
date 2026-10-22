@@ -33,4 +33,7 @@ pub(crate) trait PasskeyRepository: Send + Sync {
     /// Every passkey of `user_id`, with its id.
     async fn list_for_user(&self, place: &Place, user_id: &str)
     -> Result<Vec<ListedPasskeyEntity>>;
+
+    /// Delete the passkey under `id`, answering what it held when there was one.
+    async fn take_passkey(&self, place: &Place, id: &str) -> Result<Option<PasskeyEntity>>;
 }

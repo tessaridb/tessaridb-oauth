@@ -235,4 +235,23 @@ impl PasskeyService {
         listed.sort_by_key(|passkey| passkey.created_at.unix_secs());
         Ok(listed)
     }
+
+    /// Remove `user`'s passkey `id` (base64url) in `tenant`; `false` when `user` holds no passkey by that id.
+    ///
+    /// # Errors
+    ///
+    /// Store failures.
+    pub async fn remove(&self, tenant: &TenantId, user: &UserId, id: &str) -> Result<bool> {
+        let place = self.tenancy.place(tenant)?;
+        // A credential id has one owner for as long as it exists, so the owner read here is the one deleted.
+        let owned = self
+            .repository
+            .find_passkey(&place, id)
+            .await?
+            .is_some_and(|passkey| passkey.user_id == user.as_str());
+        if !owned {
+            return Ok(false);
+        }
+        Ok(self.repository.take_passkey(&place, id).await?.is_some())
+    }
 }

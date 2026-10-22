@@ -42,6 +42,12 @@ pub enum Error {
     /// The browser holds no session at this issuer, so there is nobody to answer for.
     #[error("no session")]
     SessionRequired,
+    /// The session's sign-in is too old, or too weak for what the account holds, to change its sign-in factors.
+    #[error("sign in again first")]
+    ReauthenticationRequired,
+    /// The change would leave the account with no way to sign in.
+    #[error("the last way to sign in")]
+    LastSignInMethod,
 }
 
 impl Error {
@@ -58,6 +64,8 @@ impl Error {
             Self::StepRefused => ErrorCategory::Conflict,
             Self::CredentialsRejected => ErrorCategory::Unauthorized,
             Self::SessionRequired => ErrorCategory::Unauthorized,
+            Self::ReauthenticationRequired => ErrorCategory::Unauthorized,
+            Self::LastSignInMethod => ErrorCategory::Conflict,
         }
     }
 }
@@ -108,6 +116,16 @@ impl IntoResponse for Error {
                 StatusCode::UNAUTHORIZED,
                 "session_required",
                 "sign in first",
+            ),
+            (Self::ReauthenticationRequired, _) => (
+                StatusCode::UNAUTHORIZED,
+                "reauthentication_required",
+                "sign in again to change how this account signs in",
+            ),
+            (Self::LastSignInMethod, _) => (
+                StatusCode::CONFLICT,
+                "last_sign_in_method",
+                "this is the account's last way to sign in",
             ),
             (_, ErrorCategory::NotFound) => {
                 (StatusCode::NOT_FOUND, "not_found", "nothing is served here")

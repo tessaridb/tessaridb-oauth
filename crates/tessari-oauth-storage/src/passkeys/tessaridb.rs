@@ -121,4 +121,16 @@ impl PasskeyRepository for TessaridbPasskeyRepository {
             .await?;
         answers::records(answers, "passkey")
     }
+
+    async fn take_passkey(&self, place: &Place, id: &str) -> Result<Option<PasskeyEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "DELETE passkeys:$id RETURN BEFORE;",
+                vec![("id".to_owned(), Value::from(id))],
+            )
+            .await?;
+        answers::returned(answers, id, "passkey")
+    }
 }

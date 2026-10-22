@@ -204,17 +204,27 @@ impl SessionService {
         Ok(self.repository.take(&place, &id).await?.is_some())
     }
 
-    /// End every session of `user` in `tenant`, answering how many of them were still alive at `now`.
+    /// End every session of `user` in `tenant` but the one whose public id is `except`, answering how many of them
+    /// were still alive at `now`.
     ///
     /// # Errors
     ///
     /// Store failures, and [`Error::Unreadable`] for a record this service did not write.
-    pub async fn end_all(&self, tenant: &TenantId, user: &UserId, now: Timestamp) -> Result<usize> {
+    pub async fn end_all(
+        &self,
+        tenant: &TenantId,
+        user: &UserId,
+        except: Option<&str>,
+        now: Timestamp,
+    ) -> Result<usize> {
         let place = self.tenancy.place(tenant)?;
         let now_secs = unix_secs(now)?;
         // The store deletes many records only one by one, each by its id: read the user's, then end each.
         let mut ended = 0_usize;
         for listed in self.repository.list_for_user(&place, user.as_str()).await? {
+            if except == Some(listed.session.sid.as_str()) {
+                continue;
+            }
             let id = answers::text_id(&listed.spelled, "session")?;
             let Some(taken) = self.repository.take(&place, &id).await? else {
                 continue;

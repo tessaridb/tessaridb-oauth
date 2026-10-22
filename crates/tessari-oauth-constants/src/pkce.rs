@@ -31,6 +31,10 @@ pub const REFRESH_ABSOLUTE_TTL_SECS: u64 = 2_592_000;
 /// request that finds it starts the clock again.
 pub const SESSION_IDLE_SECS: u64 = 28_800;
 
+/// Longest ago a session's sign-in may have been for it to change the account's sign-in factors, in seconds: 10
+/// minutes, so a session left open on a shared screen cannot replace what protects the account.
+pub const FACTOR_CHANGE_RECENCY_SECS: u64 = 600;
+
 /// Longest a session at this issuer lasts however often it is used, in seconds: 7 days. After it, the user signs in
 /// again; the table's own expiry is the same week.
 pub const SESSION_ABSOLUTE_SECS: u64 = 604_800;

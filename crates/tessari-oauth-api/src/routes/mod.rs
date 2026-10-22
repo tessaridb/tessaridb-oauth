@@ -3,6 +3,7 @@
 //! theirs, the sign-in steps under theirs, and the account portal's requests under theirs, every body capped.
 
 mod account;
+mod account_factors;
 mod account_me;
 mod account_sessions;
 mod authorize;
@@ -119,6 +120,10 @@ pub fn public_router(state: PublicState) -> Router {
             post(account::revoke),
         )
         .route(&format!("/{{tenant}}{ACCOUNT_API_PATH}/me"), get(account_me::me))
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/remove"),
+            post(account_factors::remove_passkey),
+        )
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions"),
             get(account_sessions::sessions),

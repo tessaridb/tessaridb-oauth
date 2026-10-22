@@ -31,11 +31,13 @@ pub enum AuditKind {
     ConsentRevoked,
     /// A user ended sessions at this issuer; `reason` says which, `families` how many refresh families went with them.
     SessionsEnded,
+    /// A user changed their sign-in factors; `reason` says which change, `families` how many refresh families went.
+    FactorChanged,
 }
 
 impl AuditKind {
     /// Every kind.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::IssuedCode,
         Self::IssuedRefresh,
         Self::IssuedClient,
@@ -49,6 +51,7 @@ impl AuditKind {
         Self::Consented,
         Self::ConsentRevoked,
         Self::SessionsEnded,
+        Self::FactorChanged,
     ];
 
     /// The name the message carries.
@@ -68,6 +71,7 @@ impl AuditKind {
             Self::Consented => "consented",
             Self::ConsentRevoked => "consent_revoked",
             Self::SessionsEnded => "sessions_ended",
+            Self::FactorChanged => "factor_changed",
         }
     }
 
