@@ -21,6 +21,7 @@ tessari-oauth-constants.workspace = true
 tessari-oauth-core.workspace = true
 tessari-oauth-infrastructure.workspace = true
 tessari-oauth-storage.workspace = true
+serde_json.workspace = true
 tessari-oauth-types.workspace = true
 thiserror.workspace = true
 # `rt` for the task set a run spreads its tenants over, `macros` for the runner's `select!`.
@@ -28,6 +29,7 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 tracing.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 tessari-oauth-test-support.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "test-util"] }
 

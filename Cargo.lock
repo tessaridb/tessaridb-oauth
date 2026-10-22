@@ -1044,6 +1044,7 @@ dependencies = [
 name = "tessari-oauth-daemons"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "tessari-oauth-constants",
  "tessari-oauth-core",
  "tessari-oauth-infrastructure",

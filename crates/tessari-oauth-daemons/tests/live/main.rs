@@ -8,6 +8,7 @@
 #![cfg(test)]
 
 mod key_rotation;
+mod logout_delivery;
 
 use std::sync::Arc;
 

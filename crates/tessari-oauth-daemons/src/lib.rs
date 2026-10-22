@@ -4,9 +4,11 @@
 mod daemon;
 mod error;
 mod key_rotation;
+mod logout_delivery;
 mod runner;
 
 pub use daemon::{Daemon, DaemonFuture, DaemonReport};
 pub use error::{Error, Result};
 pub use key_rotation::KeyRotation;
+pub use logout_delivery::{LogoutDelivery, LogoutSender};
 pub use runner::run;

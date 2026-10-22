@@ -59,3 +59,13 @@ pub const SIGNIN_WRITE_ATTEMPTS: u32 = 8;
 /// `retry`, counting the first. Simultaneous requests from one client write one counter, and each must land: a count
 /// that gave up would let the client through uncounted or answer it `503`.
 pub const THROTTLE_WRITE_ATTEMPTS: u32 = 8;
+
+/// How many owed logouts one delivery run claims per tenant.
+pub const LOGOUT_CLAIM_BATCH: u32 = 50;
+
+/// How long an owed logout a client did not acknowledge waits before its second try, in seconds; each later try waits
+/// twice as long as the one before.
+pub const LOGOUT_RETRY_FIRST_SECS: u64 = 5;
+
+/// The longest wait between two tries of an owed logout, in seconds.
+pub const LOGOUT_RETRY_MAX_SECS: u64 = 3_600;
