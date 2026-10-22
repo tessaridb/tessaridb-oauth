@@ -12,6 +12,7 @@ use crate::consents::{ConsentService, TessaridbConsentRepository};
 use crate::factors::{FactorService, TessaridbFactorRepository};
 use crate::interactions::{InteractionService, TessaridbInteractionRepository};
 use crate::keys::{KeyService, TessaridbKeyRepository};
+use crate::logouts::{LogoutService, TessaridbLogoutRepository};
 use crate::passkeys::{PasskeyService, TessaridbPasskeyRepository};
 use crate::policies::{PolicyService, TessaridbPolicyRepository};
 use crate::refresh::{RefreshService, TessaridbRefreshRepository};
@@ -58,6 +59,8 @@ pub struct Storage {
     pub signins: Arc<SigninService>,
     /// Sessions at this issuer.
     pub sessions: Arc<SessionService>,
+    /// The logouts owed to clients of ended sessions.
+    pub logouts: Arc<LogoutService>,
     /// The audit trail.
     pub audit: Arc<AuditService>,
 }
@@ -86,6 +89,7 @@ impl Storage {
         let signin_repository = Arc::new(TessaridbSigninRepository::new(database.clone()));
 
         let session_repository = Arc::new(TessaridbSessionRepository::new(database.clone()));
+        let logout_repository = Arc::new(TessaridbLogoutRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
         Self {
             tenants: Arc::new(TenantService::new(tenant_repository, tenancy.clone())),
@@ -111,6 +115,7 @@ impl Storage {
             passkeys: Arc::new(PasskeyService::new(passkey_repository, tenancy.clone())),
             signins: Arc::new(SigninService::new(signin_repository, tenancy.clone())),
             sessions: Arc::new(SessionService::new(session_repository, tenancy.clone())),
+            logouts: Arc::new(LogoutService::new(logout_repository, tenancy.clone())),
             audit,
         }
     }

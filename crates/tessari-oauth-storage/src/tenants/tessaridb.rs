@@ -97,6 +97,14 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      user_id string REQUIRED, sid string REQUIRED, methods array REQUIRED, auth_time int REQUIRED, \
      seen_at int REQUIRED) EXPIRE AFTER 7d; \
      DEFINE FIELD IF NOT EXISTS clients ON sessions TYPE array; \
+     DEFINE QUEUE IF NOT EXISTS logout_deliveries TIMEOUT 30s ATTEMPTS 10 SCHEMAFULL NOT BEFORE due; \
+     DEFINE FIELD IF NOT EXISTS user_id ON logout_deliveries TYPE string REQUIRED; \
+     DEFINE FIELD IF NOT EXISTS sid ON logout_deliveries TYPE string REQUIRED; \
+     DEFINE FIELD IF NOT EXISTS clients ON logout_deliveries TYPE array REQUIRED; \
+     DEFINE FIELD IF NOT EXISTS due ON logout_deliveries TYPE datetime REQUIRED; \
+     DEFINE EVENT OR REPLACE tell_clients ON sessions FOR DELETE WHEN array::len($before.clients ?? []) > 0 \
+     THEN CREATE logout_deliveries:$id = { user_id: $before.user_id, sid: $before.sid, clients: $before.clients, \
+     due: time::now() }; \
      DEFINE INDEX IF NOT EXISTS by_user ON sessions FIELDS user_id;";
 
 pub(crate) struct TessaridbTenantRepository {

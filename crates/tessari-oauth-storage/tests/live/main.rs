@@ -18,6 +18,7 @@ mod factors;
 mod interactions;
 mod interactions_finish;
 mod keys;
+mod logouts;
 mod passkeys;
 mod policies;
 mod refresh;

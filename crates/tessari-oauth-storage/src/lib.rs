@@ -9,6 +9,7 @@ mod error;
 pub mod factors;
 pub mod interactions;
 pub mod keys;
+pub mod logouts;
 pub mod passkeys;
 pub mod policies;
 pub mod refresh;
