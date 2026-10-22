@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
 
 use super::TotpEntity;
+use super::entity::PendingTotpEntity;
 use crate::Result;
 
 /// The one-time code factors and the recovery codes.
@@ -35,4 +36,14 @@ pub(crate) trait FactorRepository: Send + Sync {
 
     /// How many unspent recovery codes `user_id` holds.
     async fn count_codes(&self, place: &Place, user_id: &str) -> Result<usize>;
+
+    /// Keep `pending` under `id`, replacing what was there, with a fresh ten minutes.
+    async fn put_pending(&self, place: &Place, id: &str, pending: &PendingTotpEntity)
+    -> Result<()>;
+
+    /// The pending secret under `id`, when there is one.
+    async fn find_pending(&self, place: &Place, id: &str) -> Result<Option<PendingTotpEntity>>;
+
+    /// Delete the pending secret under `id`, answering what it held when there was one.
+    async fn take_pending(&self, place: &Place, id: &str) -> Result<Option<PendingTotpEntity>>;
 }

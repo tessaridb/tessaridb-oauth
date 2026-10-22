@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
 use super::TotpEntity;
-use super::entity::CodeEntity;
+use super::entity::{CodeEntity, PendingTotpEntity};
 use super::repository::FactorRepository;
 use crate::{Result, answers};
 
@@ -143,5 +143,52 @@ impl FactorRepository for TessaridbFactorRepository {
             )
             .await?;
         Ok(answers::records::<CodeEntity>(answers, "recovery code")?.len())
+    }
+
+    async fn put_pending(
+        &self,
+        place: &Place,
+        id: &str,
+        pending: &PendingTotpEntity,
+    ) -> Result<()> {
+        // Deleted and created in one commit, so a second begin starts the ten minutes again with its own secret.
+        self.database
+            .run_at(
+                place,
+                "BEGIN; DELETE totp_pending:$id; \
+                 CREATE totp_pending:$id = { user_id: $user, sealed: $sealed, created_at: $at }; COMMIT;",
+                vec![
+                    ("id".to_owned(), Value::from(id)),
+                    ("user".to_owned(), Value::from(pending.user_id.as_str())),
+                    ("sealed".to_owned(), Value::from(pending.sealed.as_str())),
+                    ("at".to_owned(), Value::from(pending.created_at)),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn find_pending(&self, place: &Place, id: &str) -> Result<Option<PendingTotpEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM totp_pending:$id;",
+                vec![("id".to_owned(), Value::from(id))],
+            )
+            .await?;
+        answers::single(answers, "pending one-time code factor")
+    }
+
+    async fn take_pending(&self, place: &Place, id: &str) -> Result<Option<PendingTotpEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "DELETE totp_pending:$id RETURN BEFORE;",
+                vec![("id".to_owned(), Value::from(id))],
+            )
+            .await?;
+        answers::returned(answers, id, "pending one-time code factor")
     }
 }

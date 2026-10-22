@@ -292,3 +292,53 @@ async fn sixteen_requests_with_one_recovery_code_spend_it_once() {
         );
     }
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_pending_secret_is_kept_sealed_per_session_and_taken_once_by_its_own_user() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    let kek = fresh_kek().expect("a key-encryption key");
+    let factors = &storage.factors;
+    factors
+        .begin_totp(
+            &tenant("acme"),
+            &kek,
+            &user("user-7"),
+            "sid-a",
+            b"first secret 0123456",
+            NOW,
+        )
+        .await
+        .expect("kept");
+    factors
+        .begin_totp(&tenant("acme"), &kek, &user("user-7"), "sid-a", SECRET, NOW)
+        .await
+        .expect("kept again");
+    let theirs = factors
+        .take_pending_totp(&tenant("acme"), &kek, &user("user-8"), "sid-a")
+        .await
+        .expect("the store answers");
+    assert!(
+        theirs.is_none(),
+        "another user's session names nothing of theirs"
+    );
+    let taken = factors
+        .take_pending_totp(&tenant("acme"), &kek, &user("user-7"), "sid-a")
+        .await
+        .expect("the store answers")
+        .expect("pending");
+    assert_eq!(taken.as_slice(), SECRET, "the latest secret, opened");
+    let again = factors
+        .take_pending_totp(&tenant("acme"), &kek, &user("user-7"), "sid-a")
+        .await
+        .expect("the store answers");
+    assert!(again.is_none(), "taken once");
+    assert!(
+        factors
+            .totp(&tenant("acme"), &kek, &user("user-7"))
+            .await
+            .expect("the store answers")
+            .is_none(),
+        "a pending secret is not an enrolled factor"
+    );
+}

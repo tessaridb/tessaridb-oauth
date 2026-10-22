@@ -24,8 +24,9 @@ use crate::Result;
 /// `users` holds each account under its random id; `user_emails` holds the address an account signs in with under the
 /// address itself, so an address belongs to one account and sign-in finds it by id; `credentials` holds an account's
 /// password hash under the account's id. `totp_factors` holds a user's one-time code secret, sealed, with the last step a
-/// code was accepted for; `recovery_codes` holds each recovery code under its owner and digest, indexed by user so a
-/// new set replaces the old. `passkeys` holds each credential under its credential id, so an id has one owner;
+/// code was accepted for, and `totp_pending` the secret a session is enrolling, sealed, under the session's public id
+/// for the ten minutes enrolment may take; `recovery_codes` holds each recovery code under its owner and digest,
+/// indexed by user so a new set replaces the old. `passkeys` holds each credential under its credential id, so an id has one owner;
 /// `passkey_challenges` holds each issued challenge under the challenge itself for the five minutes
 /// (`WEBAUTHN_CHALLENGE_TTL_SECS`) it may be answered in. `signins` holds one browser's sign-in in progress under the
 /// digest of its sign-in cookie value, for the ten minutes (`INTERACTION_TTL_SECS`) its authorization request is kept.
@@ -73,6 +74,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      user_id string REQUIRED, hash string REQUIRED, pepper int REQUIRED, updated_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS totp_factors (\
      user_id string REQUIRED, sealed string REQUIRED, last_step int REQUIRED, created_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS totp_pending (\
+     user_id string REQUIRED, sealed string REQUIRED, created_at int REQUIRED) EXPIRE AFTER 10m; \
      DEFINE TABLE IF NOT EXISTS recovery_codes (user_id string REQUIRED, created_at int REQUIRED); \
      DEFINE INDEX IF NOT EXISTS by_user ON recovery_codes FIELDS user_id; \
      DEFINE TABLE IF NOT EXISTS passkeys (\

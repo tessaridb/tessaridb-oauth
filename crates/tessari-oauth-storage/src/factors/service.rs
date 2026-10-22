@@ -8,10 +8,13 @@
 
 use std::sync::Arc;
 
+use zeroize::Zeroizing;
+
 use tessari_oauth_constants::FACTOR_WRITE_ATTEMPTS;
 use tessari_oauth_infrastructure::custody::Kek;
 use tessari_oauth_types::{ErrorCategory, TenantId, Timestamp, UserId, base64url};
 
+use super::entity::PendingTotpEntity;
 use super::repository::FactorRepository;
 use super::{Enrolled, FactorSummary, TotpEntity, TotpFactor};
 use crate::{Error, Result, Tenancy, retry};
@@ -40,6 +43,11 @@ const fn invalid(reason: &'static str) -> Error {
 /// What the secret is sealed for: one user's one-time code factor.
 fn binding(user: &UserId) -> String {
     format!("totp:{}", user.as_str())
+}
+
+/// What a secret being enrolled is sealed for, apart from an enrolled one, so neither opens as the other.
+fn pending_binding(user: &UserId) -> String {
+    format!("totp-pending:{}", user.as_str())
 }
 
 fn unix_secs(at: Timestamp) -> Result<i64> {
@@ -211,5 +219,59 @@ impl FactorService {
             totp,
             recovery_codes,
         })
+    }
+
+    /// Keep `secret` for `user` in `tenant` as the one-time code factor the session `sid` is enrolling, sealed under
+    /// `kek`, until it is confirmed or ten minutes pass; a later call for the same session replaces it.
+    ///
+    /// # Errors
+    ///
+    /// Custody and store failures.
+    pub async fn begin_totp(
+        &self,
+        tenant: &TenantId,
+        kek: &Kek,
+        user: &UserId,
+        sid: &str,
+        secret: &[u8],
+        now: Timestamp,
+    ) -> Result<()> {
+        let place = self.tenancy.place(tenant)?;
+        let pending = PendingTotpEntity {
+            user_id: user.as_str().to_owned(),
+            sealed: base64url::encode(&kek.seal(tenant, &pending_binding(user), secret)?),
+            created_at: unix_secs(now)?,
+        };
+        self.repository.put_pending(&place, sid, &pending).await
+    }
+
+    /// Take, once, the secret the session `sid` of `user` in `tenant` is enrolling, opened under `kek`; `None` when
+    /// there is none, it lapsed, or it is not `user`'s.
+    ///
+    /// # Errors
+    ///
+    /// A custody failure when it does not open; store failures.
+    pub async fn take_pending_totp(
+        &self,
+        tenant: &TenantId,
+        kek: &Kek,
+        user: &UserId,
+        sid: &str,
+    ) -> Result<Option<Zeroizing<Vec<u8>>>> {
+        let place = self.tenancy.place(tenant)?;
+        // A session's public id names one user's session, so the owner read here is the one whose secret is taken.
+        let owned = self
+            .repository
+            .find_pending(&place, sid)
+            .await?
+            .is_some_and(|pending| pending.user_id == user.as_str());
+        if !owned {
+            return Ok(None);
+        }
+        let Some(taken) = self.repository.take_pending(&place, sid).await? else {
+            return Ok(None);
+        };
+        let sealed = base64url::decode(&taken.sealed).map_err(|_| unreadable("sealed"))?;
+        Ok(Some(kek.unseal(tenant, &pending_binding(user), &sealed)?))
     }
 }

@@ -40,3 +40,24 @@ impl FromRecord for CodeEntity {
         })
     }
 }
+
+/// A one-time code secret a session is enrolling, under the session's public id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PendingTotpEntity {
+    /// The user enrolling it.
+    pub(crate) user_id: String,
+    /// The secret, sealed, base64url.
+    pub(crate) sealed: String,
+    /// Unix seconds it was drawn.
+    pub(crate) created_at: i64,
+}
+
+impl FromRecord for PendingTotpEntity {
+    fn from_row(mut row: Row) -> Result<Self, MappingFault> {
+        Ok(Self {
+            user_id: row.take("user_id")?,
+            sealed: row.take("sealed")?,
+            created_at: row.take("created_at")?,
+        })
+    }
+}
