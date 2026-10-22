@@ -1,7 +1,8 @@
 //! `GET /{tenant}/oauth2/authorize/resume?interaction=<id>`: the pending authorization a finished sign-in continues.
 //!
-//! The request must still be pending, or it is refused on a page here and sent nowhere: the redirect URI it carried
-//! is no longer known to be the one to answer. A browser with no session at this issuer is sent to sign in for it.
+//! The request must still be pending and have been brought by this browser, as its browser cookie says, or it is
+//! refused on a page here and sent nowhere: the redirect URI it carried is no longer known to be the one to answer. A
+//! browser with no session at this issuer is sent to sign in for it.
 //! When the user's consent to this client covers every scope and resource asked for, under the consent policy in
 //! force, the request is taken, once, and answered at its redirect URI with a code bound to the client, the redirect
 //! URI, the PKCE challenge, the user and the tenant, its `state`, and the issuer (RFC 9207); otherwise the browser is
@@ -19,10 +20,12 @@ use tessari_oauth_core::codes::IssuedCode;
 use tessari_oauth_core::consents::{ConsentRequest, Coverage};
 use tessari_oauth_infrastructure::custody::random_secret;
 use tessari_oauth_types::{
-    AuthorizationCode, ErrorCode, SessionSecret, TenantId, Timestamp, UserId, base64url,
+    AuthorizationCode, BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp, UserId,
+    base64url,
 };
 
 use super::authorize::{page, see_other};
+use super::browser::held;
 use super::login::{cookie, well_formed};
 use crate::state::PublicState;
 use crate::{Error, Result};
@@ -40,16 +43,18 @@ pub(super) async fn resume(
 ) -> Result<Response> {
     let (tenant, issuer) = state.tenant(&tenant)?;
     let now = (state.clock)();
-    let Some(id) = query
-        .ok()
-        .and_then(|Query(resume)| resume.interaction)
-        .filter(|id| well_formed(id))
-    else {
+    let (Some(id), Some(browser)) = (
+        query
+            .ok()
+            .and_then(|Query(resume)| resume.interaction)
+            .filter(|id| well_formed(id)),
+        held(&headers),
+    ) else {
         return Ok(page(ErrorCode::InvalidRequest));
     };
     let Some(request) = state
         .interactions
-        .find(&tenant, &id, now)
+        .find(&tenant, &id, &browser, now)
         .await
         .map_err(Error::Store)?
     else {
@@ -82,27 +87,29 @@ pub(super) async fn resume(
         .await
         .map_err(Error::Store)?;
     match coverage {
-        Coverage::Covered => match issued(&state, &tenant, issuer, &id, session.user, now).await? {
-            Some(target) => see_other(&target),
-            None => Ok(page(ErrorCode::InvalidRequest)),
-        },
+        Coverage::Covered => {
+            match issued(&state, &tenant, issuer, (&id, &browser), session.user, now).await? {
+                Some(target) => see_other(&target),
+                None => Ok(page(ErrorCode::InvalidRequest)),
+            }
+        }
         Coverage::Prompt { .. } => see_other(&format!("{issuer}{CONSENT_PATH}?interaction={id}")),
     }
 }
 
-/// Take the pending authorization `id` in `tenant` for `user` at `now`, once, and answer the address of its redirect
+/// Take the pending authorization `id` that `browser` brought in `tenant` for `user` at `now`, once, and answer the address of its redirect
 /// URI carrying a fresh code; `None` when another request took it first.
 pub(super) async fn issued(
     state: &PublicState,
     tenant: &TenantId,
     issuer: &str,
-    id: &str,
+    (id, browser): (&str, &BrowserBinding),
     user: UserId,
     now: Timestamp,
 ) -> Result<Option<String>> {
     let Some(request) = state
         .interactions
-        .finish(tenant, id, now)
+        .finish(tenant, id, browser, now)
         .await
         .map_err(Error::Store)?
     else {

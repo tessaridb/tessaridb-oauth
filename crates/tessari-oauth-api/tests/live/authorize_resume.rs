@@ -19,7 +19,9 @@ use crate::login::{post, signin};
 use crate::login_complete::session_value;
 use crate::login_password::{RIGHT, identified, with_password};
 use crate::routes::{Answer, header};
-use crate::token_fixture::{API, NOW, REDIRECT, Server, issuer, plenty, server, state, tenant};
+use crate::token_fixture::{
+    API, BROWSER_COOKIE, NOW, REDIRECT, Server, browser, issuer, plenty, server, state, tenant,
+};
 
 /// The verifier whose S256 challenge the pending authorizations carry (RFC 7636 appendix B).
 pub(crate) const VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
@@ -29,9 +31,13 @@ const SESSION_COOKIE: &str = "__Host-tessari-session";
 async fn get(server: &Server, path: &str, session: Option<&str>) -> Answer {
     let mut request =
         Request::get(path).extension(ConnectInfo(SocketAddr::from(([192, 0, 2, 1], 50_000))));
-    if let Some(value) = session {
-        request = request.header("cookie", format!("theme=dark; {SESSION_COOKIE}={value}"));
-    }
+    request = match session {
+        Some(value) => request.header(
+            "cookie",
+            format!("theme=dark; {BROWSER_COOKIE}; {SESSION_COOKIE}={value}"),
+        ),
+        None => request.header("cookie", BROWSER_COOKIE),
+    };
     let response = public_router(state(server, plenty()))
         .oneshot(request.body(Body::empty()).expect("a request"))
         .await
@@ -148,6 +154,7 @@ async fn without_consent_the_browser_is_sent_to_be_asked_and_the_request_waits()
         .find(
             &tenant("acme"),
             &interaction,
+            &browser(),
             Timestamp::from_unix_secs(NOW),
         )
         .await
@@ -203,6 +210,7 @@ async fn the_answer_carries_the_state_the_client_sent() {
         .find(
             &tenant("acme"),
             &interaction,
+            &browser(),
             Timestamp::from_unix_secs(NOW),
         )
         .await
@@ -212,7 +220,12 @@ async fn the_answer_carries_the_state_the_client_sent() {
     let with_state = server
         .storage
         .interactions
-        .open(&tenant("acme"), &request, Timestamp::from_unix_secs(NOW))
+        .open(
+            &tenant("acme"),
+            &request,
+            &browser(),
+            Timestamp::from_unix_secs(NOW),
+        )
         .await
         .expect("kept");
     let answered = get(&server, &resume_path(&with_state), Some(&session)).await;

@@ -7,13 +7,14 @@
 //! request its client pushed (RFC 9126): claimed once by that client, it is the request, and nothing else in the
 //! query is read; one that cannot be claimed is refused at the server. A request that asks for
 //! no page is refused with `login_required`, because no session can answer it yet. A valid request is kept as a
-//! pending authorization and the browser is sent to sign in carrying that record's id and nothing else. Every refusal
+//! pending authorization bound to the browser that brought it, by a browser cookie the browser keeps or this server
+//! draws, and the browser is sent to sign in carrying that record's id and nothing else. Every refusal
 //! is appended to the tenant's audit trail — identifiers and the reason, never the request's values — and is answered
 //! whether or not its record lands. No answer may be stored by a cache.
 
 use axum::extract::rejection::{FormRejection, QueryRejection};
 use axum::extract::{Form, Path, Query, State};
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use tessari_oauth_constants::LOGIN_PATH;
 use tessari_oauth_core::Reason;
@@ -22,6 +23,7 @@ use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_types::{ClientId, ErrorCode, TenantId, Timestamp};
 
 use super::Found;
+use super::browser::{browser_cookie, held_or_drawn};
 use crate::Error;
 use crate::headers::no_store;
 use crate::state::PublicState;
@@ -31,27 +33,43 @@ type Pairs = Vec<(String, String)>;
 pub(super) async fn query(
     State(state): State<PublicState>,
     Path(tenant): Path<String>,
+    headers: HeaderMap,
     pairs: Result<Query<Pairs>, QueryRejection>,
 ) -> crate::Result<Response> {
-    respond(&state, &tenant, pairs.map(|Query(pairs)| pairs).ok()).await
+    respond(
+        &state,
+        &tenant,
+        &headers,
+        pairs.map(|Query(pairs)| pairs).ok(),
+    )
+    .await
 }
 
 pub(super) async fn form(
     State(state): State<PublicState>,
     Path(tenant): Path<String>,
+    headers: HeaderMap,
     pairs: Result<Form<Pairs>, FormRejection>,
 ) -> crate::Result<Response> {
-    respond(&state, &tenant, pairs.map(|Form(pairs)| pairs).ok()).await
+    respond(
+        &state,
+        &tenant,
+        &headers,
+        pairs.map(|Form(pairs)| pairs).ok(),
+    )
+    .await
 }
 
 /// Judge the request's `pairs` — `None` when they could not be read — and answer it.
 async fn respond(
     state: &PublicState,
     tenant: &str,
+    headers: &HeaderMap,
     pairs: Option<Pairs>,
 ) -> crate::Result<Response> {
     let (tenant, issuer) = state.tenant(tenant)?;
     let now = (state.clock)();
+    let browser = held_or_drawn(headers)?;
     let Some(pairs) = pairs else {
         let refused = Refusal::RenderAtServer {
             error: ErrorCode::InvalidRequest,
@@ -71,7 +89,7 @@ async fn respond(
         Ok(Some((client, id))) => {
             let claimed = state
                 .interactions
-                .claim(&tenant, &id, &client, now)
+                .claim(&tenant, &id, &client, &browser, now)
                 .await
                 .map_err(Error::Store)?;
             let Some(request) = claimed else {
@@ -116,11 +134,15 @@ async fn respond(
         Some(id) => id,
         None => state
             .interactions
-            .open(&tenant, &request, now)
+            .open(&tenant, &request, &browser, now)
             .await
             .map_err(Error::Store)?,
     };
-    see_other(&format!("{issuer}{LOGIN_PATH}?interaction={id}"))
+    let mut response = see_other(&format!("{issuer}{LOGIN_PATH}?interaction={id}"))?;
+    response
+        .headers_mut()
+        .insert(header::SET_COOKIE, browser_cookie(&browser)?);
+    Ok(response)
 }
 
 /// Record `refused` for the client the request named, then answer it where it may go.

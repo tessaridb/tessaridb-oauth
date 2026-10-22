@@ -1,6 +1,6 @@
 //! `GET` and `POST /{tenant}/login/api/consent`: the user's answer to what a pending authorization asks.
 //!
-//! Both need the session this issuer opened for the browser, and a request still pending. The page is told what is
+//! Both need the session this issuer opened for the browser, and a request still pending that this browser brought. The page is told what is
 //! asked and not yet granted under the consent policy in force, and nothing else: the client by its registered id,
 //! never a name the client supplied. Allowing records the grant before any code exists, widening the user's standing
 //! grant to the client, and then takes the request once and answers the address of its redirect URI with a code.
@@ -18,8 +18,9 @@ use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_core::consents::{ConsentRequest, Coverage};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::consents::NewGrant;
-use tessari_oauth_types::{ErrorCode, SessionSecret, TenantId, Timestamp, UserId};
+use tessari_oauth_types::{BrowserBinding, ErrorCode, SessionSecret, TenantId, Timestamp, UserId};
 
+use super::super::browser::held;
 use super::super::resume::issued;
 use super::{body, cookie, record, well_formed};
 use crate::state::PublicState;
@@ -69,7 +70,8 @@ pub(in crate::routes) async fn consent(
         .ok()
         .and_then(|Query(asked)| asked.interaction)
         .ok_or(Error::Invalid)?;
-    let request = pending(&state, &tenant, &id, now).await?;
+    let browser = held(&headers).ok_or(Error::SigninGone)?;
+    let request = pending(&state, &tenant, (&id, &browser), now).await?;
     let user = signed_in(&state, &tenant, &headers, now).await?;
     let coverage = state
         .consents
@@ -111,7 +113,8 @@ pub(in crate::routes) async fn decide(
     let (tenant, issuer) = state.tenant(&tenant)?;
     let answered = body(read)?;
     let now = (state.clock)();
-    let request = pending(&state, &tenant, &answered.interaction, now).await?;
+    let browser = held(&headers).ok_or(Error::SigninGone)?;
+    let request = pending(&state, &tenant, (&answered.interaction, &browser), now).await?;
     let user = signed_in(&state, &tenant, &headers, now).await?;
     let target = match answered.decision {
         Decision::Allow => {
@@ -132,12 +135,20 @@ pub(in crate::routes) async fn decide(
                 ..AuditEvent::of(AuditKind::Consented)
             };
             record(&state, &tenant, &event, now).await;
-            issued(&state, &tenant, issuer, &answered.interaction, user, now).await?
+            issued(
+                &state,
+                &tenant,
+                issuer,
+                (&answered.interaction, &browser),
+                user,
+                now,
+            )
+            .await?
         }
         Decision::Deny => {
             let taken = state
                 .interactions
-                .finish(&tenant, &answered.interaction, now)
+                .finish(&tenant, &answered.interaction, &browser, now)
                 .await
                 .map_err(Error::Store)?;
             taken.map(|request| denied(&request, issuer)).transpose()?
@@ -147,12 +158,12 @@ pub(in crate::routes) async fn decide(
     Ok((StatusCode::OK, Json(Onward { redirect })).into_response())
 }
 
-/// The request `id` names in `tenant`, still pending at `now`: [`Error::Invalid`] for an id this server could not
+/// The request `id` names in `tenant`, still pending at `now` and brought by `browser`: [`Error::Invalid`] for an id this server could not
 /// have made, [`Error::SigninGone`] for one that is answered, lapsed or never kept.
 async fn pending(
     state: &PublicState,
     tenant: &TenantId,
-    id: &str,
+    (id, browser): (&str, &BrowserBinding),
     now: Timestamp,
 ) -> Result<AuthorizationRequest> {
     if !well_formed(id) {
@@ -160,7 +171,7 @@ async fn pending(
     }
     state
         .interactions
-        .find(tenant, id, now)
+        .find(tenant, id, browser, now)
         .await
         .map_err(Error::Store)?
         .ok_or(Error::SigninGone)

@@ -1,18 +1,21 @@
 //! `POST /{tenant}/login/api/begin`: start signing in for a pending authorization.
 //!
-//! The authorization must still be pending (kept, brought by its browser, and within its lifetime), or nothing is
-//! started and no cookie is set. A started sign-in is bound to a fresh value the server draws and sets as the
-//! sign-in cookie; beginning again starts a new one under a new value, and the old one lapses on its own.
+//! The authorization must still be pending (kept, brought by this browser as its browser cookie says, and within its
+//! lifetime), or nothing is started and no cookie is set. A started sign-in is bound to a fresh value the server draws
+//! and sets as the sign-in cookie; beginning again starts a new one under a new value, and the old one lapses on its
+//! own.
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::Deserialize;
 use tessari_oauth_core::ceremony::Stage;
 use tessari_oauth_infrastructure::custody::random_secret;
 use tessari_oauth_types::{SigninBinding, base64url};
 
+use super::super::browser::held;
 use super::{answer, binding_cookie, body, well_formed};
 use crate::state::PublicState;
 use crate::{Error, Result};
@@ -25,17 +28,18 @@ pub(in crate::routes) struct Begin {
 pub(in crate::routes) async fn begin(
     State(state): State<PublicState>,
     Path(tenant): Path<String>,
+    headers: HeaderMap,
     read: std::result::Result<Json<Begin>, JsonRejection>,
 ) -> Result<Response> {
     let (tenant, _) = state.tenant(&tenant)?;
     let Begin { interaction } = body(read)?;
     let now = (state.clock)();
-    if !well_formed(&interaction) {
+    let Some(browser) = held(&headers).filter(|_| well_formed(&interaction)) else {
         return Err(Error::SigninGone);
-    }
+    };
     state
         .interactions
-        .find(&tenant, &interaction, now)
+        .find(&tenant, &interaction, &browser, now)
         .await
         .map_err(Error::Store)?
         .ok_or(Error::SigninGone)?;

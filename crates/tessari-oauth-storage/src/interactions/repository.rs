@@ -15,7 +15,7 @@ pub(crate) trait InteractionRepository: Send + Sync {
     /// The interaction at `id`, unless there is none or the store has expired it.
     async fn find(&self, place: &Place, id: &str) -> Result<Option<InteractionEntity>>;
 
-    /// Set `claimed_at` to `at` on the interaction at `id` in one conditional write, if it is unclaimed and was made
+    /// Set `claimed_at` to `at` and `browser` on the interaction at `id` in one conditional write, if it is unclaimed and was made
     /// by `client_id`, answering it as it stood before. One that is claimed already or another client's is a refusal
     /// from the store, because the condition is a compare-and-set rather than a filter.
     async fn claim(
@@ -23,6 +23,7 @@ pub(crate) trait InteractionRepository: Send + Sync {
         place: &Place,
         id: &str,
         client_id: &str,
+        browser: &str,
         at: i64,
     ) -> Result<Option<InteractionEntity>>;
 

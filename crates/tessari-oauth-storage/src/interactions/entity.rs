@@ -27,6 +27,8 @@ pub struct InteractionEntity {
     pub created_at: i64,
     /// Unix seconds the browser brought it — absent while a pushed request waits for its browser.
     pub claimed_at: Option<i64>,
+    /// The digest of the browser cookie of the browser that brought it, absent while a pushed request waits.
+    pub browser: Option<String>,
 }
 
 impl FromRecord for InteractionEntity {
@@ -43,6 +45,7 @@ impl FromRecord for InteractionEntity {
             silent: row.take("silent")?,
             created_at: row.take("created_at")?,
             claimed_at: row.take("claimed_at")?,
+            browser: row.take("browser")?,
         })
     }
 }

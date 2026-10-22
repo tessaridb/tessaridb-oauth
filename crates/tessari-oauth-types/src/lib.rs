@@ -5,6 +5,7 @@
 mod algorithm;
 mod authorization_code;
 pub mod base64url;
+mod browser_binding;
 mod category;
 mod client_id;
 mod email;
@@ -24,6 +25,7 @@ mod user_id;
 
 pub use algorithm::Algorithm;
 pub use authorization_code::AuthorizationCode;
+pub use browser_binding::BrowserBinding;
 pub use category::ErrorCategory;
 pub use client_id::ClientId;
 pub use email::EmailAddress;

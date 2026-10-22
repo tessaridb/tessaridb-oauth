@@ -4,7 +4,8 @@
 //! ceremony resumes it without trusting anything the browser sends back but that id. It lives ten minutes: the store
 //! expires the record, and a read judges its age by this server's clock as well, so a record the store has not yet
 //! removed is never resumed late. A pushed request waits unclaimed for its minute and is claimed once, by the client
-//! that pushed it, in one conditional write; until then it is not a pending sign-in.
+//! that pushed it, in one conditional write; until then it is not a pending sign-in. It belongs to the browser that
+//! brought it, by the digest of that browser's cookie: any other browser finds nothing and cannot take it.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -14,7 +15,9 @@ use tessari_oauth_constants::{
 };
 use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_infrastructure::custody::token_id;
-use tessari_oauth_types::{Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp};
+use tessari_oauth_types::{
+    BrowserBinding, Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp,
+};
 
 use super::InteractionEntity;
 use super::repository::InteractionRepository;
@@ -78,7 +81,8 @@ impl InteractionService {
         }
     }
 
-    /// Keep `request`, made to `tenant` at `now`, and answer the id the login ceremony resumes it by.
+    /// Keep `request`, made to `tenant` at `now` from the browser holding `browser`, and answer the id the login
+    /// ceremony resumes it by.
     ///
     /// # Errors
     ///
@@ -87,9 +91,11 @@ impl InteractionService {
         &self,
         tenant: &TenantId,
         request: &AuthorizationRequest,
+        browser: &BrowserBinding,
         now: Timestamp,
     ) -> Result<String> {
-        self.keep(tenant, request, now, Some(seconds(now)?)).await
+        let claimed = Some((seconds(now)?, browser.digest()));
+        self.keep(tenant, request, now, claimed).await
     }
 
     /// Keep `request`, pushed by its client to `tenant` at `now` (RFC 9126), unclaimed until the browser brings its id.
@@ -106,7 +112,8 @@ impl InteractionService {
         self.keep(tenant, request, now, None).await
     }
 
-    /// Claim the pushed request kept as `id` in `tenant` for `client_id` at `now`, once.
+    /// Claim the pushed request kept as `id` in `tenant` for `client_id` at `now`, once, for the browser holding
+    /// `browser`.
     ///
     /// # Errors
     ///
@@ -116,12 +123,15 @@ impl InteractionService {
         tenant: &TenantId,
         id: &str,
         client_id: &ClientId,
+        browser: &BrowserBinding,
         now: Timestamp,
     ) -> Result<Option<AuthorizationRequest>> {
         let place = self.tenancy.place(tenant)?;
         let at = seconds(now)?;
+        let digest = browser.digest();
         let claimed = retry::bounded(INTERACTION_CLAIM_ATTEMPTS, retry::on_store_retry, || {
-            self.repository.claim(&place, id, client_id.as_str(), at)
+            self.repository
+                .claim(&place, id, client_id.as_str(), &digest, at)
         })
         .await;
         let entity = match claimed {
@@ -148,8 +158,9 @@ impl InteractionService {
         to_request(entity).map(Some)
     }
 
-    /// Take the pending authorization kept as `id` in `tenant` at `now`, once, when its code is issued. A pushed one
-    /// its browser never brought, a lapsed one and another tenant's are taken and not handed out.
+    /// Take the pending authorization kept as `id` in `tenant` at `now` for the browser holding `browser`, once, when
+    /// its code is issued. A lapsed one and another tenant's are taken and not handed out; a pushed one no browser
+    /// brought, and one another browser brought, are left in place.
     ///
     /// # Errors
     ///
@@ -158,9 +169,17 @@ impl InteractionService {
         &self,
         tenant: &TenantId,
         id: &str,
+        browser: &BrowserBinding,
         now: Timestamp,
     ) -> Result<Option<AuthorizationRequest>> {
         let place = self.tenancy.place(tenant)?;
+        // A request's browser is written once, when it is brought, and never changes; so a request this browser did
+        // not bring is left alone, and only its own browser's takers ever reach the delete.
+        let digest = browser.digest();
+        let found = self.repository.find(&place, id).await?;
+        if !found.is_some_and(|row| row.browser.as_deref() == Some(digest.as_str())) {
+            return Ok(None);
+        }
         let taken = retry::take_once(
             INTERACTION_CLAIM_ATTEMPTS,
             || self.repository.take(&place, id),
@@ -181,7 +200,7 @@ impl InteractionService {
         tenant: &TenantId,
         request: &AuthorizationRequest,
         now: Timestamp,
-        claimed_at: Option<i64>,
+        claimed: Option<(i64, String)>,
     ) -> Result<String> {
         let place = self.tenancy.place(tenant)?;
         let id = token_id()?;
@@ -200,13 +219,15 @@ impl InteractionService {
             nonce: request.nonce.clone(),
             silent: request.silent,
             created_at: seconds(now)?,
-            claimed_at,
+            claimed_at: claimed.as_ref().map(|(at, _)| *at),
+            browser: claimed.map(|(_, browser)| browser),
         };
         self.repository.create(&place, &id, &entity).await?;
         Ok(id)
     }
 
-    /// The request kept as `id` in `tenant`, unless there is none or it is older than its lifetime at `now`.
+    /// The request kept as `id` in `tenant` for the browser holding `browser`, unless there is none, another browser
+    /// brought it, or it is older than its lifetime at `now`.
     ///
     /// # Errors
     ///
@@ -215,12 +236,16 @@ impl InteractionService {
         &self,
         tenant: &TenantId,
         id: &str,
+        browser: &BrowserBinding,
         now: Timestamp,
     ) -> Result<Option<AuthorizationRequest>> {
         let place = self.tenancy.place(tenant)?;
         let Some(entity) = self.repository.find(&place, id).await? else {
             return Ok(None);
         };
+        if entity.browser != Some(browser.digest()) {
+            return Ok(None);
+        }
         // A pushed request is not a pending sign-in until its browser has brought it.
         if entity.claimed_at.is_none() || !current(&entity, tenant, INTERACTION_TTL_SECS, now)? {
             return Ok(None);

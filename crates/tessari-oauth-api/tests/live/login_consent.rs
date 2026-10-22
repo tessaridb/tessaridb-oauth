@@ -20,7 +20,8 @@ use crate::authorize_resume::{VERIFIER, signed_in};
 use crate::login::refused;
 use crate::routes::{Answer, answer};
 use crate::token_fixture::{
-    API, NOW, REDIRECT, Server, issuer, plenty, server, state, tenant, uncached,
+    API, BROWSER_COOKIE, NOW, REDIRECT, Server, browser, issuer, plenty, server, state, tenant,
+    uncached,
 };
 
 const SESSION_COOKIE: &str = "__Host-tessari-session";
@@ -39,9 +40,13 @@ async fn call(
         .uri(path)
         .header("content-type", "application/json")
         .extension(ConnectInfo(SocketAddr::from(([192, 0, 2, 1], 50_000))));
-    if let Some(value) = session {
-        request = request.header("cookie", format!("theme=dark; {SESSION_COOKIE}={value}"));
-    }
+    request = match session {
+        Some(value) => request.header(
+            "cookie",
+            format!("theme=dark; {BROWSER_COOKIE}; {SESSION_COOKIE}={value}"),
+        ),
+        None => request.header("cookie", BROWSER_COOKIE),
+    };
     let body = body.map_or_else(Body::empty, Body::from);
     let response = public_router(state(server, plenty()))
         .oneshot(request.body(body).expect("a request"))
@@ -85,7 +90,12 @@ async fn pending(server: &Server, scopes: &str, client_state: Option<&str>) -> S
     server
         .storage
         .interactions
-        .open(&tenant("acme"), &request, Timestamp::from_unix_secs(NOW))
+        .open(
+            &tenant("acme"),
+            &request,
+            &browser(),
+            Timestamp::from_unix_secs(NOW),
+        )
         .await
         .expect("kept")
 }
@@ -95,7 +105,12 @@ async fn waiting(server: &Server, interaction: &str) -> bool {
     server
         .storage
         .interactions
-        .find(&tenant("acme"), interaction, Timestamp::from_unix_secs(NOW))
+        .find(
+            &tenant("acme"),
+            interaction,
+            &browser(),
+            Timestamp::from_unix_secs(NOW),
+        )
         .await
         .expect("the store answers")
         .is_some()

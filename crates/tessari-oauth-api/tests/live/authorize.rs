@@ -11,7 +11,7 @@ use axum::http::{Request, StatusCode};
 use tessari_oauth_api::{PublicState, public_router};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::throttle::Limit;
-use tessari_oauth_types::{ClientId, Resource, Timestamp};
+use tessari_oauth_types::{BrowserBinding, ClientId, Resource, Timestamp};
 use tower::ServiceExt;
 
 use crate::routes::{Answer, header};
@@ -249,7 +249,12 @@ async fn a_valid_request_is_kept_and_handed_to_sign_in_by_its_id_alone() {
         let kept = server
             .storage
             .interactions
-            .find(&tenant("acme"), id, Timestamp::from_unix_secs(NOW))
+            .find(
+                &tenant("acme"),
+                id,
+                &browser_set(&page.answer),
+                Timestamp::from_unix_secs(NOW),
+            )
             .await
             .expect("the store answers")
             .expect("the request was kept");
@@ -321,4 +326,27 @@ async fn the_endpoint_is_counted_under_its_own_limit() {
     assert_eq!(header(&first.answer, "x-ratelimit-limit"), "1");
     let second = send(public, request()).await;
     assert_eq!(second.answer.status, StatusCode::TOO_MANY_REQUESTS);
+}
+
+/// The browser the answer's browser cookie names, after checking the cookie is kept only as this issuer's own.
+fn browser_set(answered: &Answer) -> BrowserBinding {
+    let set = header(answered, "set-cookie");
+    for attribute in [
+        "Path=/",
+        "Secure",
+        "HttpOnly",
+        "SameSite=Lax",
+        "Max-Age=600",
+    ] {
+        assert!(
+            set.split("; ").any(|part| part == attribute),
+            "{attribute} in {set}"
+        );
+    }
+    let (pair, _) = set.split_once(';').expect("attributes follow the value");
+    let value = pair
+        .strip_prefix("__Host-tessari-browser=")
+        .unwrap_or_else(|| panic!("the browser cookie is set: {set}"));
+    assert_eq!(value.len(), 43, "256 bits, base64url");
+    BrowserBinding::from_secret(value)
 }

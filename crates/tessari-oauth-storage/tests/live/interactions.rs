@@ -6,7 +6,9 @@ use std::collections::BTreeSet;
 
 use tessari_oauth_constants::{INTERACTION_TTL_SECS, PUSHED_REQUEST_TTL_SECS};
 use tessari_oauth_core::authorize::AuthorizationRequest;
-use tessari_oauth_types::{Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp};
+use tessari_oauth_types::{
+    BrowserBinding, Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp,
+};
 
 use crate::fresh;
 
@@ -18,6 +20,11 @@ fn tenant(name: &str) -> TenantId {
 
 fn at(offset: u64) -> Timestamp {
     Timestamp::from_unix_secs(START.checked_add(offset).expect("a time within range"))
+}
+
+/// The browser that brought the request.
+fn browser() -> BrowserBinding {
+    BrowserBinding::from_secret("browser-a")
 }
 
 fn request(state: Option<&str>, nonce: Option<&str>) -> AuthorizationRequest {
@@ -44,11 +51,11 @@ async fn a_pending_authorization_reads_back_as_it_was_kept_until_it_lapses() {
     let full = request(Some("af0ifjsldkj"), Some("n-0S6_WzA2Mj"));
     let bare = request(None, None);
     let first = interactions
-        .open(&tenant("acme"), &full, at(0))
+        .open(&tenant("acme"), &full, &browser(), at(0))
         .await
         .expect("kept");
     let second = interactions
-        .open(&tenant("acme"), &bare, at(0))
+        .open(&tenant("acme"), &bare, &browser(), at(0))
         .await
         .expect("kept");
     assert_ne!(first, second, "each is kept under its own id");
@@ -62,21 +69,26 @@ async fn a_pending_authorization_reads_back_as_it_was_kept_until_it_lapses() {
         .expect("a positive lifetime");
     assert_eq!(
         interactions
-            .find(&tenant("acme"), &first, at(last_moment))
+            .find(&tenant("acme"), &first, &browser(), at(last_moment))
             .await
             .expect("read"),
         Some(full)
     );
     assert_eq!(
         interactions
-            .find(&tenant("acme"), &second, at(0))
+            .find(&tenant("acme"), &second, &browser(), at(0))
             .await
             .expect("read"),
         Some(bare)
     );
     assert_eq!(
         interactions
-            .find(&tenant("acme"), &first, at(INTERACTION_TTL_SECS))
+            .find(
+                &tenant("acme"),
+                &first,
+                &browser(),
+                at(INTERACTION_TTL_SECS)
+            )
             .await
             .expect("read"),
         None,
@@ -84,7 +96,7 @@ async fn a_pending_authorization_reads_back_as_it_was_kept_until_it_lapses() {
     );
     assert_eq!(
         interactions
-            .find(&tenant("acme"), "never-opened", at(0))
+            .find(&tenant("acme"), "never-opened", &browser(), at(0))
             .await
             .expect("read"),
         None
@@ -102,13 +114,13 @@ async fn a_pending_authorization_is_not_found_from_another_tenant() {
         .expect("provisioned");
     let id = storage
         .interactions
-        .open(&tenant("acme"), &request(None, None), at(0))
+        .open(&tenant("acme"), &request(None, None), &browser(), at(0))
         .await
         .expect("kept");
     assert_eq!(
         storage
             .interactions
-            .find(&tenant("initech"), &id, at(1))
+            .find(&tenant("initech"), &id, &browser(), at(1))
             .await
             .expect("read"),
         None
@@ -136,7 +148,7 @@ async fn a_pushed_request_is_claimed_once_by_its_client_then_read_as_pending() {
         .expect("kept");
     assert_eq!(
         interactions
-            .find(&tenant("acme"), &id, at(1))
+            .find(&tenant("acme"), &id, &browser(), at(1))
             .await
             .expect("read"),
         None,
@@ -145,7 +157,7 @@ async fn a_pushed_request_is_claimed_once_by_its_client_then_read_as_pending() {
     let kiosk = ClientId::parse("kiosk").expect("a client id");
     assert_eq!(
         interactions
-            .claim(&tenant("acme"), &id, &kiosk, at(1))
+            .claim(&tenant("acme"), &id, &kiosk, &browser(), at(1))
             .await
             .expect("claimed"),
         None,
@@ -153,7 +165,7 @@ async fn a_pushed_request_is_claimed_once_by_its_client_then_read_as_pending() {
     );
     assert_eq!(
         interactions
-            .claim(&tenant("initech"), &id, &portal(), at(1))
+            .claim(&tenant("initech"), &id, &portal(), &browser(), at(1))
             .await
             .expect("claimed"),
         None,
@@ -164,7 +176,7 @@ async fn a_pushed_request_is_claimed_once_by_its_client_then_read_as_pending() {
         .expect("a positive lifetime");
     assert_eq!(
         interactions
-            .claim(&tenant("acme"), &id, &portal(), at(last_moment))
+            .claim(&tenant("acme"), &id, &portal(), &browser(), at(last_moment))
             .await
             .expect("claimed"),
         Some(pushed.clone()),
@@ -172,7 +184,7 @@ async fn a_pushed_request_is_claimed_once_by_its_client_then_read_as_pending() {
     );
     assert_eq!(
         interactions
-            .claim(&tenant("acme"), &id, &portal(), at(last_moment))
+            .claim(&tenant("acme"), &id, &portal(), &browser(), at(last_moment))
             .await
             .expect("claimed"),
         None,
@@ -180,7 +192,7 @@ async fn a_pushed_request_is_claimed_once_by_its_client_then_read_as_pending() {
     );
     assert_eq!(
         interactions
-            .find(&tenant("acme"), &id, at(last_moment))
+            .find(&tenant("acme"), &id, &browser(), at(last_moment))
             .await
             .expect("read"),
         Some(pushed),
@@ -203,6 +215,7 @@ async fn a_pushed_request_lapses_at_its_minute_and_an_opened_one_cannot_be_claim
                 &tenant("acme"),
                 &pushed,
                 &portal(),
+                &browser(),
                 at(PUSHED_REQUEST_TTL_SECS)
             )
             .await
@@ -211,12 +224,12 @@ async fn a_pushed_request_lapses_at_its_minute_and_an_opened_one_cannot_be_claim
         "lapsed at its lifetime"
     );
     let opened = interactions
-        .open(&tenant("acme"), &request(None, None), at(0))
+        .open(&tenant("acme"), &request(None, None), &browser(), at(0))
         .await
         .expect("kept");
     assert_eq!(
         interactions
-            .claim(&tenant("acme"), &opened, &portal(), at(1))
+            .claim(&tenant("acme"), &opened, &portal(), &browser(), at(1))
             .await
             .expect("claimed"),
         None,
@@ -240,7 +253,7 @@ async fn a_silent_request_reads_back_silent() {
     assert_eq!(
         storage
             .interactions
-            .claim(&tenant("acme"), &id, &portal(), at(1))
+            .claim(&tenant("acme"), &id, &portal(), &browser(), at(1))
             .await
             .expect("claimed"),
         Some(silent)
@@ -263,7 +276,7 @@ async fn of_simultaneous_claims_of_one_pushed_request_exactly_one_succeeds() {
             racers.spawn(async move {
                 storage
                     .interactions
-                    .claim(&tenant("acme"), &id, &portal(), at(1))
+                    .claim(&tenant("acme"), &id, &portal(), &browser(), at(1))
                     .await
             });
         }

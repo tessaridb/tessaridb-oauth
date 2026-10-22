@@ -7,7 +7,9 @@ use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_types::{ClientId, Timestamp};
 
 use crate::routes::{Answer, answer};
-use crate::token_fixture::{NOW, REDIRECT, Server, plenty, server, state, tenant, uncached};
+use crate::token_fixture::{
+    BROWSER_COOKIE, NOW, REDIRECT, Server, browser, plenty, server, state, tenant, uncached,
+};
 use axum::body::Body;
 use axum::http::Request;
 use tessari_oauth_api::public_router;
@@ -86,6 +88,7 @@ async fn a_pushed_request_is_named_by_a_request_uri_its_client_alone_can_claim()
             &tenant("acme"),
             id,
             &ClientId::parse("portal").expect("a client id"),
+            &browser(),
             Timestamp::from_unix_secs(NOW),
         )
         .await
@@ -169,6 +172,7 @@ async fn authorize(server: &Server, pairs: &[(&str, &str)]) -> (StatusCode, Opti
     let response = public_router(state(server, plenty()))
         .oneshot(
             Request::get(format!("/acme/oauth2/authorize?{query}"))
+                .header("cookie", BROWSER_COOKIE)
                 .body(Body::empty())
                 .expect("a request"),
         )
@@ -218,7 +222,12 @@ async fn the_browser_brings_a_request_uri_once_and_is_handed_to_sign_in_with_it(
     let pending = server
         .storage
         .interactions
-        .find(&tenant("acme"), id, Timestamp::from_unix_secs(NOW))
+        .find(
+            &tenant("acme"),
+            id,
+            &browser(),
+            Timestamp::from_unix_secs(NOW),
+        )
         .await
         .expect("the store answers")
         .expect("now a pending sign-in");

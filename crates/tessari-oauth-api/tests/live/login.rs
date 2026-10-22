@@ -24,7 +24,8 @@ use tower::ServiceExt;
 
 use crate::routes::{Answer, answer, header, protected};
 use crate::token_fixture::{
-    API, NOW, REDIRECT, Server, passwords, plenty, server, state, tenant, uncached,
+    API, BROWSER_COOKIE, NOW, REDIRECT, Server, browser, passwords, plenty, server, state, tenant,
+    uncached,
 };
 
 pub(crate) const KNOWN: &str = "ada@example.com";
@@ -44,9 +45,13 @@ pub(crate) async fn post_from(
     let mut request = Request::post(format!("/acme/login/api/{step}"))
         .header("content-type", "application/json")
         .extension(ConnectInfo(peer));
-    if let Some(value) = cookie {
-        request = request.header("cookie", format!("theme=dark; {COOKIE}={value}"));
-    }
+    request = match cookie {
+        Some(value) => request.header(
+            "cookie",
+            format!("theme=dark; {BROWSER_COOKIE}; {COOKIE}={value}"),
+        ),
+        None => request.header("cookie", BROWSER_COOKIE),
+    };
     let response = public_router(public)
         .oneshot(request.body(Body::from(body)).expect("a request"))
         .await
@@ -94,7 +99,12 @@ async fn pending(server: &Server) -> String {
     server
         .storage
         .interactions
-        .open(&tenant("acme"), &request, Timestamp::from_unix_secs(NOW))
+        .open(
+            &tenant("acme"),
+            &request,
+            &browser(),
+            Timestamp::from_unix_secs(NOW),
+        )
         .await
         .expect("kept")
 }

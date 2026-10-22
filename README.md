@@ -216,7 +216,10 @@ every scope and resource asked for, the request is answered once at its redirect
 `iss`; otherwise the browser is sent to `<issuer>/consent`, and without a session to sign in again. The consent
 page reads `GET <issuer>/login/api/consent?interaction=<id>`, which lists only the scopes and resources not yet
 granted, and posts the user's `allow` or `deny`: allowing records the grant before a code exists, denying grants
-nothing and answers `access_denied`, and either answer is the redirect-URI address the browser goes on to.
+nothing and answers `access_denied`, and either answer is the redirect-URI address the browser goes on to. A pending
+authorization belongs to the browser that brought it to `/oauth2/authorize`, by the cookie `__Host-tessari-browser`
+(kept when the browser has one, drawn otherwise): another browser holding the request's id cannot sign in for it,
+answer its consent or receive its code.
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listener stops accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.

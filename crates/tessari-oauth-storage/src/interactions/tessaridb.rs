@@ -33,7 +33,7 @@ impl InteractionRepository for TessaridbInteractionRepository {
                 place,
                 "CREATE interactions:$id = { tenant: $tenant, client_id: $client_id, redirect_uri: $redirect_uri, \
                  scopes: $scopes, challenge: $challenge, state: $state, resources: $resources, nonce: $nonce, \
-                 silent: $silent, created_at: $created_at, claimed_at: $claimed_at };",
+                 silent: $silent, created_at: $created_at, claimed_at: $claimed_at, browser: $browser };",
                 vec![
                     ("id".to_owned(), text(id)),
                     ("tenant".to_owned(), text(&interaction.tenant)),
@@ -55,6 +55,10 @@ impl InteractionRepository for TessaridbInteractionRepository {
                     (
                         "claimed_at".to_owned(),
                         interaction.claimed_at.map_or(Value::None, Value::from),
+                    ),
+                    (
+                        "browser".to_owned(),
+                        interaction.browser.as_deref().map_or(Value::None, text),
                     ),
                 ],
             )
@@ -79,6 +83,7 @@ impl InteractionRepository for TessaridbInteractionRepository {
         place: &Place,
         id: &str,
         client_id: &str,
+        browser: &str,
         at: i64,
     ) -> Result<Option<InteractionEntity>> {
         // The condition and the write are one statement, so of any number of simultaneous claims one sets it.
@@ -86,11 +91,12 @@ impl InteractionRepository for TessaridbInteractionRepository {
             .database
             .run_at(
                 place,
-                "UPDATE interactions:$id SET claimed_at = $at WHERE claimed_at = NONE AND client_id = $client_id \
+                "UPDATE interactions:$id SET claimed_at = $at, browser = $browser WHERE claimed_at = NONE AND client_id = $client_id \
                  RETURN BEFORE;",
                 vec![
                     ("id".to_owned(), text(id)),
                     ("client_id".to_owned(), text(client_id)),
+                    ("browser".to_owned(), text(browser)),
                     ("at".to_owned(), Value::from(at)),
                 ],
             )

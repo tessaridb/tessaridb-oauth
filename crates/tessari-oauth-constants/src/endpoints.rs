@@ -24,6 +24,10 @@ pub const LOGIN_COOKIE: &str = "__Host-tessari-login";
 /// as the sign-in cookie.
 pub const SESSION_COOKIE: &str = "__Host-tessari-session";
 
+/// The cookie that names the browser a pending authorization was brought by, so only that browser can sign in for it,
+/// answer its consent or receive its code; under the same `__Host-` rules.
+pub const BROWSER_COOKIE: &str = "__Host-tessari-browser";
+
 /// Where a browser whose sign-in completed is sent to continue its pending authorization, appended to the issuer
 /// with that authorization's id as `interaction`.
 pub const AUTHORIZE_RESUME_PATH: &str = "/oauth2/authorize/resume";

@@ -3,6 +3,7 @@
 //! under theirs, every body capped.
 
 mod authorize;
+mod browser;
 mod jwks;
 mod login;
 mod metadata;

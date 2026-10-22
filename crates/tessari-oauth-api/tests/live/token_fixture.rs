@@ -17,8 +17,8 @@ use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_test_support::{fresh_kek, fresh_passwords, fresh_storage, plain_node};
 use tessari_oauth_types::{
-    Algorithm, AuthorizationCode, Challenge, ClientId, RedirectUri, Resource, ScopeSet, TenantId,
-    Timestamp, UserId,
+    Algorithm, AuthorizationCode, BrowserBinding, Challenge, ClientId, RedirectUri, Resource,
+    ScopeSet, TenantId, Timestamp, UserId,
 };
 use tower::ServiceExt;
 
@@ -29,6 +29,12 @@ pub(crate) const VERIFIER: &str = "verifier-0123456789-0123456789-0123456789-abc
 pub(crate) const REDIRECT: &str = "https://app.example.com/callback";
 pub(crate) const API: &str = "https://api.example.com/";
 pub(crate) const USER: &str = "user-7";
+/// The browser cookie every test browser holds, and the binding it names.
+pub(crate) const BROWSER_COOKIE: &str = "__Host-tessari-browser=browser-a";
+
+pub(crate) fn browser() -> BrowserBinding {
+    BrowserBinding::from_secret("browser-a")
+}
 
 pub(crate) fn tenant(name: &str) -> TenantId {
     TenantId::parse(name).expect("a tenant id")
