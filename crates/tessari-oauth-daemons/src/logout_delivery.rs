@@ -17,6 +17,7 @@ use tessari_oauth_constants::{
     LOGOUT_CLAIM_BATCH, LOGOUT_RETRY_FIRST_SECS, LOGOUT_RETRY_MAX_SECS, LOGOUT_SEND_TIMEOUT_SECS,
 };
 use tessari_oauth_core::logout::{Ended, LOGOUT_TOKEN_TYPE, logout_claims};
+use tessari_oauth_infrastructure::backchannel::Poster;
 use tessari_oauth_infrastructure::custody::{Kek, token_id};
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::keys::KeyService;
@@ -37,6 +38,25 @@ pub trait LogoutSender: Send + Sync {
         uri: &'a str,
         logout_token: &'a str,
     ) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>>;
+}
+
+/// HTTPS delivery: the reason a client was not told is logged here, since the daemon sees only that it was not.
+impl LogoutSender for Poster {
+    fn send<'a>(
+        &'a self,
+        uri: &'a str,
+        logout_token: &'a str,
+    ) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>> {
+        Box::pin(async move {
+            match self.deliver(uri, logout_token).await {
+                Ok(()) => true,
+                Err(reason) => {
+                    tracing::warn!(event = "logout_undelivered", %reason, "a back-channel endpoint was not told");
+                    false
+                }
+            }
+        })
+    }
 }
 
 /// The delivery daemon and everything a run needs.
@@ -257,9 +277,20 @@ impl Daemon for LogoutDelivery {
 
 #[cfg(test)]
 mod tests {
-    use tessari_oauth_constants::{LOGOUT_RETRY_FIRST_SECS, LOGOUT_RETRY_MAX_SECS};
+    use std::time::Duration;
 
-    use super::backoff;
+    use rustls::RootCertStore;
+    use tessari_oauth_constants::{LOGOUT_RETRY_FIRST_SECS, LOGOUT_RETRY_MAX_SECS};
+    use tessari_oauth_infrastructure::backchannel::Poster;
+
+    use super::{LogoutSender, backoff};
+
+    #[tokio::test]
+    async fn an_endpoint_the_poster_will_not_call_reads_as_not_told() {
+        let poster = Poster::new(RootCertStore::empty(), Duration::from_secs(5)).expect("a poster");
+        assert!(!poster.send("http://rp.example.com/bc", "a.b.c").await);
+        assert!(!poster.send("https://169.254.169.254/bc", "a.b.c").await);
+    }
 
     #[test]
     fn the_wait_doubles_from_the_first_and_stops_at_the_longest() {
