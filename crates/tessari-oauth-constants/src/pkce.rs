@@ -38,3 +38,15 @@ pub const FACTOR_CHANGE_RECENCY_SECS: u64 = 600;
 /// Longest a session at this issuer lasts however often it is used, in seconds: 7 days. After it, the user signs in
 /// again; the table's own expiry is the same week.
 pub const SESSION_ABSOLUTE_SECS: u64 = 604_800;
+
+/// Longest a sign-in to the admin console may take between leaving for the issuer and coming back, in seconds: 10
+/// minutes, the table's own expiry as well.
+pub const ADMIN_SIGNIN_TTL_SECS: u64 = 600;
+
+/// Longest an admin console session stays signed in without a request, in seconds: 30 minutes, because the console
+/// carries the most authority in the product and a workstation left unattended is its ordinary threat.
+pub const ADMIN_SESSION_IDLE_SECS: u64 = 1_800;
+
+/// Longest an admin console session lasts however often it is used, in seconds: 8 hours, a working day; the table's
+/// own expiry is the same.
+pub const ADMIN_SESSION_ABSOLUTE_SECS: u64 = 28_800;

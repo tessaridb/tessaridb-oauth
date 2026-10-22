@@ -34,7 +34,10 @@ use crate::Result;
 /// (`SESSION_ABSOLUTE_SECS`) a session lasts, found for its user's own list by `by_user`.
 /// `enrolments` holds a user's one live enrolment code under its digest for 72 hours, found by `by_user` when a new code
 /// replaces it. `operator_grants` holds each role a user may administer the company with under `<user id>.<role>`,
-/// with who gave it, why and until when, found for its holder by `by_user`.
+/// with who gave it, why and until when, found for its holder by `by_user`. `admin_signins` holds a sign-in to the
+/// admin console under the digest of its sign-in cookie for the ten minutes (`ADMIN_SIGNIN_TTL_SECS`) a trip to the
+/// issuer may take; `admin_sessions` holds an admin console session under the digest of its cookie for at most the
+/// eight hours (`ADMIN_SESSION_ABSOLUTE_SECS`) it lasts.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -116,7 +119,13 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      user_id string REQUIRED, role_name string REQUIRED, granted_by string REQUIRED, granted_at int REQUIRED, \
      reason string REQUIRED); \
      DEFINE FIELD IF NOT EXISTS expires_at ON operator_grants TYPE int; \
-     DEFINE INDEX IF NOT EXISTS by_user ON operator_grants FIELDS user_id;";
+     DEFINE INDEX IF NOT EXISTS by_user ON operator_grants FIELDS user_id; \
+     DEFINE TABLE IF NOT EXISTS admin_signins (\
+     state string REQUIRED, verifier string REQUIRED, nonce string REQUIRED, created_at int REQUIRED) \
+     EXPIRE AFTER 10m; \
+     DEFINE TABLE IF NOT EXISTS admin_sessions (\
+     user_id string REQUIRED, sid string REQUIRED, methods array REQUIRED, auth_time int REQUIRED, \
+     seen_at int REQUIRED) EXPIRE AFTER 8h;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

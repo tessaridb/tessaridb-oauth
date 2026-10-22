@@ -9,6 +9,7 @@
 
 #![cfg(test)]
 
+mod admin;
 mod audit;
 mod bootstrap;
 mod clients;

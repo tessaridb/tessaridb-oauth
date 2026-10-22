@@ -1,5 +1,6 @@
 //! Persistence on TessariDB, organised by domain; every domain exposes services, never its repository.
 
+pub mod admin;
 mod answers;
 pub mod audit;
 mod bootstrap;

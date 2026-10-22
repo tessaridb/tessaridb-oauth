@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tessari_oauth_infrastructure::tessaridb::Database;
 
 use crate::Tenancy;
+use crate::admin::{AdminService, TessaridbAdminRepository};
 use crate::audit::{AuditService, TessaridbAuditRepository};
 use crate::clients::{ClientService, TessaridbClientRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
@@ -70,6 +71,8 @@ pub struct Storage {
     pub logouts: Arc<LogoutService>,
     /// Which users of each company may administer it, and for which tasks.
     pub operators: Arc<OperatorService>,
+    /// Admin console sign-ins and sessions.
+    pub admin: Arc<AdminService>,
     /// The audit trail.
     pub audit: Arc<AuditService>,
 }
@@ -102,6 +105,7 @@ impl Storage {
         let session_repository = Arc::new(TessaridbSessionRepository::new(database.clone()));
         let logout_repository = Arc::new(TessaridbLogoutRepository::new(database.clone()));
         let operator_repository = Arc::new(TessaridbOperatorRepository::new(database.clone()));
+        let admin_repository = Arc::new(TessaridbAdminRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
         Self {
             companies: Arc::new(CompanyService::new(company_repository, tenancy.clone())),
@@ -135,6 +139,7 @@ impl Storage {
                 tenancy.clone(),
                 Arc::clone(&audit),
             )),
+            admin: Arc::new(AdminService::new(admin_repository, tenancy.clone())),
             audit,
         }
     }
