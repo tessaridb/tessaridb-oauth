@@ -29,4 +29,7 @@ pub(crate) trait FactorRepository: Send + Sync {
 
     /// Delete `user_id`'s code under `digest`; whether there was one to delete.
     async fn delete_code(&self, place: &Place, user_id: &str, digest: &str) -> Result<bool>;
+
+    /// Whether `user_id` holds a code under `digest`.
+    async fn has_code(&self, place: &Place, user_id: &str, digest: &str) -> Result<bool>;
 }

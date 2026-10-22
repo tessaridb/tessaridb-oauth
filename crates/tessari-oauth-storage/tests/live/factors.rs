@@ -253,3 +253,42 @@ async fn recovery_codes_are_replaced_as_a_set_and_spent_once_by_their_owner() {
         "another user's issue leaves this set alone"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn sixteen_requests_with_one_recovery_code_spend_it_once() {
+    let storage = fresh(&tenant("acme"), 16).await;
+    for round in 0..5_u64 {
+        let id = format!("spender-{round}");
+        let (_, digests) = code_set();
+        storage
+            .factors
+            .issue_recovery_codes(&tenant("acme"), &user(&id), &digests, NOW)
+            .await
+            .expect("issued");
+        let start = Arc::new(Barrier::new(16));
+        let racers: Vec<_> = (0..16)
+            .map(|_| {
+                let (storage, start, id) = (storage.clone(), Arc::clone(&start), id.clone());
+                let digest = digests[0].clone();
+                tokio::spawn(async move {
+                    start.wait().await;
+                    storage
+                        .factors
+                        .spend_recovery_code(&tenant("acme"), &user(&id), &digest)
+                        .await
+                })
+            })
+            .collect();
+        let mut answers = Vec::new();
+        for racer in racers {
+            answers.push(racer.await.expect("the task finished"));
+        }
+        let spent = answers.iter().filter(|answer| **answer == Ok(true)).count();
+        assert_eq!(spent, 1, "round {round}: {answers:?}");
+        assert!(
+            answers.iter().all(|answer| answer.is_ok()),
+            "round {round}: a loser learns the code is gone, never a failure: {answers:?}"
+        );
+    }
+}

@@ -172,9 +172,25 @@ impl FactorService {
         digest: &str,
     ) -> Result<bool> {
         let place = self.tenancy.place(tenant)?;
-        retry::bounded(FACTOR_WRITE_ATTEMPTS, retry::on_store_retry, || {
+        let spent = retry::bounded(FACTOR_WRITE_ATTEMPTS, retry::on_store_retry, || {
             self.repository.delete_code(&place, user.as_str(), digest)
         })
-        .await
+        .await;
+        match spent {
+            // A delete that keeps meeting other requests' deletes of the same code: when the code is gone, one of
+            // them spent it.
+            Err(refusal @ Error::Store(tessari_oauth_infrastructure::Error::Refused { .. })) => {
+                if self
+                    .repository
+                    .has_code(&place, user.as_str(), digest)
+                    .await?
+                {
+                    Err(refusal)
+                } else {
+                    Ok(false)
+                }
+            }
+            other => other,
+        }
     }
 }

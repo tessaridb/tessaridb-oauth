@@ -117,4 +117,19 @@ impl FactorRepository for TessaridbFactorRepository {
             .await?;
         Ok(answers::returned::<CodeEntity>(answers, &id, "recovery code")?.is_some())
     }
+
+    async fn has_code(&self, place: &Place, user_id: &str, digest: &str) -> Result<bool> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM recovery_codes:$id;",
+                vec![(
+                    "id".to_owned(),
+                    Value::from(code_id(user_id, digest).as_str()),
+                )],
+            )
+            .await?;
+        Ok(answers::single::<CodeEntity>(answers, "recovery code")?.is_some())
+    }
 }
