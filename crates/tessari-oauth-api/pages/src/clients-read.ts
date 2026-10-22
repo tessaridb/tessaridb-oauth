@@ -99,6 +99,42 @@ export function readRegistered(body: unknown): Client | null {
   return readClient(body);
 }
 
+/** The address of the one registration `id`. */
+export function clientPath(id: string): string {
+  return `api/clients/${encodeURIComponent(id)}`;
+}
+
+/** The address removing the registration `id`. */
+export function removalPath(id: string): string {
+  return `${clientPath(id)}/remove`;
+}
+
+/** A natural number field of `body`, or null. */
+function count(body: unknown, key: string): number | null {
+  const value = field(body, key);
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/** How many users hold a grant to the one registration `GET api/clients/{id}` answers. */
+export function readHolders(body: unknown): number | null {
+  return count(body, "holders");
+}
+
+/** What ended with a removed client, and when the access tokens it already holds stop working. */
+export function readRemoved(
+  body: unknown,
+): { clientId: string; consents: number; families: number; accessTokensEndBy: number } | null {
+  const clientId = field(body, "client_id");
+  const consents = count(body, "consents");
+  const families = count(body, "families");
+  const accessTokensEndBy = count(body, "access_tokens_end_by");
+  if (typeof clientId !== "string" || clientId === "" || consents === null || families === null
+    || accessTokensEndBy === null) {
+    return null;
+  }
+  return { clientId, consents, families, accessTokensEndBy };
+}
+
 /** The values a list field holds: one per line or space, empty ones dropped. */
 export function listOf(text: string): string[] {
   return text.split(/\s+/).filter((value) => value !== "");

@@ -1,11 +1,11 @@
 // The clients view: the company's client registrations a page at a time, and a form registering a new one. A public
 // client signs nobody's secret and always uses PKCE; a confidential one signs its assertions with the key it
 // registers. The console offers nothing else, and the server reads every value again whatever is offered here. The
-// server's own console client is listed and marked, and never changed from here.
+// server's own console client is listed and marked, and never changed from here; any other may be removed.
 
 import { clientRefusalText } from "./console-copy.ts";
 import { change, keys, notice, reasonField, reasonIn, refusedOn, refusedText, unreadable } from "./console-change.ts";
-import { type Screen, heading, labelled, link, make, segmented, show } from "./console-dom.ts";
+import { type Screen, button, heading, labelled, link, make, segmented, show } from "./console-dom.ts";
 import { call, say } from "./dom.ts";
 import {
   ALGORITHMS,
@@ -17,6 +17,7 @@ import {
   readRegistered,
   registrationOf,
 } from "./clients-read.ts";
+import { removalPanel } from "./clients-remove.ts";
 
 /** What each form field says when it holds something the registration cannot take. */
 const WRONG: Record<FormField, string> = {
@@ -179,8 +180,8 @@ function values(list: readonly string[]): Node {
   return cell;
 }
 
-/** The registrations as a table. */
-function clientsTable(clients: readonly Client[]): HTMLTableElement {
+/** The registrations as a table, each but the console's own with a Remove action handed to `remove`. */
+function clientsTable(clients: readonly Client[], remove: (client: Client) => void): HTMLTableElement {
   const head = make(
     "tr",
     "",
@@ -189,6 +190,7 @@ function clientsTable(clients: readonly Client[]): HTMLTableElement {
     make("th", "", "Redirect URIs"),
     make("th", "", "Scopes"),
     make("th", "", "Grants"),
+    make("th", "", "Actions"),
   );
   for (const cell of head.children) {
     cell.setAttribute("scope", "col");
@@ -210,10 +212,18 @@ function clientsTable(clients: readonly Client[]): HTMLTableElement {
         make("td", "", values(client.redirectUris)),
         make("td", "", values(client.scopeCeiling)),
         make("td", "", values(client.grantTypes)),
+        make("td", "", client.console ? "" : removeButton(client, remove)),
       ),
     );
   }
   return make("table", "grid", make("thead", "", head), body);
+}
+
+/** The Remove action of `client`, named for screen readers. */
+function removeButton(client: Client, remove: (client: Client) => void): HTMLButtonElement {
+  const pressed = button("Remove", "secondary", () => remove(client));
+  pressed.setAttribute("aria-label", `Remove ${client.id}`);
+  return pressed;
 }
 
 /** The clients view after `after`, with `message` said once it is drawn. */
@@ -238,10 +248,13 @@ export async function clientsView(screen: Screen, after: string | null, message 
     make("p", "lead", "Applications that sign people in through this company. A public client always uses PKCE; a "
       + "confidential one proves itself with a key it registered. No shared secrets."),
   ];
+  const removal = make("div", "");
+  const remove = (client: Client): void => void removalPanel(screen, client, removal, redraw);
   parts.push(
     page.clients.length === 0
       ? make("p", "empty", after === null ? "No clients yet." : "No more clients.")
-      : clientsTable(page.clients),
+      : clientsTable(page.clients, remove),
+    removal,
   );
   const paging = make("p", "paging");
   if (after !== null) {

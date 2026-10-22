@@ -4,8 +4,17 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { route } from "../src/console-read.ts";
-import { clientRefusalText } from "../src/console-copy.ts";
-import { clientsPath, listOf, readClientsPage, registrationOf } from "../src/clients-read.ts";
+import { clientRefusalText, clientRemovalRefusalText } from "../src/console-copy.ts";
+import {
+  clientPath,
+  clientsPath,
+  listOf,
+  readClientsPage,
+  readHolders,
+  readRemoved,
+  registrationOf,
+  removalPath,
+} from "../src/clients-read.ts";
 
 const portal = {
   client_id: "portal",
@@ -127,4 +136,31 @@ test("each refused registration says what to do next", () => {
   assert.match(clientRefusalText("client_taken"), /another id/);
   assert.match(clientRefusalText("client_reserved"), /console/);
   assert.notEqual(clientRefusalText("client_taken"), clientRefusalText("client_reserved"));
+});
+
+test("a removal is addressed by the client id, escaped, and its holders read from the one client", () => {
+  assert.equal(clientPath("a b/c"), "api/clients/a%20b%2Fc");
+  assert.equal(removalPath("a b/c"), "api/clients/a%20b%2Fc/remove");
+  assert.equal(readHolders({ ...portal, holders: 3 }), 3);
+  assert.equal(readHolders({ ...portal, holders: -1 }), null);
+  assert.equal(readHolders({ ...portal, holders: "3" }), null);
+  assert.equal(readHolders(portal), null);
+});
+
+test("a removal answer is read whole, and any part of another shape makes it unreadable", () => {
+  const answer = { client_id: "portal", consents: 2, families: 1, access_tokens_end_by: 1800000300 };
+  assert.deepEqual(readRemoved(answer), {
+    clientId: "portal",
+    consents: 2,
+    families: 1,
+    accessTokensEndBy: 1800000300,
+  });
+  assert.equal(readRemoved({ ...answer, consents: 1.5 }), null);
+  assert.equal(readRemoved({ ...answer, client_id: "" }), null);
+  assert.equal(readRemoved({ ...answer, families: undefined }), null);
+});
+
+test("a refused removal says what happened, not how to register", () => {
+  assert.match(clientRemovalRefusalText("client_reserved"), /not removed/);
+  assert.doesNotMatch(clientRemovalRefusalText("client_reserved"), /another id/);
 });

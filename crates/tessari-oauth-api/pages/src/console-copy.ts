@@ -74,6 +74,13 @@ export function clientRefusalText(code: string): string {
   }
 }
 
+/** The words for a client removal the server refused with `code`. */
+export function clientRemovalRefusalText(code: string): string {
+  return code === "client_reserved"
+    ? "The console's own client is managed by the server and is not removed."
+    : changeRefusalText(code);
+}
+
 /** The words for a company change the server refused with `code`. */
 export function companyRefusalText(code: string): string {
   switch (code) {

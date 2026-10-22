@@ -268,10 +268,11 @@ requests are counted per client address under the `LOGIN_LIMIT` and `LOGIN_WINDO
 The console itself is the page at `<ADMIN_URL>/admin/<company>/`, served by the binary with its script, style and mark
 under `.../assets/`, for an active company only, under the same policy as the sign-in pages and never cached. It holds
 no token, only the session cookie, and asks the API for everything it shows. It offers the sections the operator's
-roles can use (Users, Operators, Sign-in policy, Audit trail, and Companies in the `system` console); the API refuses
-the rest whatever is offered. Every change asks for a reason and is sent once under its own `Idempotency-Key`.
-Disabling an account names it and says what ends; a two-factor policy change or a company's suspension says what it
-does to every account and asks for the company's id typed out. Lists page behind the server's cursor with no total,
+roles can use (Users, Clients, Operators, Sign-in policy, Audit trail, and Companies in the `system` console); the API
+refuses the rest whatever is offered. Every change asks for a reason and is sent once under its own `Idempotency-Key`.
+Disabling an account names it and says what ends; removing a client says how many users hold a grant to it and asks
+for its id typed out; a two-factor policy change or a company's suspension says what it does to every account and
+asks for the company's id typed out. Lists page behind the server's cursor with no total,
 and an address is shown masked until it is revealed with a reason.
 
 What the console does not do yet, stated as limits rather than promised: a change that reaches a whole company is
