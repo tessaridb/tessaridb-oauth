@@ -296,3 +296,58 @@ async fn a_clients_backchannel_logout_uri_is_found_as_registered() {
         );
     }
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn registrations_are_paged_in_id_order_in_their_own_tenant_only() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    storage
+        .tenants
+        .provision(&tenant("globex"))
+        .await
+        .expect("provisioned");
+    for id in ["svc-3", "svc-1", "svc-2"] {
+        storage
+            .clients
+            .register(
+                &tenant("acme"),
+                &service_client(id, vec![ED25519_JWK.to_owned()]),
+                NOW,
+            )
+            .await
+            .expect("registered");
+    }
+    storage
+        .clients
+        .register(
+            &tenant("globex"),
+            &service_client("svc-0", vec![ED25519_JWK.to_owned()]),
+            NOW,
+        )
+        .await
+        .expect("registered");
+    let ids = |page: Vec<tessari_oauth_core::clients::ClientRegistration>| {
+        page.into_iter()
+            .map(|client| client.client_id.as_str().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let first = storage
+        .clients
+        .page(&tenant("acme"), None, 2)
+        .await
+        .expect("a page");
+    assert_eq!(ids(first), ["svc-1", "svc-2"]);
+    let after = ClientId::parse("svc-2").expect("a client id");
+    let rest = storage
+        .clients
+        .page(&tenant("acme"), Some(&after), 2)
+        .await
+        .expect("a page");
+    assert_eq!(ids(rest), ["svc-3"]);
+    let other = storage
+        .clients
+        .page(&tenant("globex"), None, 10)
+        .await
+        .expect("a page");
+    assert_eq!(ids(other), ["svc-0"]);
+}

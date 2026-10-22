@@ -1,4 +1,5 @@
-//! Client registrations on TessariDB: one `clients` record per client, under its id.
+//! Client registrations on TessariDB: one `clients` record per client, under its id, read by id or a page in
+//! id order.
 
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
@@ -100,6 +101,39 @@ impl ClientRepository for TessaridbClientRepository {
             )
             .await?;
         Ok(())
+    }
+
+    async fn page(
+        &self,
+        place: &Place,
+        after: Option<&str>,
+        count: u32,
+    ) -> Result<Vec<ClientEntity>> {
+        let count = Value::from(i64::from(count));
+        let answers = match after {
+            Some(after) => {
+                self.database
+                    .run_at(
+                        place,
+                        "SELECT * FROM clients AFTER clients:$after LIMIT $count;",
+                        vec![
+                            ("after".to_owned(), Value::from(after)),
+                            ("count".to_owned(), count),
+                        ],
+                    )
+                    .await?
+            }
+            None => {
+                self.database
+                    .run_at(
+                        place,
+                        "SELECT * FROM clients LIMIT $count;",
+                        vec![("count".to_owned(), count)],
+                    )
+                    .await?
+            }
+        };
+        answers::records(answers, "client")
     }
 
     async fn find(&self, place: &Place, client_id: &str) -> Result<Option<ClientEntity>> {

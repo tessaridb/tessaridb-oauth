@@ -1,5 +1,5 @@
 //! The client service: register a client once, move the server's own console to its current addresses, and find a
-//! registration in its own tenant.
+//! registration, or a page of them in id order, in its own tenant.
 //!
 //! A registration is checked before it is written — every key a public signing key under the client's algorithm,
 //! keys present exactly when the client authenticates with them — so what `find` reads back is what was accepted.
@@ -8,6 +8,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use tessari_oauth_constants::CLIENT_PAGE_MAX;
 use tessari_oauth_core::clients::{AuthMethod, ClientRegistration, GrantType};
 use tessari_oauth_core::jose::VerifyingKey;
 use tessari_oauth_types::{
@@ -226,6 +227,31 @@ impl ClientService {
                 &resources,
             )
             .await
+    }
+
+    /// At most `count` registrations of `tenant`, never more than [`CLIENT_PAGE_MAX`], after `after` in id order.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, among them the refusal of an anchor the company does not hold, and a stored row that does not
+    /// read as a registration.
+    pub async fn page(
+        &self,
+        tenant: &TenantId,
+        after: Option<&ClientId>,
+        count: u32,
+    ) -> Result<Vec<ClientRegistration>> {
+        let place = self.tenancy.place(tenant)?;
+        self.repository
+            .page(
+                &place,
+                after.map(ClientId::as_str),
+                count.min(CLIENT_PAGE_MAX),
+            )
+            .await?
+            .into_iter()
+            .map(|entity| registration(tenant, entity))
+            .collect()
     }
 
     /// The registration of `client_id` in `tenant`, when there is one.
