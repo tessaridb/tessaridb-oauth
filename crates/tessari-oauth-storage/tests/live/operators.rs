@@ -219,3 +219,60 @@ async fn the_companies_role_is_held_only_in_the_system_company() {
         [OperatorRole::Companies]
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_page_holds_only_current_grants_of_the_roles_asked_for_in_record_order() {
+    let storage = fresh(&acme(), 2).await;
+    for (holder, role, expires_at) in [
+        ("user-a", OperatorRole::Users, None),
+        ("user-a", OperatorRole::Audit, None),
+        ("user-b", OperatorRole::Users, Some(NOW + 10)),
+        ("user-c", OperatorRole::Policy, None),
+        ("user-d", OperatorRole::Users, Some(NOW + 3600)),
+    ] {
+        let granted = storage
+            .operators
+            .grant(&acme(), &grant(holder, role, "operator-1", expires_at))
+            .await
+            .expect("granted");
+        assert_eq!(granted, Granted::Granted);
+    }
+    let later = Timestamp::from_unix_secs(NOW + 20);
+    let asked = [OperatorRole::Users, OperatorRole::Audit];
+    let named = |page: &[OperatorGrant]| -> Vec<(String, &'static str)> {
+        page.iter()
+            .map(|grant| (grant.user.as_str().to_owned(), grant.role.name()))
+            .collect()
+    };
+    let first = storage
+        .operators
+        .page(&acme(), &asked, None, 2, later)
+        .await
+        .expect("a page");
+    assert_eq!(
+        named(&first),
+        [
+            ("user-a".to_owned(), "audit"),
+            ("user-a".to_owned(), "users")
+        ]
+    );
+    assert_eq!(first[1].reason, "users for user-a");
+    let last = &first[1];
+    let second = storage
+        .operators
+        .page(&acme(), &asked, Some((&last.user, last.role)), 2, later)
+        .await
+        .expect("a page");
+    assert_eq!(named(&second), [("user-d".to_owned(), "users")]);
+    assert_eq!(
+        second[0].expires_at,
+        Some(Timestamp::from_unix_secs(NOW + 3600))
+    );
+    let policy_only = storage
+        .operators
+        .page(&acme(), &[OperatorRole::Policy], None, 100, later)
+        .await
+        .expect("a page");
+    assert_eq!(named(&policy_only), [("user-c".to_owned(), "policy")]);
+}

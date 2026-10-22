@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use tessari_oauth_constants::SYSTEM_COMPANY;
+use tessari_oauth_constants::{OPERATOR_PAGE_MAX, SYSTEM_COMPANY};
 use tessari_oauth_types::{TenantId, Timestamp, UserId};
 
 use super::repository::OperatorRepository;
@@ -143,6 +143,37 @@ impl OperatorService {
         };
         self.audit.record(tenant, &event, now).await?;
         Ok(true)
+    }
+
+    /// At most `count` grants in `tenant` current at `now` whose role is one of `roles`, after the grant of the role
+    /// `after` names, in record order; never more than [`OPERATOR_PAGE_MAX`].
+    ///
+    /// # Errors
+    ///
+    /// Store failures, among them the refusal of an anchor the company does not hold, and [`Error::Unreadable`].
+    pub async fn page(
+        &self,
+        tenant: &TenantId,
+        roles: &[OperatorRole],
+        after: Option<(&UserId, OperatorRole)>,
+        count: u32,
+        now: Timestamp,
+    ) -> Result<Vec<OperatorGrant>> {
+        let place = self.tenancy.place(tenant)?;
+        let names: Vec<&str> = roles.iter().map(|role| role.name()).collect();
+        let anchor = after.map(|(user, role)| grant_id(user, role));
+        self.repository
+            .page(
+                &place,
+                &names,
+                anchor.as_deref(),
+                count.min(OPERATOR_PAGE_MAX),
+                seconds(now)?,
+            )
+            .await?
+            .into_iter()
+            .map(to_grant)
+            .collect()
     }
 
     /// The grants `user` holds in `tenant` at `now`, expired ones left out.

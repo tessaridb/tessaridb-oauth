@@ -78,4 +78,36 @@ impl OperatorRepository for TessaridbOperatorRepository {
             .await?;
         answers::records(answers, "operator grant")
     }
+
+    async fn page(
+        &self,
+        place: &Place,
+        roles: &[&str],
+        after: Option<&str>,
+        count: u32,
+        now: i64,
+    ) -> Result<Vec<OperatorGrantEntity>> {
+        // The roles and the expiry are applied in the read, so a grant the caller may not see never leaves the store.
+        let mut parameters = vec![
+            (
+                "roles".to_owned(),
+                Value::Array(roles.iter().map(|role| Value::from(*role)).collect()),
+            ),
+            ("now".to_owned(), Value::from(now)),
+            ("count".to_owned(), Value::from(i64::from(count))),
+        ];
+        let statement = match after {
+            Some(after) => {
+                parameters.push(("after".to_owned(), Value::from(after)));
+                "SELECT * FROM operator_grants WHERE role_name IN $roles \
+                 AND (expires_at = NONE OR expires_at > $now) AFTER operator_grants:$after LIMIT $count;"
+            }
+            None => {
+                "SELECT * FROM operator_grants WHERE role_name IN $roles \
+                 AND (expires_at = NONE OR expires_at > $now) LIMIT $count;"
+            }
+        };
+        let answers = self.database.run_at(place, statement, parameters).await?;
+        answers::records(answers, "operator grant")
+    }
 }

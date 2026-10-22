@@ -23,4 +23,15 @@ pub(crate) trait OperatorRepository: Send + Sync {
         now: i64,
         limit: i64,
     ) -> Result<Vec<OperatorGrantEntity>>;
+
+    /// At most `count` grants of the roles named `roles` that have not expired at `now`, after the grant under `after`,
+    /// in record order.
+    async fn page(
+        &self,
+        place: &Place,
+        roles: &[&str],
+        after: Option<&str>,
+        count: u32,
+        now: i64,
+    ) -> Result<Vec<OperatorGrantEntity>>;
 }
