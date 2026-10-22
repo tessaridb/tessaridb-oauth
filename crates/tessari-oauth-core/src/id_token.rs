@@ -8,6 +8,9 @@ use sha2::{Digest, Sha256};
 use tessari_oauth_constants::ID_TOKEN_TTL_SECS;
 use tessari_oauth_types::{Algorithm, ClientId, Timestamp, base64url};
 
+/// The JOSE `typ` an ID token is signed under.
+pub const TYPE: &str = "JWT";
+
 /// How much of the digest `at_hash` keeps: its left half (OpenID Connect Core §3.1.3.6) — sixteen bytes of SHA-256.
 const AT_HASH_BYTES: usize = 16;
 

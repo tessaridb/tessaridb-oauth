@@ -111,6 +111,12 @@ The access token is an RFC 9068 JWT addressed to one resource, carrying only `is
 `scope`, `iat`, `exp` and `jti`, valid for five minutes — the time a revoked grant can still be used — with `sub` a
 pairwise identifier per client.
 
+A code granted `openid` also redeems for an ID token (OpenID Connect Core §3.1.3.3), a JWT of type `JWT` signed by
+the same key and addressed to the client alone. It states how the user signed in, as the code recorded it when it
+was issued: `auth_time`, `acr`, `amr` derived from the methods verified, `sid` (the session's public id, never its
+cookie), the request's `nonce` when one was sent, and `at_hash` binding it to the access token beside it, under the
+same pairwise `sub`. It carries no profile or contact data and lives five minutes.
+
 A client registered for refresh tokens also receives one, and redeems it at the same endpoint (RFC 6749 §6). Refresh
 tokens rotate on every use and are kept as digests only. The request is judged on the family's grant before the
 token is rotated, so a refused refresh leaves the token usable; the access token may be narrowed to fewer scopes or

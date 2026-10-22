@@ -19,6 +19,8 @@ pub(super) struct Issued {
     #[serde(skip_serializing_if = "Option::is_none")]
     refresh_token: Option<String>,
     scope: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id_token: Option<String>,
 }
 
 impl Issued {
@@ -36,7 +38,14 @@ impl Issued {
             expires_in: ACCESS_TOKEN_TTL_SECS,
             refresh_token: refresh_token.map(|token| token.expose().to_owned()),
             scope: scopes.iter().collect::<Vec<_>>().join(" "),
+            id_token: None,
         }
+    }
+
+    /// This answer carrying `id_token` (OpenID Connect Core §3.1.3.3).
+    pub(super) fn with_id_token(mut self, id_token: String) -> Self {
+        self.id_token = Some(id_token);
+        self
     }
 }
 

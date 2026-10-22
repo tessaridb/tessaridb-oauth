@@ -1,9 +1,13 @@
-//! Redeeming a spent code: its bindings checked, its proof spent, its refresh family started, its access token signed.
+//! Redeeming a spent code: its bindings checked, its proof spent, its refresh family started, its access token signed,
+//! and, when the code was granted `openid`, an ID token stating how its user signed in, as the code recorded it.
 
+use tessari_oauth_constants::OPENID_SCOPE;
 use tessari_oauth_core::access_token::{self, Grant, TYPE};
+use tessari_oauth_core::authentication::assess;
 use tessari_oauth_core::clients::{AuthMethod, ClientRegistration, GrantType};
 use tessari_oauth_core::codes::IssuedCode;
 use tessari_oauth_core::dpop::ProofUse;
+use tessari_oauth_core::id_token::{self, Authenticated};
 use tessari_oauth_core::token::{self, Endpoint, Redemption};
 use tessari_oauth_core::{Params, Reason};
 use tessari_oauth_infrastructure::custody::{SigningKey, random_secret, token_id};
@@ -95,13 +99,61 @@ pub(super) async fn redeem(
         Some(&redemption.user),
         client.auth_method,
     );
-    let issued = Issued::new(
+    let id_token = if redemption.scopes.iter().any(|scope| scope == OPENID_SCOPE) {
+        Some(sign_id_token(
+            &signer,
+            endpoint,
+            &issued,
+            &subject,
+            &signed.token,
+        )?)
+    } else {
+        None
+    };
+    let answer = Issued::new(
         signed.token,
         refresh_token.as_ref(),
         &redemption.scopes,
         bound_to,
     );
-    Ok((issued, event))
+    let answer = match id_token {
+        Some(id_token) => answer.with_id_token(id_token),
+        None => answer,
+    };
+    Ok((answer, event))
+}
+
+/// The ID token for the user `issued` names, known to its client as `subject`, beside `access_token`: when they
+/// signed in, at the level and by the methods the code recorded, in the session the code names, with the request's
+/// `nonce`.
+fn sign_id_token(
+    signer: &SigningKey,
+    endpoint: &Endpoint,
+    issued: &IssuedCode,
+    subject: &str,
+    access_token: &str,
+) -> Result<String, Failure> {
+    let assessment = assess(&issued.authentication.methods).ok_or(Error::Internal)?;
+    let authenticated = Authenticated {
+        issuer: &endpoint.issuer,
+        subject,
+        client_id: &issued.client_id,
+        auth_time: issued.authentication.auth_time,
+        nonce: issued.nonce.as_deref(),
+        acr: Some(assessment.level.acr()),
+        amr: &assessment.amr,
+        session_id: &issued.authentication.sid,
+    };
+    let claims = id_token::claims(
+        &authenticated,
+        endpoint.now,
+        Some((access_token, signer.algorithm())),
+    )
+    .map_err(|_| Error::Internal)?;
+    let payload = serde_json::to_vec(&claims).map_err(|_| Error::Internal)?;
+    signer
+        .sign_compact(id_token::TYPE, &payload)
+        .map_err(|_| Error::Internal.into())
 }
 
 /// The authority a code's refresh family carries: everything the code granted, bound to `key` when given.
