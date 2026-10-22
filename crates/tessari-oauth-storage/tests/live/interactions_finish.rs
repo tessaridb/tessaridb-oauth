@@ -42,6 +42,7 @@ fn request() -> AuthorizationRequest {
         ]),
         nonce: Some("n-0S6_WzA2Mj".to_owned()),
         silent: false,
+        max_age: None,
     }
 }
 

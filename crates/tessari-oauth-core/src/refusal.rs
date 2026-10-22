@@ -30,6 +30,8 @@ pub enum Reason {
     OpenIdWithoutUser,
     /// `prompt` named `none` together with another value.
     PromptNoneCombined,
+    /// `max_age` was not a whole number of seconds.
+    MaxAgeInvalid,
     /// `prompt=none` asked for no page, and there is no session to answer it from.
     SilentWithoutSession,
     /// A pushed authorization request named a `request_uri` of its own (RFC 9126 §2.1).

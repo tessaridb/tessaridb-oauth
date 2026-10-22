@@ -22,6 +22,7 @@ pub(crate) const CHALLENGE_METHOD_S256: &str = "S256";
 
 /// The `prompt` value asking that no page be shown (OpenID Connect Core §3.1.2.1).
 const PROMPT_NONE: &str = "none";
+const PROMPT_LOGIN: &str = "login";
 
 /// An authorization request that passed every check and may go on to the login ceremony.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +44,9 @@ pub struct AuthorizationRequest {
     /// The client asked that no page be shown (`prompt=none`): the request is answered from an existing session or
     /// refused, never sent to sign in.
     pub silent: bool,
+    /// The longest a sign-in may be past for this request, in seconds (`max_age`); `prompt=login` asks for a sign-in
+    /// now and is kept as `0`, and with both the stricter holds.
+    pub max_age: Option<u64>,
 }
 
 /// Why an authorization request was refused, and where the answer may go.
@@ -111,6 +115,8 @@ where
     // Step 8: the OpenID Connect parameters.
     let silent =
         reject_prompt_none_combined(&params).map_err(|(error, reason)| redirect(error, reason))?;
+    let max_age =
+        reject_max_age_not_seconds(&params).map_err(|(error, reason)| redirect(error, reason))?;
 
     Ok(AuthorizationRequest {
         client_id: client.client_id,
@@ -121,6 +127,7 @@ where
         resources: BTreeSet::from([resource]),
         nonce: params.get("nonce").map(str::to_owned),
         silent,
+        max_age,
     })
 }
 
@@ -248,6 +255,26 @@ fn reject_prompt_none_combined(params: &Params) -> Result<bool, (ErrorCode, Reas
         return Err((ErrorCode::InvalidRequest, Reason::PromptNoneCombined));
     }
     Ok(true)
+}
+
+/// Step 8: how long past a sign-in may be (`max_age`, a whole number of seconds), `0` when `prompt` names `login`
+/// (OpenID Connect Core §3.1.2.1), the stricter when both are given.
+fn reject_max_age_not_seconds(params: &Params) -> Result<Option<u64>, (ErrorCode, Reason)> {
+    let asked = match params.get("max_age") {
+        None => None,
+        Some(value) if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) => {
+            Some(
+                value
+                    .parse::<u64>()
+                    .map_err(|_| (ErrorCode::InvalidRequest, Reason::MaxAgeInvalid))?,
+            )
+        }
+        Some(_) => return Err((ErrorCode::InvalidRequest, Reason::MaxAgeInvalid)),
+    };
+    let login = params
+        .get("prompt")
+        .is_some_and(|prompt| prompt.split(' ').any(|value| value == PROMPT_LOGIN));
+    Ok(if login { Some(0) } else { asked })
 }
 
 #[cfg(test)]

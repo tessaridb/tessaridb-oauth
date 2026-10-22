@@ -70,6 +70,10 @@ fn to_request(entity: InteractionEntity) -> Result<AuthorizationRequest> {
             .collect::<Result<BTreeSet<Resource>>>()?,
         nonce: entity.nonce,
         silent: entity.silent,
+        max_age: entity
+            .max_age
+            .map(|seconds| u64::try_from(seconds).map_err(|_| unreadable("max_age")))
+            .transpose()?,
     })
 }
 
@@ -218,6 +222,10 @@ impl InteractionService {
                 .collect(),
             nonce: request.nonce.clone(),
             silent: request.silent,
+            max_age: request
+                .max_age
+                .map(|seconds| i64::try_from(seconds).map_err(|_| unreadable("max_age beyond i64")))
+                .transpose()?,
             created_at: seconds(now)?,
             claimed_at: claimed.as_ref().map(|(at, _)| *at),
             browser: claimed.map(|(_, browser)| browser),

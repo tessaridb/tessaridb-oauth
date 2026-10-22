@@ -40,6 +40,7 @@ fn request(state: Option<&str>, nonce: Option<&str>) -> AuthorizationRequest {
         ]),
         nonce: nonce.map(str::to_owned),
         silent: false,
+        max_age: Some(300),
     }
 }
 
@@ -243,6 +244,7 @@ async fn a_silent_request_reads_back_silent() {
     let storage = fresh(&tenant("acme"), 2).await;
     let silent = AuthorizationRequest {
         silent: true,
+        max_age: None,
         ..request(None, None)
     };
     let id = storage

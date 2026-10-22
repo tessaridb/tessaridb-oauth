@@ -54,7 +54,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS interactions (\
      tenant string REQUIRED, client_id string REQUIRED, redirect_uri string REQUIRED, scopes array REQUIRED, \
      challenge string REQUIRED, state string, resources array REQUIRED, nonce string, silent bool REQUIRED, \
-     created_at int REQUIRED, claimed_at int, browser string) \
+     max_age int, created_at int REQUIRED, claimed_at int, browser string) \
      EXPIRE AFTER 10m; \
      DEFINE SPACE IF NOT EXISTS replays; \
      DEFINE TOPIC IF NOT EXISTS audit RETAIN 400d; \
