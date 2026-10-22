@@ -5,6 +5,7 @@ mod audit;
 mod callback;
 mod change;
 mod companies;
+mod console;
 mod enrolment;
 mod operator;
 mod operators;
@@ -130,6 +131,8 @@ impl AdminState {
 /// The routes of the admin listener over `state`. Unknown paths answer 404.
 pub fn admin_router(state: AdminState) -> Router {
     Router::new()
+        .route("/admin/{company}/", get(console::page))
+        .route("/admin/{company}/assets/{file}", get(console::asset))
         .route("/admin/{company}/signin", get(signin::signin))
         .route("/admin/{company}/callback", get(callback::callback))
         .route("/admin/{company}/api/me", get(session::me))

@@ -16,6 +16,7 @@ mod admin_callback;
 mod admin_companies;
 mod admin_matrix;
 mod admin_operators;
+mod admin_pages;
 mod admin_policy;
 mod admin_session;
 mod admin_signin;
