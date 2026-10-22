@@ -1,6 +1,6 @@
 //! What the passkey service takes and answers with.
 
-use tessari_oauth_types::UserId;
+use tessari_oauth_types::{Timestamp, UserId};
 
 /// What a registration did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,4 +48,16 @@ pub struct Passkey {
     pub sign_count: u32,
     /// Whether the credential may be synced to other devices.
     pub backup_eligible: bool,
+}
+
+/// A passkey as its user's own list shows it: which credential, since when, and whether it may be synced; never its
+/// key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListedPasskey {
+    /// The credential id, base64url.
+    pub id: String,
+    /// When it was registered.
+    pub created_at: Timestamp,
+    /// Whether the authenticator may copy it to the user's other devices.
+    pub synced: bool,
 }

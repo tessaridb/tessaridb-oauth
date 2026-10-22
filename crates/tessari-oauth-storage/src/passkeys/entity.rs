@@ -49,3 +49,20 @@ impl FromRecord for ChallengeEntity {
         })
     }
 }
+
+/// One passkey as its user's list reads it: the record id as the node spells it, and the row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ListedPasskeyEntity {
+    pub(crate) spelled: String,
+    pub(crate) passkey: PasskeyEntity,
+}
+
+impl FromRecord for ListedPasskeyEntity {
+    fn from_row(row: Row) -> Result<Self, MappingFault> {
+        let spelled = row.id().to_owned();
+        Ok(Self {
+            spelled,
+            passkey: PasskeyEntity::from_row(row)?,
+        })
+    }
+}

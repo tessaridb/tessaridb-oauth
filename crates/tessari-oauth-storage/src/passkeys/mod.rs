@@ -8,6 +8,6 @@ mod service;
 mod tessaridb;
 
 pub use entity::{ChallengeEntity, PasskeyEntity};
-pub use model::{Ceremony, Challenged, Passkey, Registration};
+pub use model::{Ceremony, Challenged, ListedPasskey, Passkey, Registration};
 pub use service::PasskeyService;
 pub(crate) use tessaridb::TessaridbPasskeyRepository;

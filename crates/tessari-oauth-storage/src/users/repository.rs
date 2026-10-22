@@ -18,6 +18,9 @@ pub(crate) trait UserRepository: Send + Sync {
     /// The account `user_id`, when there is one.
     async fn find_user(&self, place: &Place, user_id: &str) -> Result<Option<UserEntity>>;
 
+    /// The address `user_id` signs in with, when the account has one.
+    async fn find_email_of(&self, place: &Place, user_id: &str) -> Result<Option<EmailEntity>>;
+
     /// Write `credential` whole, replacing any before it.
     async fn put_credential(&self, place: &Place, credential: &CredentialEntity) -> Result<()>;
 

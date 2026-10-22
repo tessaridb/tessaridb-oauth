@@ -68,6 +68,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      user_id string REQUIRED, tenant string REQUIRED, status string REQUIRED, created_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS user_emails (\
      address string REQUIRED, user_id string REQUIRED, verified_at int, verified_by string); \
+     DEFINE INDEX IF NOT EXISTS by_user ON user_emails FIELDS user_id; \
      DEFINE TABLE IF NOT EXISTS credentials (\
      user_id string REQUIRED, hash string REQUIRED, pepper int REQUIRED, updated_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS totp_factors (\
@@ -77,6 +78,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS passkeys (\
      user_id string REQUIRED, public_key string REQUIRED, sign_count int REQUIRED, backup_eligible bool REQUIRED, \
      created_at int REQUIRED); \
+     DEFINE INDEX IF NOT EXISTS by_user ON passkeys FIELDS user_id; \
      DEFINE TABLE IF NOT EXISTS passkey_challenges (\
      ceremony string REQUIRED, user_id string, created_at int REQUIRED) \
      EXPIRE AFTER 5m; \

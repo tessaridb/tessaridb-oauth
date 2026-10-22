@@ -13,7 +13,7 @@ use tessari_oauth_infrastructure::custody::Kek;
 use tessari_oauth_types::{ErrorCategory, TenantId, Timestamp, UserId, base64url};
 
 use super::repository::FactorRepository;
-use super::{Enrolled, TotpEntity, TotpFactor};
+use super::{Enrolled, FactorSummary, TotpEntity, TotpFactor};
 use crate::{Error, Result, Tenancy, retry};
 
 /// Second factors.
@@ -192,5 +192,24 @@ impl FactorService {
             }
             other => other,
         }
+    }
+
+    /// Which second factors `user` of `tenant` holds, without opening any of them.
+    ///
+    /// # Errors
+    ///
+    /// The store's failures, and [`Error::Unreadable`] for a stored record of another shape.
+    pub async fn summary(&self, tenant: &TenantId, user: &UserId) -> Result<FactorSummary> {
+        let place = self.tenancy.place(tenant)?;
+        let totp = self
+            .repository
+            .find_totp(&place, user.as_str())
+            .await?
+            .is_some();
+        let recovery_codes = self.repository.count_codes(&place, user.as_str()).await?;
+        Ok(FactorSummary {
+            totp,
+            recovery_codes,
+        })
     }
 }

@@ -32,4 +32,7 @@ pub(crate) trait FactorRepository: Send + Sync {
 
     /// Whether `user_id` holds a code under `digest`.
     async fn has_code(&self, place: &Place, user_id: &str, digest: &str) -> Result<bool>;
+
+    /// How many unspent recovery codes `user_id` holds.
+    async fn count_codes(&self, place: &Place, user_id: &str) -> Result<usize>;
 }

@@ -19,3 +19,12 @@ pub struct TotpFactor {
     /// The last time step a code was accepted for; 0 before the first.
     pub last_step: u64,
 }
+
+/// Which second factors a user holds, as their own account page shows it: nothing secret.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FactorSummary {
+    /// Whether an authenticator app is enrolled.
+    pub totp: bool,
+    /// How many recovery codes are left unspent.
+    pub recovery_codes: usize,
+}

@@ -7,6 +7,7 @@
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
+use super::entity::ListedPasskeyEntity;
 use super::repository::PasskeyRepository;
 use super::{ChallengeEntity, PasskeyEntity};
 use crate::{Result, answers};
@@ -103,5 +104,21 @@ impl PasskeyRepository for TessaridbPasskeyRepository {
             )
             .await?;
         answers::returned(answers, id, "passkey challenge")
+    }
+
+    async fn list_for_user(
+        &self,
+        place: &Place,
+        user_id: &str,
+    ) -> Result<Vec<ListedPasskeyEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM passkeys WHERE user_id = $user USING INDEX by_user;",
+                vec![("user".to_owned(), Value::from(user_id))],
+            )
+            .await?;
+        answers::records(answers, "passkey")
     }
 }

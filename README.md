@@ -153,6 +153,14 @@ token gets the same `401` with `error="invalid_token"` in `WWW-Authenticate`, a 
 `error="insufficient_scope"`, and none of the answers is cached. A token from the client credentials grant never
 carries `openid`, so it never reaches UserInfo. Discovery advertises the endpoint.
 
+### Your account: `<issuer>/account/api/me`
+
+`GET <issuer>/account/api/me` answers the signed-in user's own account: the address they sign in with and whether it
+is verified, and their sign-in factors as facts: whether a password is set, whether an authenticator app is
+enrolled, how many recovery codes are left, and each passkey by its credential id, with when it was registered and
+whether it may be synced. No secret, hash or key is part of it. Like the routes below it needs the session cookie,
+is counted under the account limit and is never cached.
+
 ### Your grants: `<issuer>/account/api/grants`
 
 A signed-in user reads the grants they gave with `GET <issuer>/account/api/grants`: for each client still holding

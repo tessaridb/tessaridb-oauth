@@ -7,6 +7,6 @@ mod service;
 mod tessaridb;
 
 pub use entity::TotpEntity;
-pub use model::{Enrolled, TotpFactor};
+pub use model::{Enrolled, FactorSummary, TotpFactor};
 pub use service::FactorService;
 pub(crate) use tessaridb::TessaridbFactorRepository;

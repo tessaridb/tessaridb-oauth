@@ -111,14 +111,26 @@ impl UserService {
             .find_user(&place, &address.user_id)
             .await?
             .ok_or_else(|| unreadable("user email", "an address naming no account"))?;
-        Ok(Some(UserAccount {
-            user: UserId::parse(account.user_id)
-                .map_err(|_| unreadable("user", "an id outside the grammar"))?,
-            email: EmailAddress::parse(&address.address)
-                .map_err(|_| unreadable("user email", "not an address"))?,
-            email_verified: address.verified_at.is_some(),
-            status: status_from(&account.status)?,
-        }))
+        account_of(&address, account).map(Some)
+    }
+
+    /// The account `user` of `tenant` with the address it signs in with, when there is one.
+    ///
+    /// # Errors
+    ///
+    /// The store's failures, and [`Error::Unreadable`] for a stored record of another shape or an account with no
+    /// address.
+    pub async fn find(&self, tenant: &TenantId, user: &UserId) -> Result<Option<UserAccount>> {
+        let place = self.tenancy.place(tenant)?;
+        let Some(account) = self.repository.find_user(&place, user.as_str()).await? else {
+            return Ok(None);
+        };
+        let address = self
+            .repository
+            .find_email_of(&place, user.as_str())
+            .await?
+            .ok_or_else(|| unreadable("user", "an account with no address"))?;
+        account_of(&address, account).map(Some)
     }
 
     /// Store `password` for `user` of `tenant` at `now`, replacing the one before. Accounts are never removed, so
@@ -183,4 +195,16 @@ impl UserService {
                 .map_err(|_| unreadable("credential", "a pepper version out of range"))?,
         }))
     }
+}
+
+/// The account `account` signing in with `address`, as the service hands it out.
+fn account_of(address: &EmailEntity, account: UserEntity) -> Result<UserAccount> {
+    Ok(UserAccount {
+        user: UserId::parse(account.user_id)
+            .map_err(|_| unreadable("user", "an id outside the grammar"))?,
+        email: EmailAddress::parse(&address.address)
+            .map_err(|_| unreadable("user email", "not an address"))?,
+        email_verified: address.verified_at.is_some(),
+        status: status_from(&account.status)?,
+    })
 }

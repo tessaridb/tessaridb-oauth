@@ -132,4 +132,16 @@ impl FactorRepository for TessaridbFactorRepository {
             .await?;
         Ok(answers::single::<CodeEntity>(answers, "recovery code")?.is_some())
     }
+
+    async fn count_codes(&self, place: &Place, user_id: &str) -> Result<usize> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM recovery_codes WHERE user_id = $user USING INDEX by_user;",
+                vec![("user".to_owned(), Value::from(user_id))],
+            )
+            .await?;
+        Ok(answers::records::<CodeEntity>(answers, "recovery code")?.len())
+    }
 }

@@ -65,6 +65,18 @@ impl UserRepository for TessaridbUserRepository {
         answers::single(answers, "user")
     }
 
+    async fn find_email_of(&self, place: &Place, user_id: &str) -> Result<Option<EmailEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM user_emails WHERE user_id = $user USING INDEX by_user;",
+                vec![("user".to_owned(), Value::from(user_id))],
+            )
+            .await?;
+        answers::single(answers, "user email")
+    }
+
     async fn put_credential(&self, place: &Place, credential: &CredentialEntity) -> Result<()> {
         // The record is the credential, so it is replaced whole.
         self.database

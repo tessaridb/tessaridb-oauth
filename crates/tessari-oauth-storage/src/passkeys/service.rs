@@ -14,8 +14,10 @@ use tessari_oauth_core::webauthn::Registered;
 use tessari_oauth_types::{ErrorCategory, TenantId, Timestamp, UserId, base64url};
 
 use super::repository::PasskeyRepository;
-use super::{Ceremony, ChallengeEntity, Challenged, Passkey, PasskeyEntity, Registration};
-use crate::{Error, Result, Tenancy, retry};
+use super::{
+    Ceremony, ChallengeEntity, Challenged, ListedPasskey, Passkey, PasskeyEntity, Registration,
+};
+use crate::{Error, Result, Tenancy, answers, retry};
 
 /// Passkeys and their challenges.
 #[derive(Clone)]
@@ -205,5 +207,32 @@ impl PasskeyService {
             .map(|user| UserId::parse(user).map_err(|_| unreadable("user_id")))
             .transpose()?;
         Ok(Some(Challenged { user }))
+    }
+
+    /// The passkeys of `user` in `tenant`, oldest first.
+    ///
+    /// # Errors
+    ///
+    /// The store's failures, and [`Error::Unreadable`] for a stored record of another shape.
+    pub async fn list(&self, tenant: &TenantId, user: &UserId) -> Result<Vec<ListedPasskey>> {
+        let place = self.tenancy.place(tenant)?;
+        let mut listed = self
+            .repository
+            .list_for_user(&place, user.as_str())
+            .await?
+            .into_iter()
+            .map(|listed| {
+                Ok(ListedPasskey {
+                    id: answers::text_id(&listed.spelled, "passkey")?,
+                    created_at: Timestamp::from_unix_secs(
+                        u64::try_from(listed.passkey.created_at)
+                            .map_err(|_| unreadable("created_at"))?,
+                    ),
+                    synced: listed.passkey.backup_eligible,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        listed.sort_by_key(|passkey| passkey.created_at.unix_secs());
+        Ok(listed)
     }
 }

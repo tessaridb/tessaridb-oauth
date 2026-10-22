@@ -3,6 +3,7 @@
 //! theirs, the sign-in steps under theirs, and the account portal's requests under theirs, every body capped.
 
 mod account;
+mod account_me;
 mod account_sessions;
 mod authorize;
 mod browser;
@@ -117,6 +118,7 @@ pub fn public_router(state: PublicState) -> Router {
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/grants/revoke"),
             post(account::revoke),
         )
+        .route(&format!("/{{tenant}}{ACCOUNT_API_PATH}/me"), get(account_me::me))
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions"),
             get(account_sessions::sessions),

@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
 
+use super::entity::ListedPasskeyEntity;
 use super::{ChallengeEntity, PasskeyEntity};
 use crate::Result;
 
@@ -28,4 +29,8 @@ pub(crate) trait PasskeyRepository: Send + Sync {
 
     /// Delete the challenge under `id`, answering what it held when there was one.
     async fn take_challenge(&self, place: &Place, id: &str) -> Result<Option<ChallengeEntity>>;
+
+    /// Every passkey of `user_id`, with its id.
+    async fn list_for_user(&self, place: &Place, user_id: &str)
+    -> Result<Vec<ListedPasskeyEntity>>;
 }
