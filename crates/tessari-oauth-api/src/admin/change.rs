@@ -24,10 +24,12 @@ pub(super) trait Reasoned {
     fn reason(&self) -> &str;
 }
 
-/// What making a change answered: the status and the JSON body, and the user it concerned when it concerned one.
+/// What making a change answered: the status and the JSON body kept for its repeats, the body shown this once instead
+/// when the answer carries a secret that must not be kept, and the user it concerned when it concerned one.
 pub(super) struct Made {
     pub(super) status: StatusCode,
     pub(super) body: String,
+    pub(super) shown: Option<String>,
     pub(super) user: Option<UserId>,
 }
 
@@ -118,7 +120,7 @@ where
             },
         )
         .await;
-    answered(made.status, made.body)
+    answered(made.status, made.shown.unwrap_or(made.body))
 }
 
 /// The operator's reason `sent` carries, trimmed: 1 to 500 characters, or refused.

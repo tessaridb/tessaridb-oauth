@@ -98,6 +98,7 @@ pub(super) async fn set_two_factor(
             Ok(Made {
                 status,
                 body: body.map_err(|_| Error::Internal)?,
+                shown: None,
                 user: None,
             })
         },

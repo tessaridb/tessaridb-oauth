@@ -3,6 +3,7 @@
 
 mod callback;
 mod change;
+mod enrolment;
 mod operator;
 mod policy;
 mod session;
@@ -21,6 +22,7 @@ use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::Served;
+use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::refresh::RefreshService;
@@ -57,6 +59,8 @@ pub struct AdminState {
     pub users: Arc<UserService>,
     /// Refresh families, revoked when their user is disabled.
     pub refresh: Arc<RefreshService>,
+    /// Enrolment codes, issued to accounts that have never set a password.
+    pub enrolments: Arc<EnrolmentService>,
     /// The request counters every admin route is counted in.
     pub throttle: Arc<ThrottleService>,
     /// How many requests a client address may make to the console per window.
@@ -129,6 +133,10 @@ pub fn admin_router(state: AdminState) -> Router {
             get(users_read::list).post(users::create),
         )
         .route("/admin/{company}/api/users/{user}", get(users_read::one))
+        .route(
+            "/admin/{company}/api/users/{user}/enrolment",
+            post(enrolment::enrol),
+        )
         .route(
             "/admin/{company}/api/users/{user}/email/reveal",
             post(users_read::reveal),

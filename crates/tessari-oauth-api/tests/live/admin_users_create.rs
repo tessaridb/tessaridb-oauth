@@ -7,13 +7,13 @@ use axum::http::{Request, StatusCode, header};
 use tessari_oauth_api::{AdminState, admin_router};
 use tessari_oauth_storage::audit::AuditKind;
 use tessari_oauth_storage::operators::OperatorRole;
-use tessari_oauth_storage::users::UserStatus;
-use tessari_oauth_types::{EmailAddress, UserId};
+use tessari_oauth_storage::users::{Registered, StoredPassword, UserStatus};
+use tessari_oauth_types::{EmailAddress, EnrolmentCode, Timestamp, UserId};
 use tower::ServiceExt;
 
 use crate::admin_session::signed_in_as;
 use crate::routes::{Answer, answer};
-use crate::token_fixture::{server, tenant};
+use crate::token_fixture::{NOW, server, tenant};
 
 const CONSOLE: &str = "https://admin.example.com";
 const PATH: &str = "/admin/acme/api/users";
@@ -167,4 +167,167 @@ async fn nobody_without_users_and_nothing_from_another_origin_opens_an_account()
         found.is_none(),
         "an account was opened by a refused request"
     );
+}
+
+/// An enrolment code for `user` asked by the console session `secret` under the `Idempotency-Key` `key`.
+fn enrolment(user: &str, secret: &str, key: &str) -> Request<Body> {
+    Request::post(format!("/admin/acme/api/users/{user}/enrolment"))
+        .header(header::COOKIE, format!("__Host-tessari-admin={secret}"))
+        .header(header::ORIGIN, CONSOLE)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("idempotency-key", key)
+        .body(Body::from(r#"{"reason":"first sign-in, ticket 53"}"#))
+        .expect("a request")
+}
+
+async fn opened(server: &crate::token_fixture::Server, email: &str) -> UserId {
+    let address = EmailAddress::parse(email).expect("an address");
+    match server
+        .storage
+        .users
+        .register(&tenant("acme"), &address, Timestamp::from_unix_secs(NOW))
+        .await
+        .expect("registered")
+    {
+        Registered::Created(user) => user,
+        Registered::AddressTaken => panic!("{email} is taken"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_enrolment_code_is_shown_once_and_kept_nowhere_but_as_its_digest() {
+    let server = server(2).await;
+    let kim = opened(&server, "kim@acme.example").await;
+    let state = signed_in_as(
+        &server,
+        "operator-u",
+        &[OperatorRole::Users],
+        "issuer-u",
+        "console-u",
+    )
+    .await;
+    let issued = send(
+        state.clone(),
+        enrolment(kim.as_str(), "console-u", "enrol-kim-000001"),
+    )
+    .await;
+    assert_eq!(issued.status, StatusCode::CREATED, "{:?}", issued.body);
+    assert_eq!(issued.body["user"], kim.as_str());
+    assert_eq!(issued.body["valid_secs"], 259_200);
+    let code = issued.body["code"].as_str().expect("a code").to_owned();
+    assert!(code.len() >= 40, "{code}");
+    let named = server
+        .storage
+        .enrolments
+        .find(&tenant("acme"), &EnrolmentCode::from_secret(code.clone()))
+        .await
+        .expect("an answer");
+    assert_eq!(named.as_ref(), Some(&kim));
+
+    let repeated = send(
+        state.clone(),
+        enrolment(kim.as_str(), "console-u", "enrol-kim-000001"),
+    )
+    .await;
+    assert_eq!(repeated.status, StatusCode::CREATED);
+    assert!(repeated.body["code"].is_null(), "{:?}", repeated.body);
+    assert_eq!(repeated.body["shown_once"], true);
+    let trail = server
+        .storage
+        .audit
+        .read_after(&tenant("acme"), 0, 500)
+        .await
+        .expect("the trail reads");
+    assert!(trail.iter().any(|message| {
+        message.event.kind == AuditKind::AdminAction
+            && message.event.action.as_deref() == Some("users.enrol")
+            && message.event.user.as_ref() == Some(&kim)
+    }));
+    assert!(
+        trail
+            .iter()
+            .all(|message| !format!("{:?}", message.event).contains(&code)),
+        "the code reached the trail"
+    );
+
+    let replaced = send(
+        state.clone(),
+        enrolment(kim.as_str(), "console-u", "enrol-kim-000002"),
+    )
+    .await;
+    assert_eq!(replaced.status, StatusCode::CREATED);
+    let old = server
+        .storage
+        .enrolments
+        .find(&tenant("acme"), &EnrolmentCode::from_secret(code))
+        .await
+        .expect("an answer");
+    assert!(old.is_none(), "a replaced code still enrols");
+
+    server
+        .storage
+        .users
+        .set_password(
+            &tenant("acme"),
+            &kim,
+            &StoredPassword {
+                hash: "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2g".to_owned(),
+                pepper: 1,
+            },
+            Timestamp::from_unix_secs(NOW),
+        )
+        .await
+        .expect("a password");
+    let enrolled = send(
+        state.clone(),
+        enrolment(kim.as_str(), "console-u", "enrol-kim-000003"),
+    )
+    .await;
+    assert_eq!(enrolled.status, StatusCode::CONFLICT);
+    assert_eq!(enrolled.body["code"], "already_enrolled");
+
+    let bo = opened(&server, "bo@acme.example").await;
+    let moved = server
+        .storage
+        .users
+        .set_status(
+            &tenant("acme"),
+            &bo,
+            UserStatus::Active,
+            UserStatus::Disabled,
+        )
+        .await
+        .expect("an answer");
+    assert!(moved);
+    let disabled = send(
+        state.clone(),
+        enrolment(bo.as_str(), "console-u", "enrol-bo-0000001"),
+    )
+    .await;
+    assert_eq!(disabled.status, StatusCode::CONFLICT);
+    assert_eq!(disabled.body["code"], "account_disabled");
+    let nobody = send(
+        state,
+        enrolment("user-nobody", "console-u", "enrol-nobody-001"),
+    )
+    .await;
+    assert_eq!(nobody.status, StatusCode::NOT_FOUND);
+    assert_eq!(nobody.body["code"], "user_not_found");
+
+    let auditor = signed_in_as(
+        &server,
+        "operator-a",
+        &[OperatorRole::Audit],
+        "issuer-a",
+        "console-a",
+    )
+    .await;
+    let refused = send(
+        auditor,
+        enrolment(bo.as_str(), "console-a", "enrol-bo-0000002"),
+    )
+    .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.body["code"], "role_required");
 }

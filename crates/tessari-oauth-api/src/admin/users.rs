@@ -111,6 +111,7 @@ pub(super) async fn create(
                     Ok(Made {
                         status: StatusCode::CREATED,
                         body,
+                        shown: None,
                         user: Some(user),
                     })
                 }
@@ -121,6 +122,7 @@ pub(super) async fn create(
                         message: "an account of this company already signs in with this address",
                     })
                     .map_err(|_| Error::Internal)?,
+                    shown: None,
                     user: None,
                 }),
             }
@@ -180,6 +182,7 @@ pub(super) async fn disable(
             Ok(Made {
                 status: StatusCode::OK,
                 body,
+                shown: None,
                 user: Some(user),
             })
         },
@@ -223,6 +226,7 @@ pub(super) async fn enable(
             Ok(Made {
                 status: StatusCode::OK,
                 body,
+                shown: None,
                 user: Some(user),
             })
         },
@@ -277,6 +281,7 @@ fn unmoved(exists: bool, user: UserId) -> Result<Made> {
     Ok(Made {
         status,
         body: serde_json::to_string(&refusal).map_err(|_| Error::Internal)?,
+        shown: None,
         user: exists.then_some(user),
     })
 }

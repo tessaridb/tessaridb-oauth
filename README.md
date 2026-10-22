@@ -280,7 +280,11 @@ reason before it is shown; when the record cannot be written, nothing is shown.
 
 `POST <ADMIN_URL>/admin/<company>/api/users` (role `users`) with `{"email", "reason"}` opens an active account that
 signs in with that address and answers `201` with its id and the address masked; an address the company already
-has is refused as `email_taken`. The account has no password until its user enrols.
+has is refused as `email_taken`. The account has no password until its user enrols:
+`POST .../api/users/<user>/enrolment` (role `users`, with a `reason`) answers `201` with an enrolment code valid for 72
+hours, shown in that answer only and kept only as its digest; the same request sent again is answered without it, and
+a new code replaces the earlier one. A code is refused for an account that already has a password
+(`already_enrolled`: an enrolment never replaces a password) or is disabled (`account_disabled`).
 
 `POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` and `.../enable` (role `users`) move an account between
 `active` and `disabled`, each only from the other status (`changed_meanwhile` otherwise, `user_not_found` for an account
