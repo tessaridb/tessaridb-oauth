@@ -25,6 +25,8 @@ tessari-oauth-test-support = { path = "crates/tessari-oauth-test-support" }
 thiserror = "2"
 sha2 = "0.10"
 subtle = "2"
+# COSE keys and CBOR for passkeys (RFC 9052 / RFC 9053).
+coset = "=0.4.2"
 # Signature verification for client assertions and DPoP proofs. Already in the tree through the TLS stack, so it adds
 # no new supply-chain surface; it verifies in constant time and offers exactly the curves this server accepts.
 ring = "0.17"

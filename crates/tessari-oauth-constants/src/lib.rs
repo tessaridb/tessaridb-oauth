@@ -13,6 +13,7 @@ mod scopes;
 mod storage;
 mod throttle;
 mod totp;
+mod webauthn;
 
 pub use encoding::{BASE64URL_ALPHABET, SHA256_BASE64URL_LEN};
 pub use endpoints::{
@@ -59,4 +60,7 @@ pub use throttle::{
 pub use totp::{
     RECOVERY_CODE_BYTES, RECOVERY_CODE_COUNT, TOTP_DIGITS, TOTP_SECRET_BYTES, TOTP_SKEW_STEPS,
     TOTP_STEP_SECS,
+};
+pub use webauthn::{
+    WEBAUTHN_CREDENTIAL_ID_MAX_BYTES, WEBAUTHN_PART_MAX_BYTES, WEBAUTHN_RSA_MIN_MODULUS_BYTES,
 };

@@ -23,6 +23,7 @@ pub mod subject;
 pub mod token;
 pub mod totp;
 pub mod userinfo;
+pub mod webauthn;
 
 pub use error::{Error, Result};
 pub use params::Params;
