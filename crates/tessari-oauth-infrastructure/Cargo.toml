@@ -21,7 +21,9 @@ serde.workspace = true
 serde_json.workspace = true
 zeroize.workspace = true
 tessaridb-client.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["rt"] }
+argon2.workspace = true
+unicode-normalization.workspace = true
 tracing.workspace = true
 rustls.workspace = true
 url.workspace = true
@@ -29,6 +31,7 @@ dotenvy.workspace = true
 
 [dev-dependencies]
 rcgen.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 [lints]
 workspace = true

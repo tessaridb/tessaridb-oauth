@@ -6,9 +6,11 @@
 //! the tenant and `kid` it was sealed for, and plaintext key material is cleared when it is dropped.
 
 mod kek;
+mod passwords;
 mod signing;
 mod token_id;
 
 pub use kek::Kek;
+pub use passwords::{PasswordCost, Passwords, Verdict};
 pub use signing::SigningKey;
 pub use token_id::{random_secret, token_id};

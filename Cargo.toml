@@ -40,6 +40,9 @@ url = "2"
 # A password is compared and hashed in Unicode Normalization Form C (NIST SP 800-63B-4 §3.1.1.2), so the same
 # characters typed on two keyboards are one password.
 unicode-normalization = "0.1"
+# Passwords are stored as Argon2id (RFC 9106) PHC strings. Pinned: the 0.5 line shares `blake2`/`digest` 0.10 with
+# `sha2`, where 0.6 would bring a second hashing stack. Salt and HMAC come from `ring`, so no random-number feature.
+argon2 = { version = "=0.5.3", default-features = false, features = ["alloc", "password-hash", "zeroize"] }
 # Reads a `.env` file into the environment for local development; a missing file is the production case.
 dotenvy = "0.15"
 # The database client is the family's own SDK; it does not publish to a registry, so it arrives pinned by tag.
