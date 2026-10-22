@@ -73,3 +73,11 @@ pub const LOGOUT_RETRY_MAX_SECS: u64 = 3_600;
 /// The most one client may take to answer a logout token, in seconds. A run tells every claimed delivery at once, so
 /// this bounds how long a run spends telling, and it is well inside the 30 s a claim holds its delivery.
 pub const LOGOUT_SEND_TIMEOUT_SECS: u64 = 5;
+
+/// How often the delivery daemon looks for owed logouts, in seconds. A client is told within about this long of the
+/// session ending, and an owed logout released for a later try is picked up within this long of being due again.
+pub const LOGOUT_DELIVERY_INTERVAL_SECS: u64 = 5;
+
+/// The most one delivery run may take, in seconds: shorter than the 30 s a claim holds its delivery, so a run that is
+/// abandoned leaves its claims to lapse rather than racing the next run for them.
+pub const LOGOUT_DELIVERY_RUN_TIMEOUT_SECS: u64 = 25;

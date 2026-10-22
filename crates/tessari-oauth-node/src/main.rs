@@ -12,10 +12,12 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tessari_oauth_api::{PublicState, public_router, serve};
 use tessari_oauth_constants::{
-    KEY_ROTATION_CHECK_SECS, KEY_ROTATION_RUN_TIMEOUT_SECS, SHUTDOWN_DRAIN_SECS,
+    KEY_ROTATION_CHECK_SECS, KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS,
+    LOGOUT_DELIVERY_RUN_TIMEOUT_SECS, LOGOUT_SEND_TIMEOUT_SECS, SHUTDOWN_DRAIN_SECS,
 };
 use tessari_oauth_core::discovery;
-use tessari_oauth_daemons::KeyRotation;
+use tessari_oauth_daemons::{KeyRotation, LogoutDelivery};
+use tessari_oauth_infrastructure::backchannel::Poster;
 use tessari_oauth_infrastructure::config::NodeConfig;
 use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_infrastructure::tessaridb::{Database, StoreConfig};
@@ -79,12 +81,13 @@ fn start() -> Result<(), Failure> {
             .map_err(|_| format!("{issuer} is not a valid issuer"))?;
         issuers.insert(tenant.clone(), issuer);
     }
+    let poster = Poster::with_native_roots(Duration::from_secs(LOGOUT_SEND_TIMEOUT_SECS))?;
     let database = Database::new(store, config.store.connections.get())?;
     let storage = Storage::new(&database, &Tenancy::for_region(&config.region)?);
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    runtime.block_on(run(config, storage, issuers, kek, passwords, tls))
+    runtime.block_on(run(config, storage, issuers, kek, passwords, tls, poster))
 }
 
 /// The system clock as the core's clock port; a clock before the epoch reads as the epoch.
@@ -106,6 +109,7 @@ async fn run(
     kek: Arc<Kek>,
     passwords: Arc<Passwords>,
     tls: Arc<rustls::ServerConfig>,
+    poster: Poster,
 ) -> Result<(), Failure> {
     for tenant in &config.tenants {
         storage.tenants.provision(tenant).await?;
@@ -123,6 +127,23 @@ async fn run(
         timeout: Duration::from_secs(KEY_ROTATION_RUN_TIMEOUT_SECS),
     });
     let rotating = tokio::spawn(tessari_oauth_daemons::run(rotation, stopped.clone()));
+    let delivery = Arc::new(LogoutDelivery {
+        logouts: Arc::clone(&storage.logouts),
+        clients: Arc::clone(&storage.clients),
+        subjects: Arc::clone(&storage.subjects),
+        keys: Arc::clone(&storage.keys),
+        kek: Arc::clone(&kek),
+        tenants: config
+            .tenants
+            .iter()
+            .filter_map(|tenant| Some((tenant.clone(), issuers.get(tenant)?.clone())))
+            .collect(),
+        sender: Arc::new(poster),
+        clock: Arc::clone(&clock),
+        interval: Duration::from_secs(LOGOUT_DELIVERY_INTERVAL_SECS),
+        timeout: Duration::from_secs(LOGOUT_DELIVERY_RUN_TIMEOUT_SECS),
+    });
+    let delivering = tokio::spawn(tessari_oauth_daemons::run(delivery, stopped.clone()));
     let state = PublicState {
         keys: Arc::clone(&storage.keys),
         clients: Arc::clone(&storage.clients),
@@ -181,12 +202,15 @@ async fn run(
         _ = terminate.recv() => tracing::info!(signal = "SIGTERM", "shutting down"),
     }
     stop.send(true)?;
-    let (served, rotated) = tokio::time::timeout(Duration::from_secs(SHUTDOWN_DRAIN_SECS), async {
-        let rotated = rotating.await;
-        (serving.await, rotated)
-    })
-    .await
-    .map_err(|_| format!("requests still in flight after {SHUTDOWN_DRAIN_SECS} s"))?;
+    let (served, rotated, delivered) =
+        tokio::time::timeout(Duration::from_secs(SHUTDOWN_DRAIN_SECS), async {
+            let rotated = rotating.await;
+            let delivered = delivering.await;
+            (serving.await, rotated, delivered)
+        })
+        .await
+        .map_err(|_| format!("requests still in flight after {SHUTDOWN_DRAIN_SECS} s"))?;
     rotated?;
+    delivered?;
     Ok(served??)
 }

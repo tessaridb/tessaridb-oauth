@@ -24,10 +24,10 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 > The binary serves each tenant's server metadata (RFC 8414, also served as the OpenID Provider configuration) and key
 > set (RFC 7517) over TLS, its authorization, pushed authorization request, token, revocation and UserInfo endpoints,
 > the sign-in and consent pages, ID tokens, and the account API a signed-in user reads and manages their own sessions
-> and grants with, and it rotates the tenants' signing keys. Accounts and their factors are not yet created or changed
-> through any served surface; the account portal page and the admin panel come next. No release has been cut. Apart from
-> the [Status](#status) section and the endpoints described below, this page describes what the project is for, not a
-> working system.
+> and grants with, it rotates the tenants' signing keys and tells clients when a session ends. Accounts and their
+> factors are not yet created or changed through any served surface; the account portal page and the admin panel come
+> next. No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
+> page describes what the project is for, not a working system.
 
 ## What it is for
 
@@ -64,7 +64,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated); the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail |
 | Built, not served yet | creating accounts and enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
 | Planned | the account portal page, the admin panel, a two-factor policy per tenant, companies with their own administrators, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
@@ -168,6 +168,18 @@ recorded in the audit trail. The browser goes back only to a `post_logout_redire
 exactly, with its `state`; any other value is never followed and a signed-out page is shown here instead. A cross-site
 `POST` carries no session cookie (`SameSite=Lax`), so a client signs users out with a `GET` redirect. Discovery
 advertises the endpoint as `end_session_endpoint`.
+
+### Back-channel logout
+
+When a session ends here, by the logout endpoint, a sign-out from the account API or a revocation that ends sessions,
+every client that received tokens in that session and registered a `backchannel_logout_uri` is told (OpenID Connect
+Back-Channel Logout 1.0). The ending and the owed notice are written in one commit, so a crash between them loses
+nothing. Each client gets its own logout token, a JWT of type `logout+jwt` signed with the tenant's key, addressed to
+that client, naming the session (`sid`) and the subject that client knows the user by, and valid for two minutes. It
+arrives as `POST` with the form field `logout_token`; `200` or `204` means told. The URI must be `https`, an address
+in the link-local range (cloud metadata services among them) is never called, a redirect is never followed, and each
+client has five seconds. A client that was not told is tried again after 5 s, then twice as long each time up to an
+hour, at most ten times. A session that simply expires tells nobody; its clients' own sessions should expire with it.
 
 ### Your account: `<issuer>/account/api/me`
 
