@@ -1,6 +1,7 @@
 //! `POST /{tenant}/login/api/identify`: say which account is signing in.
 //!
-//! An address naming an active account identifies it, with whether a second factor must follow; any other address,
+//! An address naming an active account identifies it, with whether a second factor must follow (the account holds an
+//! authenticator app and its company's policy is not `off`); any other address,
 //! whether it names no account or one that may not sign in, identifies nobody. The sign-in moves on either way and the answer is
 //! the same, so the step says nothing about which addresses have accounts; a sign-in for nobody never completes.
 
@@ -11,6 +12,7 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::Deserialize;
 use tessari_oauth_core::ceremony::Identity;
+use tessari_oauth_core::two_factor::asks_second_factor;
 use tessari_oauth_storage::users::UserStatus;
 use tessari_oauth_types::{EmailAddress, TenantId};
 
@@ -60,14 +62,19 @@ async fn identity(
     let Some(account) = found.filter(|account| account.status == UserStatus::Active) else {
         return Ok(Identity::Unknown);
     };
-    let second_factor = state
+    let holds_app = state
         .factors
         .totp(tenant, &state.kek, &account.user)
         .await
         .map_err(Error::Store)?
         .is_some();
+    let policy = state
+        .policies
+        .two_factor(tenant)
+        .await
+        .map_err(Error::Store)?;
     Ok(Identity::Known {
         user: account.user,
-        second_factor,
+        second_factor: asks_second_factor(policy, holds_app),
     })
 }

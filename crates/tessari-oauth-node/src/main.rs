@@ -136,6 +136,7 @@ async fn run(
         interactions: Arc::clone(&storage.interactions),
         users: Arc::clone(&storage.users),
         factors: Arc::clone(&storage.factors),
+        policies: Arc::clone(&storage.policies),
         signins: Arc::clone(&storage.signins),
         passkeys: Arc::clone(&storage.passkeys),
         consents: Arc::clone(&storage.consents),

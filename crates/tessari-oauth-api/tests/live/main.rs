@@ -40,4 +40,5 @@ mod token_fixture;
 mod token_refresh;
 mod token_refusals;
 mod token_revoke;
+mod two_factor_policy;
 mod userinfo;
