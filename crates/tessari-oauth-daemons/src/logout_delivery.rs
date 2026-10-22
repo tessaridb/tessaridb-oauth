@@ -4,14 +4,18 @@
 //! addressed to that client alone, with the subject that client knows the user by, and hands it to the sender. A
 //! client that was told, or that registered no back-channel URI and so cannot be told, is done; one that was not told
 //! stays on the delivery, which is released to be due again later, so the queue's attempt bound limits how long a
-//! client that never answers is retried. No token appears in any log line.
+//! client that never answers is retried. Every client of every claimed delivery is told at once, and each is given a
+//! few seconds, so a run's telling ends well before the claims' hold lapses. No token appears in any log line.
 
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tessari_oauth_constants::{LOGOUT_CLAIM_BATCH, LOGOUT_RETRY_FIRST_SECS, LOGOUT_RETRY_MAX_SECS};
+use futures_util::future::join_all;
+use tessari_oauth_constants::{
+    LOGOUT_CLAIM_BATCH, LOGOUT_RETRY_FIRST_SECS, LOGOUT_RETRY_MAX_SECS, LOGOUT_SEND_TIMEOUT_SECS,
+};
 use tessari_oauth_core::logout::{Ended, LOGOUT_TOKEN_TYPE, logout_claims};
 use tessari_oauth_infrastructure::custody::{Kek, token_id};
 use tessari_oauth_storage::clients::ClientService;
@@ -119,17 +123,21 @@ impl LogoutDelivery {
             .claim(tenant, LOGOUT_CLAIM_BATCH)
             .await
             .map_err(|failure| store(&failure))?;
-        for delivery in deliveries {
+        // Every claimed delivery is told at once: a claim holds its delivery for a short while only, so telling them
+        // one after another would let a slow client keep the later ones past their hold.
+        let outcomes = join_all(
+            deliveries
+                .iter()
+                .map(|delivery| self.untold(tenant, issuer, delivery)),
+        )
+        .await;
+        for (delivery, outcome) in deliveries.iter().zip(outcomes) {
+            let untold = outcome?;
             tally.sessions = tally.sessions.saturating_add(1);
-            let mut untold = Vec::new();
-            for client in &delivery.clients {
-                if self.tell(tenant, issuer, &delivery, client).await? {
-                    tally.told = tally.told.saturating_add(1);
-                } else {
-                    tally.untold = tally.untold.saturating_add(1);
-                    untold.push(client.clone());
-                }
-            }
+            tally.untold = tally.untold.saturating_add(untold.len());
+            tally.told = tally
+                .told
+                .saturating_add(delivery.clients.len().saturating_sub(untold.len()));
             if untold.is_empty() {
                 self.logouts
                     .finish(tenant, &delivery.id)
@@ -145,6 +153,29 @@ impl LogoutDelivery {
             }
         }
         Ok(())
+    }
+
+    /// Tell every client of `delivery` at once; the clients that are still to be told.
+    async fn untold(
+        &self,
+        tenant: &TenantId,
+        issuer: &str,
+        delivery: &Delivery,
+    ) -> Result<Vec<ClientId>> {
+        let told = join_all(
+            delivery
+                .clients
+                .iter()
+                .map(|client| self.tell(tenant, issuer, delivery, client)),
+        )
+        .await;
+        let mut untold = Vec::new();
+        for (client, told) in delivery.clients.iter().zip(told) {
+            if !told? {
+                untold.push(client.clone());
+            }
+        }
+        Ok(untold)
     }
 
     /// Tell `client` that `delivery`'s session ended; whether it is done with: told, or nowhere to tell it.
@@ -187,7 +218,12 @@ impl LogoutDelivery {
         let token = signer
             .sign_compact(LOGOUT_TOKEN_TYPE, &payload)
             .map_err(|failure| failed(failure.to_string(), ErrorCategory::Internal))?;
-        let told = self.sender.send(uri.as_str(), &token).await;
+        let told = tokio::time::timeout(
+            Duration::from_secs(LOGOUT_SEND_TIMEOUT_SECS),
+            self.sender.send(uri.as_str(), &token),
+        )
+        .await
+        .unwrap_or(false);
         if !told {
             tracing::warn!(
                 event = "logout_untold",

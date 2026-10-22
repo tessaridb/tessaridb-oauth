@@ -8,6 +8,8 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
+use tokio::sync::Barrier;
+
 use tessari_oauth_core::authentication::Method;
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
 use tessari_oauth_core::jose::{self, VerifyingKey};
@@ -101,9 +103,9 @@ async fn provisioned(storage: &Storage, kek: &Kek) -> String {
     public_jwk
 }
 
-/// End a session of `user` that signed both clients in; its public id.
-async fn ended(storage: &Storage, user: &UserId) -> String {
-    let secret = SessionSecret::from_secret("cookie-1");
+/// End a session of `user`, held by the cookie `cookie`, that signed both clients in; its public id.
+async fn ended(storage: &Storage, user: &UserId, cookie: &str) -> String {
+    let secret = SessionSecret::from_secret(cookie);
     let at = Timestamp::from_unix_secs(NOW);
     storage
         .sessions
@@ -135,7 +137,7 @@ async fn each_client_is_told_by_its_own_token_and_an_untold_one_is_kept() {
     let kek = fresh_kek();
     let published = provisioned(&storage, &kek).await;
     let user = UserId::parse("user-1").expect("a user id");
-    let sid = ended(&storage, &user).await;
+    let sid = ended(&storage, &user, "cookie-1").await;
     let sender = Arc::new(Recorder::default());
     let daemon = LogoutDelivery {
         logouts: Arc::clone(&storage.logouts),
@@ -194,5 +196,105 @@ async fn each_client_is_told_by_its_own_token_and_an_untold_one_is_kept() {
             .await
             .expect("claimed")
             .is_empty()
+    );
+}
+
+/// A sender that answers no tell until every tell it expects has started, then tells them all.
+struct Gathering {
+    all_started: Barrier,
+}
+
+impl LogoutSender for Gathering {
+    fn send<'a>(
+        &'a self,
+        _uri: &'a str,
+        _logout_token: &'a str,
+    ) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>> {
+        Box::pin(async move {
+            self.all_started.wait().await;
+            true
+        })
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn every_tell_of_a_run_is_under_way_at_once() {
+    let storage = storage();
+    let kek = fresh_kek();
+    provisioned(&storage, &kek).await;
+    let user = UserId::parse("user-1").expect("a user id");
+    ended(&storage, &user, "cookie-1").await;
+    ended(&storage, &user, "cookie-2").await;
+    // Two sessions, two clients each: a slow client must not keep the others waiting past their claim's hold.
+    let daemon = LogoutDelivery {
+        logouts: Arc::clone(&storage.logouts),
+        clients: Arc::clone(&storage.clients),
+        subjects: Arc::clone(&storage.subjects),
+        keys: Arc::clone(&storage.keys),
+        kek: Arc::clone(&kek),
+        tenants: vec![(acme(), ISSUER.to_owned())],
+        sender: Arc::new(Gathering {
+            all_started: Barrier::new(4),
+        }),
+        clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
+        interval: Duration::from_secs(5),
+        timeout: Duration::from_secs(30),
+    };
+    let report = tokio::time::timeout(Duration::from_secs(10), daemon.run_once())
+        .await
+        .expect("all four tells were under way together")
+        .expect("a run");
+    assert_eq!(
+        report.message,
+        "tenants=1 sessions=2 told=4 untold=0 finished=2 retried=0"
+    );
+}
+
+/// A sender that never answers for `REFUSING` and tells everyone else.
+struct Silent;
+
+impl LogoutSender for Silent {
+    fn send<'a>(
+        &'a self,
+        uri: &'a str,
+        _logout_token: &'a str,
+    ) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>> {
+        Box::pin(async move {
+            if uri == REFUSING {
+                std::future::pending::<()>().await;
+            }
+            true
+        })
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_client_that_never_answers_is_given_up_on_for_this_run() {
+    let storage = storage();
+    let kek = fresh_kek();
+    provisioned(&storage, &kek).await;
+    let user = UserId::parse("user-1").expect("a user id");
+    ended(&storage, &user, "cookie-1").await;
+    let daemon = LogoutDelivery {
+        logouts: Arc::clone(&storage.logouts),
+        clients: Arc::clone(&storage.clients),
+        subjects: Arc::clone(&storage.subjects),
+        keys: Arc::clone(&storage.keys),
+        kek: Arc::clone(&kek),
+        tenants: vec![(acme(), ISSUER.to_owned())],
+        sender: Arc::new(Silent),
+        clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
+        interval: Duration::from_secs(5),
+        timeout: Duration::from_secs(30),
+    };
+    let report = tokio::time::timeout(Duration::from_secs(15), daemon.run_once())
+        .await
+        .expect("the silent client was given up on")
+        .expect("a run");
+    assert_eq!(
+        report.message,
+        "tenants=1 sessions=1 told=1 untold=1 finished=0 retried=1"
     );
 }

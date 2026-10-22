@@ -69,3 +69,7 @@ pub const LOGOUT_RETRY_FIRST_SECS: u64 = 5;
 
 /// The longest wait between two tries of an owed logout, in seconds.
 pub const LOGOUT_RETRY_MAX_SECS: u64 = 3_600;
+
+/// The most one client may take to answer a logout token, in seconds. A run tells every claimed delivery at once, so
+/// this bounds how long a run spends telling, and it is well inside the 30 s a claim holds its delivery.
+pub const LOGOUT_SEND_TIMEOUT_SECS: u64 = 5;

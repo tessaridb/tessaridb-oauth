@@ -21,6 +21,7 @@ tessari-oauth-constants.workspace = true
 tessari-oauth-core.workspace = true
 tessari-oauth-infrastructure.workspace = true
 tessari-oauth-storage.workspace = true
+futures-util.workspace = true
 serde_json.workspace = true
 tessari-oauth-types.workspace = true
 thiserror.workspace = true

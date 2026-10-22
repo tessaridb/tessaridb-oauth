@@ -51,6 +51,8 @@ dotenvy = "0.15"
 tessaridb-client = { git = "https://github.com/tessaridb/tessaridb-sdk-rust.git", tag = "v0.12.0" }
 tokio = { version = "1", default-features = false, features = ["net", "sync", "time"] }
 async-trait = "0.1"
+# Telling many back-channel endpoints at once from one task: `join_all` over borrowed futures.
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 # The HTTP surface, as the family's other servers build it: axum over hyper's HTTP/1 connection builder, with tower
 # layers; no default features, so nothing unused is compiled.
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json", "query", "form"] }
