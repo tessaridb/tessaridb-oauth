@@ -176,14 +176,17 @@ scans, and keeps it sealed for that session for ten minutes; `POST <issuer>/acco
 `{"code": "<six digits>"}` enrols it when the code comes from that secret, with the same sign-outs. A wrong code ends
 the attempt (`400 code_rejected`, then `409 nothing_pending`), and an account that has an app already gets
 `409 already_enrolled`. `POST <issuer>/account/api/totp/remove` with `{}` turns the app off under the same rule,
-takes the unspent recovery codes with it and ends the same things; with no app it answers `{"removed": false}`. A passkey is added the same way: `POST <issuer>/account/api/passkeys/options` with `{}`
+takes the unspent recovery codes with it and ends the same things; with no app it answers `{"removed": false}`.
+Each company has a two-factor policy, `optional` until set: under `off` a sign-in asks no app code, no app is offered
+(`409 not_offered`) and an app still held counts for nothing, so a password sign-in may turn it off; under `required`
+the account's last second factor, app or passkey, is not removed (`409 second_factor_required`). A passkey is added the same way: `POST <issuer>/account/api/passkeys/options` with `{}`
 answers a registration challenge issued to that user alone, with the user's own passkeys to exclude and the user
 verification it requires, and `POST <issuer>/account/api/passkeys/register` with the browser's `client_data_json`
 and `attestation_object` spends that challenge once, checks the response against this issuer's relying party and
 origin, stores the passkey and signs out the other sessions.
 `POST <issuer>/account/api/password` with `{"password": "<new password>"}` sets a new password under the same rule
 and with the same sign-outs. It must be at least fifteen characters, or eight when the account has an authenticator
-app (a sign-in then always asks for its code), and must not be the account's own address, its local part or the
+app its company's policy asks for (a sign-in then always asks for its code), and must not be the account's own address, its local part or the
 tenant's name; otherwise `400 password_rejected` with the rule it broke. The value is never echoed, logged or
 recorded. Screening against a list of compromised passwords is not done yet.
 

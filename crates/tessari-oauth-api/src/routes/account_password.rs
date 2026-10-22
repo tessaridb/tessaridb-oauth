@@ -2,7 +2,8 @@
 //!
 //! It needs a session that may change the account's factors (a recent sign-in at the account's level). The new value
 //! meets the rules for how the account signs in: at least fifteen characters when the password is the only factor,
-//! eight when the account also holds an authenticator app, since a sign-in then always asks for its code; and it is
+//! eight when the account also holds an authenticator app its company's policy asks for, since a sign-in then always
+//! asks for its code; and it is
 //! not the account's own address, the address's local part or the tenant's name. No list of compromised passwords is
 //! held yet, so only those words are refused as guessable. The value is hashed with the pepper, replaces the stored
 //! hash, signs out the user's other sessions, revokes every refresh family and is recorded; it is never logged,
@@ -17,6 +18,7 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use tessari_oauth_constants::CURRENT_PEPPER;
 use tessari_oauth_core::password::{Usage, accept};
+use tessari_oauth_core::two_factor::asks_second_factor;
 use tessari_oauth_storage::users::StoredPassword;
 
 use super::account_factors::{changed, may_change};
@@ -47,14 +49,9 @@ pub(super) async fn change(
     let NewPassword { password } = body(read)?;
     let now = (state.clock)();
     let asking = signed_in(&state, &tenant, &headers, now).await?;
-    may_change(&state, &tenant, &asking, now).await?;
-    let usage = if state
-        .factors
-        .summary(&tenant, &asking.user)
-        .await
-        .map_err(Error::Store)?
-        .totp
-    {
+    let held = may_change(&state, &tenant, &asking, now).await?;
+    // A shorter password is allowed only where every sign-in also asks for the app's code.
+    let usage = if asks_second_factor(held.policy, held.app) {
         Usage::WithinMfa
     } else {
         Usage::Alone

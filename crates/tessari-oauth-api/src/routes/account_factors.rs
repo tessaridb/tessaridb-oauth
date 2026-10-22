@@ -4,7 +4,8 @@
 //! A change to how the account signs in needs a recent sign-in that reached the level the account's second factor
 //! gives, or the user signs in again first (`reauthentication_required`). The passkey is found among the session's
 //! user's own, so another user's id removes nothing, and the account's last way to sign in is refused
-//! (`last_sign_in_method`). A removal signs out every other session of the user, revokes every refresh family the user
+//! (`last_sign_in_method`), as is the last second factor of a company whose policy requires one
+//! (`second_factor_required`). A removal signs out every other session of the user, revokes every refresh family the user
 //! holds, because a credential the user no longer trusts may have opened them, and is recorded. New recovery codes
 //! replace every unspent one, are answered once and never kept or recorded in the clear, and end the same things.
 //! Bodies are JSON and the session cookie is `SameSite=Lax`, so a cross-site page can do neither. No answer may be
@@ -18,6 +19,7 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use tessari_oauth_constants::ACCESS_TOKEN_TTL_SECS;
 use tessari_oauth_core::factor_change::factor_change;
+use tessari_oauth_core::two_factor::{TwoFactorPolicy, asks_second_factor};
 use tessari_oauth_infrastructure::custody::{recovery_codes, recovery_digest};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::passkeys::ListedPasskey;
@@ -55,6 +57,13 @@ struct Issued {
     access_tokens_end_by: u64,
 }
 
+/// What the account of a session that may change its factors holds, and its company's two-factor policy.
+pub(super) struct Held {
+    pub(super) passkeys: Vec<ListedPasskey>,
+    pub(super) app: bool,
+    pub(super) policy: TwoFactorPolicy,
+}
+
 /// What a removal ended with it.
 #[derive(Serialize)]
 struct Removed {
@@ -75,7 +84,11 @@ pub(super) async fn remove_passkey(
     let now = (state.clock)();
     let asking = signed_in(&state, &tenant, &headers, now).await?;
     let user = asking.user.clone();
-    let passkeys = may_change(&state, &tenant, &asking, now).await?;
+    let Held {
+        passkeys,
+        app,
+        policy,
+    } = may_change(&state, &tenant, &asking, now).await?;
     if !passkeys.iter().any(|passkey| passkey.id == removal.id) {
         return Ok((StatusCode::OK, Json(NotRemoved { removed: false })).into_response());
     }
@@ -87,6 +100,9 @@ pub(super) async fn remove_passkey(
         .is_some();
     if !password && passkeys.len() == 1 {
         return Err(Error::LastSignInMethod);
+    }
+    if policy == TwoFactorPolicy::Required && !app && passkeys.len() == 1 {
+        return Err(Error::SecondFactorRequired);
     }
     if !state
         .passkeys
@@ -139,13 +155,14 @@ pub(super) async fn issue_recovery_codes(
     Ok((StatusCode::OK, Json(issued)).into_response())
 }
 
-/// The passkeys of the user of `asking`, once its session may change that user's sign-in factors at `now`.
+/// What the user of `asking` holds, once its session may change that user's sign-in factors at `now`. An app counts as
+/// a second factor only where the company's policy asks for its code at sign-in.
 pub(super) async fn may_change(
     state: &PublicState,
     tenant: &TenantId,
     asking: &Session,
     now: Timestamp,
-) -> Result<Vec<ListedPasskey>> {
+) -> Result<Held> {
     let passkeys = state
         .passkeys
         .list(tenant, &asking.user)
@@ -156,11 +173,20 @@ pub(super) async fn may_change(
         .summary(tenant, &asking.user)
         .await
         .map_err(Error::Store)?;
+    let policy = state
+        .policies
+        .two_factor(tenant)
+        .await
+        .map_err(Error::Store)?;
     let signed_in_for = now.unix_secs().saturating_sub(asking.auth_time.unix_secs());
-    let holds_second_factor = summary.totp || !passkeys.is_empty();
+    let holds_second_factor = asks_second_factor(policy, summary.totp) || !passkeys.is_empty();
     factor_change(asking.assessment.level, signed_in_for, holds_second_factor)
         .map_err(|_| Error::ReauthenticationRequired)?;
-    Ok(passkeys)
+    Ok(Held {
+        passkeys,
+        app: summary.totp,
+        policy,
+    })
 }
 
 /// After a change named `reason` to the factors of the user of `asking`: sign out the user's other sessions, revoke

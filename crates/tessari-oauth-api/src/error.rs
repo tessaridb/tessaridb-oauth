@@ -49,6 +49,12 @@ pub enum Error {
     /// The change would leave the account with no way to sign in.
     #[error("the last way to sign in")]
     LastSignInMethod,
+    /// The company's two-factor policy is `off`, so no authenticator app is offered.
+    #[error("not offered")]
+    NotOffered,
+    /// The company's two-factor policy requires a second factor and this is the account's last.
+    #[error("a second factor is required")]
+    SecondFactorRequired,
     /// The account already holds the factor being enrolled.
     #[error("already enrolled")]
     AlreadyEnrolled,
@@ -78,7 +84,9 @@ impl Error {
             Self::CredentialsRejected => ErrorCategory::Unauthorized,
             Self::SessionRequired => ErrorCategory::Unauthorized,
             Self::ReauthenticationRequired => ErrorCategory::Unauthorized,
-            Self::LastSignInMethod => ErrorCategory::Conflict,
+            Self::LastSignInMethod | Self::NotOffered | Self::SecondFactorRequired => {
+                ErrorCategory::Conflict
+            }
             Self::AlreadyEnrolled | Self::NothingPending => ErrorCategory::Conflict,
             Self::CodeRejected | Self::PasswordRejected(_) => ErrorCategory::Validation,
         }
@@ -141,6 +149,16 @@ impl IntoResponse for Error {
                 StatusCode::CONFLICT,
                 "last_sign_in_method",
                 "this is the account's last way to sign in",
+            ),
+            (Self::NotOffered, _) => (
+                StatusCode::CONFLICT,
+                "not_offered",
+                "this company does not use a second factor",
+            ),
+            (Self::SecondFactorRequired, _) => (
+                StatusCode::CONFLICT,
+                "second_factor_required",
+                "this company requires a second factor; add another before removing this one",
             ),
             (Self::AlreadyEnrolled, _) => (
                 StatusCode::CONFLICT,

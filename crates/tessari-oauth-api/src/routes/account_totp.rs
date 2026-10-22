@@ -4,12 +4,13 @@
 //! Both need a session that may change the account's factors (a recent sign-in at the account's level). Beginning
 //! draws a secret from the system random source, keeps it sealed for this session for ten minutes, and answers it
 //! once, in base32 and as the Key URI an app scans; an account that already has an app is refused
-//! (`already_enrolled`). Confirming takes the pending secret once: a code from it enrols the app, spends that code's
+//! (`already_enrolled`), and no app is offered where the company's two-factor policy is `off` (`not_offered`). Confirming takes the pending secret once: a code from it enrols the app, spends that code's
 //! step, signs out the user's other sessions, revokes every refresh family and is recorded; a wrong code ends the
 //! attempt, so a code is never guessed against one secret twice. The secret is never logged or recorded. Turning
 //! the app off needs the same recent sign-in (with an app held, that means one that used it), takes the unspent
 //! recovery codes with it and ends the same things; with no app it answers `{"removed": false}` and changes
-//! nothing. Bodies are
+//! nothing, and where the policy requires a second factor and no passkey is held it is refused
+//! (`second_factor_required`). Bodies are
 //! JSON and the session cookie is `SameSite=Lax`, so a cross-site page can do neither. No answer may be stored by a
 //! cache.
 
@@ -21,6 +22,7 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use tessari_oauth_constants::TOTP_SECRET_BYTES;
 use tessari_oauth_core::totp::{provisioning, verify};
+use tessari_oauth_core::two_factor::TwoFactorPolicy;
 use tessari_oauth_infrastructure::custody::random_secret;
 
 use super::account_factors::{Nothing, changed, may_change};
@@ -58,13 +60,11 @@ pub(super) async fn begin(
     body(read)?;
     let now = (state.clock)();
     let asking = signed_in(&state, &tenant, &headers, now).await?;
-    may_change(&state, &tenant, &asking, now).await?;
-    let summary = state
-        .factors
-        .summary(&tenant, &asking.user)
-        .await
-        .map_err(Error::Store)?;
-    if summary.totp {
+    let held = may_change(&state, &tenant, &asking, now).await?;
+    if held.policy == TwoFactorPolicy::Off {
+        return Err(Error::NotOffered);
+    }
+    if held.app {
         return Err(Error::AlreadyEnrolled);
     }
     // A session names an account that existed when it signed in, and accounts are never removed.
@@ -147,7 +147,10 @@ pub(super) async fn remove(
     body(read)?;
     let now = (state.clock)();
     let asking = signed_in(&state, &tenant, &headers, now).await?;
-    may_change(&state, &tenant, &asking, now).await?;
+    let held = may_change(&state, &tenant, &asking, now).await?;
+    if held.app && held.policy == TwoFactorPolicy::Required && held.passkeys.is_empty() {
+        return Err(Error::SecondFactorRequired);
+    }
     if !state
         .factors
         .remove_totp(&tenant, &asking.user)

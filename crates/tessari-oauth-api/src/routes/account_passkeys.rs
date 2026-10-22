@@ -74,7 +74,7 @@ pub(super) async fn options(
     body(read)?;
     let now = (state.clock)();
     let asking = signed_in(&state, &tenant, &headers, now).await?;
-    let passkeys = may_change(&state, &tenant, &asking, now).await?;
+    let passkeys = may_change(&state, &tenant, &asking, now).await?.passkeys;
     // A session names an account that existed when it signed in, and accounts are never removed.
     let account = state
         .users

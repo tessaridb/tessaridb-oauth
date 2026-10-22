@@ -22,7 +22,7 @@ const UV: Method = Method::Passkey {
 };
 
 /// Open a session for `user` under the cookie value `value`, signed in with `methods` `ago` seconds before now.
-async fn session(
+pub(crate) async fn session(
     server: &Server,
     user: &UserId,
     value: &str,
@@ -45,7 +45,7 @@ async fn session(
 }
 
 /// Register a passkey on `user` from an authenticator holding `credential`, answering its id.
-async fn passkey(server: &Server, user: &UserId, credential: &[u8]) -> String {
+pub(crate) async fn passkey(server: &Server, user: &UserId, credential: &[u8]) -> String {
     let authenticator = Authenticator::new(credential);
     server
         .storage
@@ -74,7 +74,7 @@ async fn held(server: &Server, user: &UserId) -> Vec<String> {
         .collect()
 }
 
-async fn remove(server: &Server, session: &str, id: &str) -> crate::routes::Answer {
+pub(crate) async fn remove(server: &Server, session: &str, id: &str) -> crate::routes::Answer {
     call(
         server,
         "POST",
