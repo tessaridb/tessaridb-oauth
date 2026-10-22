@@ -180,6 +180,9 @@ first, for development only.
 | `PUBLIC_ADDRESS` | where the public listener binds | `0.0.0.0:8443` |
 | `TLS_CERT`, `TLS_KEY` | the listener's certificate chain and private key, PEM | required |
 | `KEK` | the 32-byte key-encryption key file, mode 600 or 400; signing keys are stored sealed under it | required |
+| `PEPPER` | the password pepper file, at least 32 bytes, mode 600 or 400; passwords are hashed under it and the sign-in counters named by keys derived from it | required |
+| `PASSWORD_MEMORY_KIB`, `PASSWORD_ITERATIONS`, `PASSWORD_PARALLELISM` | the Argon2id cost of new password hashes; a value below the floor stops the start | `65536`, `3`, `1` |
+| `PASSWORD_CONCURRENCY` | password hashes or checks run at once, each holding the cost's memory | `4` |
 | `STORE`, `STORE_USER`, `STORE_PASSWORD` | the TessariDB node's wire address and the account the server signs in with | required |
 | `STORE_AUTHORITY` | the PEM the node's certificate must lead to; without it only a loopback store is reached | none |
 | `STORE_CONNECTIONS` | connections to the store at most | `16` |

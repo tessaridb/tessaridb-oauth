@@ -16,6 +16,8 @@ use tessari_oauth_storage::Storage;
 use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_test_support::{fresh_storage, plain_node, unique};
+
+use crate::token_fixture::passwords;
 use tessari_oauth_types::{Algorithm, TenantId, Timestamp};
 use tower::ServiceExt;
 
@@ -43,6 +45,7 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         factors: Arc::clone(&storage.factors),
         signins: Arc::clone(&storage.signins),
         sessions: Arc::clone(&storage.sessions),
+        passwords: passwords(),
         read_limit,
         token_limit: unlimited(),
         authorize_limit: unlimited(),

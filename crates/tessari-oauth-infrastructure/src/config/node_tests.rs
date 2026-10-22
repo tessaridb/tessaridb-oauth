@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use super::NodeConfig;
 use crate::Error;
+use crate::custody::PasswordCost;
 
-const REQUIRED: [&str; 9] = [
+const REQUIRED: [&str; 10] = [
     "TESSARIDB_OAUTH_PUBLIC_URL",
     "TESSARIDB_OAUTH_TLS_CERT",
     "TESSARIDB_OAUTH_TLS_KEY",
@@ -13,6 +14,7 @@ const REQUIRED: [&str; 9] = [
     "TESSARIDB_OAUTH_STORE_PASSWORD",
     "TESSARIDB_OAUTH_REGION",
     "TESSARIDB_OAUTH_TENANTS",
+    "TESSARIDB_OAUTH_PEPPER",
 ];
 
 fn environment() -> HashMap<&'static str, String> {
@@ -29,6 +31,7 @@ fn environment() -> HashMap<&'static str, String> {
         ("TESSARIDB_OAUTH_STORE_PASSWORD", "s3cret-value".to_owned()),
         ("TESSARIDB_OAUTH_REGION", "eu".to_owned()),
         ("TESSARIDB_OAUTH_TENANTS", "acme, globex".to_owned()),
+        ("TESSARIDB_OAUTH_PEPPER", "/run/secrets/pepper".to_owned()),
     ])
 }
 
@@ -79,6 +82,37 @@ fn a_complete_environment_is_read_with_the_documented_defaults() {
             config.login_limit.window_secs.get()
         ),
         (30, 60)
+    );
+    assert_eq!(config.pepper.to_str(), Some("/run/secrets/pepper"));
+    assert_eq!(
+        config.password_cost,
+        PasswordCost::new(65_536, 3, 1).expect("the floor")
+    );
+    assert_eq!(config.password_concurrency.get(), 4);
+}
+
+#[test]
+fn a_password_cost_below_the_floor_is_refused_and_one_above_it_read() {
+    let mut below = environment();
+    below.insert("TESSARIDB_OAUTH_PASSWORD_ITERATIONS", "2".to_owned());
+    assert!(matches!(
+        read(&below),
+        Err(Error::InvalidConfig {
+            field: "password_hash_cost",
+            ..
+        })
+    ));
+    let mut above = environment();
+    above.insert("TESSARIDB_OAUTH_PASSWORD_MEMORY_KIB", "131072".to_owned());
+    assert_eq!(
+        read(&above).expect("a valid environment").password_cost,
+        PasswordCost::new(131_072, 3, 1).expect("a cost")
+    );
+    let mut lanes = environment();
+    lanes.insert("TESSARIDB_OAUTH_PASSWORD_PARALLELISM", "2".to_owned());
+    assert_eq!(
+        read(&lanes).expect("a valid environment").password_cost,
+        PasswordCost::new(65_536, 3, 2).expect("a cost")
     );
 }
 

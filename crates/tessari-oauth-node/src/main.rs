@@ -17,7 +17,7 @@ use tessari_oauth_constants::{
 use tessari_oauth_core::discovery;
 use tessari_oauth_daemons::KeyRotation;
 use tessari_oauth_infrastructure::config::NodeConfig;
-use tessari_oauth_infrastructure::custody::Kek;
+use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_infrastructure::tessaridb::{Database, StoreConfig};
 use tessari_oauth_infrastructure::{ListenerTls, listener_config};
 use tessari_oauth_storage::throttle::Limit;
@@ -56,6 +56,11 @@ fn start() -> Result<(), Failure> {
         std::fs::read(&config.public.tls_key)?,
     ))?;
     let kek = Arc::new(Kek::load(&config.kek)?);
+    let passwords = Passwords::load(
+        &config.pepper,
+        config.password_cost,
+        config.password_concurrency.get(),
+    )?;
     let store = StoreConfig {
         address: config.store.address.clone(),
         user: config.store.user.clone(),
@@ -78,7 +83,7 @@ fn start() -> Result<(), Failure> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    runtime.block_on(run(config, storage, issuers, kek, tls))
+    runtime.block_on(run(config, storage, issuers, kek, passwords, tls))
 }
 
 /// The system clock as the core's clock port; a clock before the epoch reads as the epoch.
@@ -98,6 +103,7 @@ async fn run(
     storage: Storage,
     issuers: HashMap<tessari_oauth_types::TenantId, String>,
     kek: Arc<Kek>,
+    passwords: Arc<Passwords>,
     tls: Arc<rustls::ServerConfig>,
 ) -> Result<(), Failure> {
     for tenant in &config.tenants {
@@ -132,6 +138,7 @@ async fn run(
         factors: Arc::clone(&storage.factors),
         signins: Arc::clone(&storage.signins),
         sessions: Arc::clone(&storage.sessions),
+        passwords,
         read_limit: Limit {
             requests: config.read_limit.requests,
             window_secs: config.read_limit.window_secs,

@@ -9,9 +9,13 @@ use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use tessari_oauth_constants::{
+    PASSWORD_HASH_ITERATIONS_FLOOR, PASSWORD_HASH_MEMORY_KIB_FLOOR, PASSWORD_HASH_PARALLELISM_FLOOR,
+};
 use tessari_oauth_types::TenantId;
 use url::Url;
 
+use crate::custody::PasswordCost;
 use crate::{Error, Result};
 
 /// Where the public listener serves and the URL clients know it by.
@@ -86,6 +90,13 @@ pub struct NodeConfig {
     pub authorize_limit: ReadLimit,
     /// The limit on the sign-in steps, counted apart from every other group.
     pub login_limit: ReadLimit,
+    /// The password pepper file (at least 32 bytes, readable by the owner only); passwords are hashed under it and
+    /// the sign-in counters named by keys derived from it.
+    pub pepper: PathBuf,
+    /// The Argon2id cost new password hashes are made at; never below the floor.
+    pub password_cost: PasswordCost,
+    /// How many password hashes or checks run at once, each holding the cost's memory.
+    pub password_concurrency: NonZeroUsize,
 }
 
 /// The environment as a lookup answers it.
@@ -243,6 +254,23 @@ impl NodeConfig {
                 "a whole number of seconds above zero",
             )?,
         };
+        let password_cost = PasswordCost::new(
+            variables.parsed(
+                "TESSARIDB_OAUTH_PASSWORD_MEMORY_KIB",
+                PASSWORD_HASH_MEMORY_KIB_FLOOR,
+                "a whole number of KiB",
+            )?,
+            variables.parsed(
+                "TESSARIDB_OAUTH_PASSWORD_ITERATIONS",
+                PASSWORD_HASH_ITERATIONS_FLOOR,
+                "a whole number of passes",
+            )?,
+            variables.parsed(
+                "TESSARIDB_OAUTH_PASSWORD_PARALLELISM",
+                PASSWORD_HASH_PARALLELISM_FLOOR,
+                "a whole number of lanes",
+            )?,
+        )?;
         Ok(Self {
             public,
             store,
@@ -253,6 +281,13 @@ impl NodeConfig {
             token_limit,
             authorize_limit,
             login_limit,
+            pepper: variables.required("TESSARIDB_OAUTH_PEPPER")?.into(),
+            password_cost,
+            password_concurrency: variables.parsed(
+                "TESSARIDB_OAUTH_PASSWORD_CONCURRENCY",
+                NonZeroUsize::MIN.saturating_add(3),
+                "a whole number of hashes above zero",
+            )?,
         })
     }
 }

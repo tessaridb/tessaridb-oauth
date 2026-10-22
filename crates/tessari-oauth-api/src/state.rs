@@ -1,11 +1,11 @@
 //! What the public routes read: the tenants this server is the issuer for, their key records, clients, codes, refresh
 //! families, spent assertions, pairwise salts, pending authorizations, accounts, factors, sign-ins in progress and
-//! sessions, the key-encryption key, the request counters and the clock.
+//! sessions, the key-encryption key, the password pepper, the request counters and the clock.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tessari_oauth_infrastructure::custody::Kek;
+use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
@@ -54,6 +54,8 @@ pub struct PublicState {
     pub signins: Arc<SigninService>,
     /// Sessions at this issuer.
     pub sessions: Arc<SessionService>,
+    /// Password hashing and checking under the pepper, and the keys sign-in failures are counted under.
+    pub passwords: Arc<Passwords>,
     /// How many metadata, key-set and UserInfo reads one client address may make per window.
     pub read_limit: Limit,
     /// How many token requests one client address may make per window.

@@ -25,6 +25,9 @@ pub enum Error {
     /// The key-encryption key was refused.
     #[error("the test key-encryption key was refused")]
     Kek(#[source] tessari_oauth_infrastructure::Error),
+    /// The password pepper was refused.
+    #[error("the test password pepper was refused")]
+    Pepper(#[source] tessari_oauth_infrastructure::Error),
 }
 
 /// Names handed out in this process, so two tests never share one; an independent counter.

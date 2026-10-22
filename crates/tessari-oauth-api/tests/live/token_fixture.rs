@@ -3,19 +3,19 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::num::NonZeroU64;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use axum::body::Body;
 use axum::http::Request;
 use tessari_oauth_api::{PublicState, public_router};
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
 use tessari_oauth_core::codes::IssuedCode;
-use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
+use tessari_oauth_infrastructure::custody::{Kek, PasswordCost, Passwords, SigningKey};
 use tessari_oauth_storage::Storage;
 use tessari_oauth_storage::clients::NewClient;
 use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_storage::throttle::Limit;
-use tessari_oauth_test_support::{fresh_kek, fresh_storage, plain_node};
+use tessari_oauth_test_support::{fresh_kek, fresh_passwords, fresh_storage, plain_node};
 use tessari_oauth_types::{
     Algorithm, AuthorizationCode, Challenge, ClientId, RedirectUri, Resource, ScopeSet, TenantId,
     Timestamp, UserId,
@@ -128,6 +128,7 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         factors: Arc::clone(&storage.factors),
         signins: Arc::clone(&storage.signins),
         sessions: Arc::clone(&storage.sessions),
+        passwords: passwords(),
         read_limit: plenty(),
         token_limit,
         authorize_limit: plenty(),
@@ -229,4 +230,13 @@ pub(crate) fn uncached(answer: &Answer) {
     assert_eq!(header(answer, "cache-control"), "no-store");
     assert_eq!(header(answer, "pragma"), "no-cache");
     protected(answer);
+}
+
+/// Password hashing at the floor cost under one test pepper, made once: loading makes a full-cost hash.
+pub(crate) fn passwords() -> Arc<Passwords> {
+    static PASSWORDS: OnceLock<Arc<Passwords>> = OnceLock::new();
+    Arc::clone(PASSWORDS.get_or_init(|| {
+        let floor = PasswordCost::new(65_536, 3, 1).expect("the floor");
+        fresh_passwords(floor).expect("a pepper")
+    }))
 }

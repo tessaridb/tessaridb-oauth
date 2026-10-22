@@ -4,5 +4,5 @@
 mod kek;
 mod node;
 
-pub use kek::fresh_kek;
+pub use kek::{fresh_kek, fresh_passwords};
 pub use node::{Error, fresh_storage, need, plain_node, unique};
