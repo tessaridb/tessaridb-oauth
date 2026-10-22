@@ -1,6 +1,6 @@
 //! Reading the store's answers into rows: the shape each statement answers in, mapped once for every domain.
 
-use tessari_oauth_infrastructure::tessaridb::{Answer, FromRecord, Row};
+use tessari_oauth_infrastructure::tessaridb::{Answer, FromRecord, Row, Value};
 
 use crate::{Error, Result};
 
@@ -27,13 +27,16 @@ pub(crate) fn single<T: FromRecord>(
 }
 
 /// The record a `RETURN BEFORE` or `RETURN AFTER` answered with: one value rather than a set of records, so it is
-/// opened as a row under the id it was addressed by.
+/// opened as a row under the id it was addressed by. A write that reached no record answers `NONE`, which is no row.
 pub(crate) fn returned<T: FromRecord>(
     answers: Vec<Answer>,
     id: &str,
     record: &'static str,
 ) -> Result<Option<T>> {
     match answers.into_iter().next() {
+        Some(Answer::Value {
+            value: Value::None, ..
+        }) => Ok(None),
         Some(Answer::Value { value, .. }) => {
             let row = Row::new(id.to_owned(), value)
                 .map_err(|fault| unreadable(record, fault.to_string()))?;

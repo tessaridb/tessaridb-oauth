@@ -42,3 +42,7 @@ pub const REFRESH_ROTATE_ATTEMPTS: u32 = 8;
 /// counting the first. A `retry` means a competing first write is still landing; once it has, the refusal says the
 /// secret exists and it is read back.
 pub const SECRET_CREATE_ATTEMPTS: u32 = 8;
+
+/// Attempts at a second-factor write — enrolment, accepting a time step, issuing or spending recovery codes — when the
+/// store answers `retry`, counting the first. A lost compare-and-set is then read back and answered as what it is.
+pub const FACTOR_WRITE_ATTEMPTS: u32 = 8;

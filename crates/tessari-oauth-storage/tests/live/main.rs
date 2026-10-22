@@ -13,6 +13,7 @@ mod audit;
 mod clients;
 mod codes;
 mod consents;
+mod factors;
 mod interactions;
 mod keys;
 mod refresh;

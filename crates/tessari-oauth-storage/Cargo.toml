@@ -25,6 +25,7 @@ tessari-oauth-types.workspace = true
 thiserror.workspace = true
 async-trait.workspace = true
 tokio.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 tessari-oauth-test-support.workspace = true

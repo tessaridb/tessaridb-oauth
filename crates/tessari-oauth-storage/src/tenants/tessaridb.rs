@@ -23,7 +23,9 @@ use crate::Result;
 /// secrets under the id naming their purpose — the pairwise salt.
 /// `users` holds each account under its random id; `user_emails` holds the address an account signs in with under the
 /// address itself, so an address belongs to one account and sign-in finds it by id; `credentials` holds an account's
-/// password hash under the account's id.
+/// password hash under the account's id. `totp_factors` holds a user's one-time code secret, sealed, with the last step a
+/// code was accepted for; `recovery_codes` holds each recovery code under its owner and digest, indexed by user so a
+/// new set replaces the old.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -62,7 +64,11 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS user_emails (\
      address string REQUIRED, user_id string REQUIRED, verified_at int, verified_by string); \
      DEFINE TABLE IF NOT EXISTS credentials (\
-     user_id string REQUIRED, hash string REQUIRED, pepper int REQUIRED, updated_at int REQUIRED);";
+     user_id string REQUIRED, hash string REQUIRED, pepper int REQUIRED, updated_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS totp_factors (\
+     user_id string REQUIRED, sealed string REQUIRED, last_step int REQUIRED, created_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS recovery_codes (user_id string REQUIRED, created_at int REQUIRED); \
+     DEFINE INDEX IF NOT EXISTS by_user ON recovery_codes FIELDS user_id;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,
