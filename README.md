@@ -270,6 +270,13 @@ the operator, the role, the change and the reason. `GET` and `PUT <ADMIN_URL>/ad
 (role `policy`) read and change the company's two-factor policy; a change names the policy it replaces in `expected`,
 and when another change came first it is refused as `changed_meanwhile` and changes nothing.
 
+`POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` and `.../enable` (role `users`) move an account between
+`active` and `disabled`, each only from the other status (`changed_meanwhile` otherwise, `user_not_found` for an account
+the company does not have). Disabling ends every session of the account, telling its clients through the back
+channel, revokes every refresh family (recorded as `user_disabled`), and with the sessions ends any console session
+of its own; its access tokens stop working by the `access_tokens_end_by` the answer gives. A disabled account cannot
+sign in. Enabling gives back only that: nothing ended comes back.
+
 ### The audit trail
 
 Every outcome at the token and revocation endpoints, and every refusal at the authorization and UserInfo endpoints,

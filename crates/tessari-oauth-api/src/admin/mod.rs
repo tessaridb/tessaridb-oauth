@@ -7,6 +7,7 @@ mod operator;
 mod policy;
 mod session;
 mod signin;
+mod users;
 
 use std::sync::Arc;
 
@@ -21,8 +22,10 @@ use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::policies::PolicyService;
+use tessari_oauth_storage::refresh::RefreshService;
 use tessari_oauth_storage::sessions::SessionService;
 use tessari_oauth_storage::throttle::{Limit, ThrottleService};
+use tessari_oauth_storage::users::UserService;
 use tessari_oauth_types::{Clock, TenantId};
 
 use crate::{Error, Result};
@@ -49,6 +52,10 @@ pub struct AdminState {
     pub sessions: Arc<SessionService>,
     /// Company policies the console reads and changes.
     pub policies: Arc<PolicyService>,
+    /// The company's user accounts the console lists and moves between active and disabled.
+    pub users: Arc<UserService>,
+    /// Refresh families, revoked when their user is disabled.
+    pub refresh: Arc<RefreshService>,
     /// The request counters every admin route is counted in.
     pub throttle: Arc<ThrottleService>,
     /// How many requests a client address may make to the console per window.
@@ -115,6 +122,14 @@ pub fn admin_router(state: AdminState) -> Router {
         .route(
             "/admin/{company}/api/policy/two-factor",
             get(policy::two_factor).put(policy::set_two_factor),
+        )
+        .route(
+            "/admin/{company}/api/users/{user}/disable",
+            post(users::disable),
+        )
+        .route(
+            "/admin/{company}/api/users/{user}/enable",
+            post(users::enable),
         )
         .fallback(|| async { crate::Error::NotFound })
         .layer(axum::middleware::from_fn_with_state(

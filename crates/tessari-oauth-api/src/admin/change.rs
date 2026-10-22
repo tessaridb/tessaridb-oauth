@@ -6,6 +6,7 @@ use std::future::Future;
 
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tessari_oauth_constants::ADMIN_REASON_MAX_CHARS;
 use tessari_oauth_storage::admin::Claim;
@@ -28,6 +29,13 @@ pub(super) struct Made {
     pub(super) status: StatusCode,
     pub(super) body: String,
     pub(super) user: Option<UserId>,
+}
+
+/// A change refused by what it found, in the shape every refusal has, kept as the change's answer.
+#[derive(Serialize)]
+pub(super) struct Refusal {
+    pub(super) code: &'static str,
+    pub(super) message: &'static str,
 }
 
 /// Make the change `action`, which needs `role`, from the request `headers` and `body` at `company`'s console, by

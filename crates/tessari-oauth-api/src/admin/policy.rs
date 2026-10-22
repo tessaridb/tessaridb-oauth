@@ -11,7 +11,7 @@ use tessari_oauth_core::two_factor::TwoFactorPolicy;
 use tessari_oauth_storage::operators::OperatorRole;
 
 use super::AdminState;
-use super::change::{Made, Reasoned, apply};
+use super::change::{Made, Reasoned, Refusal, apply};
 use super::operator::signed_in;
 use crate::{Error, Result};
 
@@ -39,13 +39,6 @@ impl Reasoned for Change {
 #[derive(Serialize)]
 struct Policy {
     policy: &'static str,
-}
-
-/// A refused change, in the shape every refusal has.
-#[derive(Serialize)]
-struct Refusal {
-    code: &'static str,
-    message: &'static str,
 }
 
 /// The company's two-factor policy.

@@ -15,6 +15,7 @@ mod admin_callback;
 mod admin_policy;
 mod admin_session;
 mod admin_signin;
+mod admin_users;
 mod authenticator;
 mod authorize;
 mod authorize_prompt;

@@ -29,6 +29,8 @@ pub(crate) fn console_state(server: &Server, console: &str) -> AdminState {
         audit: Arc::clone(&server.storage.audit),
         sessions: Arc::clone(&server.storage.sessions),
         policies: Arc::clone(&server.storage.policies),
+        users: Arc::clone(&server.storage.users),
+        refresh: Arc::clone(&server.storage.refresh),
         throttle: Arc::clone(&server.storage.throttle),
         limit: plenty(),
         served: Arc::new(served),
