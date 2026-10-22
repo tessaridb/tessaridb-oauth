@@ -3,7 +3,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { accountApi, readEndBy, readGrants, readMe, readSessions } from "../src/account-read.ts";
+import {
+  accountApi,
+  changeRefusal,
+  readEndBy,
+  readGrants,
+  readIssuedCodes,
+  readMe,
+  readSessions,
+} from "../src/account-read.ts";
 
 test("the account API lives under the page's tenant", () => {
   assert.equal(accountApi("/acme/account"), "/acme/account/api");
@@ -90,4 +98,27 @@ test("an ending says when the issued access tokens stop working", () => {
   assert.equal(readEndBy({ sessions: 2, families: 0, access_tokens_end_by: 99 }), 99);
   assert.equal(readEndBy({ access_tokens_end_by: "soon" }), null);
   assert.equal(readEndBy({}), null);
+});
+
+test("new recovery codes are read only as a list of codes", () => {
+  assert.deepEqual(
+    readIssuedCodes({ codes: ["AAAA-BBBB", "CCCC-DDDD"], sessions: 1, families: 0, access_tokens_end_by: 9 }),
+    ["AAAA-BBBB", "CCCC-DDDD"],
+  );
+  assert.equal(readIssuedCodes({ codes: [] }), null, "an empty set is not a set of codes");
+  assert.equal(readIssuedCodes({ codes: ["AAAA", 7] }), null);
+  assert.equal(readIssuedCodes({}), null);
+});
+
+test("a refused change names why in the page's words", () => {
+  assert.equal(changeRefusal(401, { code: "reauthentication_required" }), "reauthenticate");
+  assert.equal(changeRefusal(401, { code: "session_required" }), "signed-out");
+  assert.equal(changeRefusal(400, { code: "password_rejected", message: "the password is too short" }), "too-short");
+  assert.equal(
+    changeRefusal(400, { code: "password_rejected", message: "the password is too easily guessed" }),
+    "guessable",
+  );
+  assert.equal(changeRefusal(400, { code: "password_rejected", message: "something new" }), "rejected");
+  assert.equal(changeRefusal(429, { code: "rate_limited" }), "other");
+  assert.equal(changeRefusal(500, null), "other");
 });

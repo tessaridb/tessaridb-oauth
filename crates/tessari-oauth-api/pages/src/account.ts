@@ -12,6 +12,7 @@ import {
   readMe,
   readSessions,
 } from "./account-read.ts";
+import { wirePassword, wireRecoveryCodes } from "./account-factors.ts";
 import { ACCOUNT_TEXT, codesLeft, describeMethods, describeScope, refusalText, when } from "./copy.ts";
 import { type Answer, call, element, say } from "./dom.ts";
 import { field, refusal } from "./flow.ts";
@@ -176,6 +177,18 @@ async function refreshSessions(base: string): Promise<void> {
   showSessions(base, sessions);
 }
 
+/** Show the account and the sessions again, after a change that ended other sessions or used up codes. */
+async function refreshAccount(base: string): Promise<void> {
+  const answer = await call("GET", `${base}/me`);
+  const me = answer.ok ? readMe(answer.body) : null;
+  if (me === null) {
+    refused(answer);
+    return;
+  }
+  showMe(me);
+  await refreshSessions(base);
+}
+
 async function signOutEverywhere(base: string): Promise<void> {
   everywhereYes.disabled = true;
   const answer = await call("POST", `${base}/sessions/end-all`, {});
@@ -225,6 +238,12 @@ async function main(): Promise<void> {
     everywhere.focus();
   });
   everywhereYes.addEventListener("click", () => void signOutEverywhere(base));
+  const followups = {
+    changed: () => refreshAccount(base),
+    signedOut: () => signedOut(ACCOUNT_TEXT.signedOut),
+  };
+  wirePassword(base, me.totp, followups);
+  wireRecoveryCodes(base, followups);
   account.hidden = false;
   say("");
 }

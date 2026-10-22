@@ -86,6 +86,10 @@ async fn a_password_is_changed_by_a_recent_sign_in_to_a_value_the_rules_accept()
         short.body["code"], "password_rejected",
         "the only factor needs fifteen characters"
     );
+    assert_eq!(
+        short.body["message"], "the password is too short",
+        "the account page reads the rule from this message"
+    );
     let own = change(&server, &asking, "Hopper@Example.com").await;
     assert_eq!(
         own.body["code"], "password_rejected",

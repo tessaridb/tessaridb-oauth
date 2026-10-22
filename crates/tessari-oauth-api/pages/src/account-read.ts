@@ -143,3 +143,46 @@ export function readGrants(answer: unknown): ListedGrant[] | null {
 export function readEndBy(answer: unknown): number | null {
   return count(field(answer, "access_tokens_end_by"));
 }
+
+/** New recovery codes, shown once: a non-empty list of codes, or null. */
+export function readIssuedCodes(answer: unknown): string[] | null {
+  const codes = strings(field(answer, "codes"));
+  return codes === null || codes.length === 0 ? null : codes;
+}
+
+/** Why a change to how the account signs in was refused, in the terms the page explains it. */
+export type ChangeRefusal =
+  | "reauthenticate"
+  | "signed-out"
+  | "too-short"
+  | "too-long"
+  | "not-printable"
+  | "guessable"
+  | "rejected"
+  | "other";
+
+/** The server's fixed message for each password rule; its `code` names only that a rule was broken. */
+const PASSWORD_RULES: Readonly<Record<string, ChangeRefusal>> = {
+  "the password is too short": "too-short",
+  "the password is too long": "too-long",
+  "the password holds a character that is not printable": "not-printable",
+  "the password is too easily guessed": "guessable",
+};
+
+/** Read a refused change from its `status` and body. */
+export function changeRefusal(status: number, body: unknown): ChangeRefusal {
+  const code = field(body, "code");
+  if (status === 401 && code === "reauthentication_required") {
+    return "reauthenticate";
+  }
+  if (status === 401 && code === "session_required") {
+    return "signed-out";
+  }
+  if (status === 400 && code === "password_rejected") {
+    const message = field(body, "message");
+    return typeof message === "string" && Object.hasOwn(PASSWORD_RULES, message)
+      ? (PASSWORD_RULES[message] ?? "rejected")
+      : "rejected";
+  }
+  return "other";
+}

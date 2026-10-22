@@ -33,6 +33,42 @@
             <dt>Authenticator app</dt><dd id="method-totp"></dd>
             <dt>Recovery codes</dt><dd id="method-recovery"></dd>
           </dl>
+          <div class="actions">
+            <button type="button" id="password-open" class="secondary">Change password</button>
+            <button type="button" id="codes-open" class="secondary">Get new recovery codes</button>
+          </div>
+
+          <form id="password-form" class="panel" hidden novalidate>
+            <input id="password-username" type="email" autocomplete="username" readonly hidden>
+            <div class="field">
+              <label for="new-password">New password</label>
+              <input id="new-password" name="new-password" type="password" autocomplete="new-password" required
+                     aria-required="true" aria-describedby="new-password-hint new-password-error">
+              <p id="new-password-hint" class="hint"></p>
+              <p id="new-password-error" class="field-error" hidden></p>
+            </div>
+            <div class="actions">
+              <button type="submit" class="primary">Change password</button>
+              <button type="button" id="password-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
+
+          <div id="codes-confirm" class="confirm" hidden>
+            <p>New codes replace every code you haven't used yet, and sign you out on your other devices.</p>
+            <div class="actions">
+              <button type="button" id="codes-yes" class="primary">Get new codes</button>
+              <button type="button" id="codes-no" class="secondary">Cancel</button>
+            </div>
+          </div>
+
+          <div id="codes-shown" class="panel" hidden>
+            <p>Save these codes somewhere safe. Each one signs you in once if you lose your other ways in.
+              They won't be shown again.</p>
+            <ul id="codes" class="codes"></ul>
+            <div class="actions">
+              <button type="button" id="codes-saved" class="primary">I've saved them</button>
+            </div>
+          </div>
           <h3 id="passkeys-title">Passkeys</h3>
           <ul id="passkeys" class="rows" aria-labelledby="passkeys-title"></ul>
         </section>

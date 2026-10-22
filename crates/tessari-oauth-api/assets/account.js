@@ -107,6 +107,30 @@
   function readEndBy(answer) {
     return count(field(answer, "access_tokens_end_by"));
   }
+  function readIssuedCodes(answer) {
+    const codes2 = strings(field(answer, "codes"));
+    return codes2 === null || codes2.length === 0 ? null : codes2;
+  }
+  var PASSWORD_RULES = {
+    "the password is too short": "too-short",
+    "the password is too long": "too-long",
+    "the password holds a character that is not printable": "not-printable",
+    "the password is too easily guessed": "guessable"
+  };
+  function changeRefusal(status, body) {
+    const code = field(body, "code");
+    if (status === 401 && code === "reauthentication_required") {
+      return "reauthenticate";
+    }
+    if (status === 401 && code === "session_required") {
+      return "signed-out";
+    }
+    if (status === 400 && code === "password_rejected") {
+      const message = field(body, "message");
+      return typeof message === "string" && Object.hasOwn(PASSWORD_RULES, message) ? PASSWORD_RULES[message] ?? "rejected" : "rejected";
+    }
+    return "other";
+  }
 
   // src/copy.ts
   var seconds = new Intl.PluralRules("en");
@@ -175,7 +199,18 @@
     everywhereConfirm: "This signs you out on every device, this one included. Applications keep access only until their current tokens expire.",
     everywhereDone: "Signed out everywhere.",
     revoked: (client, endBy) => `Removed ${client}'s access. Anything it already holds stops working by ${when(endBy)}.`,
-    notRevoked: "That access was already removed."
+    notRevoked: "That access was already removed.",
+    reauthenticate: "Changing how you sign in needs a sign-in from the last ten minutes. Sign in again through an application, then come back.",
+    passwordHintAlone: "At least 15 characters. A few unrelated words work well.",
+    passwordHintWithApp: "At least 8 characters, since you also use an authenticator app.",
+    passwordRequired: "Enter a new password.",
+    passwordTooShort: "That password is too short for this account.",
+    passwordTooLong: "That password is too long. Use 64 characters or fewer.",
+    passwordNotPrintable: "That password has a character that can't be typed. Remove it and try again.",
+    passwordGuessable: "That password is too easy to guess. Don't use your email address.",
+    passwordRejected: "That password can't be used. Choose a longer one that isn't your email address.",
+    passwordChanged: "Password changed. You were signed out on your other devices.",
+    codesIssued: "New recovery codes are ready. Your old ones no longer work."
   };
 
   // src/dom.ts
@@ -210,8 +245,161 @@
       return { ok: false, status: 0, body: null, retryAfter: null };
     }
   }
+  function fieldError(input, text2) {
+    const error = element(`${input.id}-error`, HTMLParagraphElement);
+    error.textContent = text2 ?? "";
+    error.hidden = text2 === null;
+    if (text2 === null) {
+      input.removeAttribute("aria-invalid");
+    } else {
+      input.setAttribute("aria-invalid", "true");
+      input.focus();
+    }
+  }
   function say(text2) {
     element("status", HTMLParagraphElement).textContent = text2;
+  }
+
+  // src/account-factors.ts
+  function refusedText(why, answer) {
+    switch (why) {
+      case "reauthenticate":
+        return ACCOUNT_TEXT.reauthenticate;
+      case "too-short":
+      case "too-long":
+      case "not-printable":
+      case "guessable":
+      case "rejected":
+        return null;
+      case "signed-out":
+      case "other":
+        return refusalText(refusal(answer.status, answer.body, answer.retryAfter));
+    }
+  }
+  function passwordRuleText(why) {
+    switch (why) {
+      case "too-short":
+        return ACCOUNT_TEXT.passwordTooShort;
+      case "too-long":
+        return ACCOUNT_TEXT.passwordTooLong;
+      case "not-printable":
+        return ACCOUNT_TEXT.passwordNotPrintable;
+      case "guessable":
+        return ACCOUNT_TEXT.passwordGuessable;
+      default:
+        return ACCOUNT_TEXT.passwordRejected;
+    }
+  }
+  function wirePassword(base, holdsApp, followups) {
+    const open = element("password-open", HTMLButtonElement);
+    const form = element("password-form", HTMLFormElement);
+    const input = element("new-password", HTMLInputElement);
+    const cancel = element("password-cancel", HTMLButtonElement);
+    element("password-username", HTMLInputElement).value = element("email", HTMLElement).textContent ?? "";
+    element("new-password-hint", HTMLParagraphElement).textContent = holdsApp ? ACCOUNT_TEXT.passwordHintWithApp : ACCOUNT_TEXT.passwordHintAlone;
+    const close = () => {
+      input.value = "";
+      fieldError(input, null);
+      form.hidden = true;
+      open.hidden = false;
+      open.focus();
+    };
+    open.addEventListener("click", () => {
+      form.hidden = false;
+      open.hidden = true;
+      input.focus();
+    });
+    cancel.addEventListener("click", close);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void (async () => {
+        if (input.value === "") {
+          fieldError(input, ACCOUNT_TEXT.passwordRequired);
+          return;
+        }
+        const submit = form.querySelector("button[type=submit]");
+        if (submit instanceof HTMLButtonElement) {
+          submit.disabled = true;
+        }
+        const answer = await call("POST", `${base}/password`, { password: input.value });
+        if (submit instanceof HTMLButtonElement) {
+          submit.disabled = false;
+        }
+        if (answer.ok) {
+          close();
+          say(ACCOUNT_TEXT.passwordChanged);
+          await followups.changed();
+          return;
+        }
+        const why = changeRefusal(answer.status, answer.body);
+        if (why === "signed-out") {
+          followups.signedOut();
+          return;
+        }
+        const text2 = refusedText(why, answer);
+        if (text2 === null) {
+          fieldError(input, passwordRuleText(why));
+        } else {
+          say(text2);
+        }
+      })();
+    });
+  }
+  function wireRecoveryCodes(base, followups) {
+    const open = element("codes-open", HTMLButtonElement);
+    const confirm2 = element("codes-confirm", HTMLDivElement);
+    const yes = element("codes-yes", HTMLButtonElement);
+    const no = element("codes-no", HTMLButtonElement);
+    const shown = element("codes-shown", HTMLDivElement);
+    const list = element("codes", HTMLUListElement);
+    const saved = element("codes-saved", HTMLButtonElement);
+    open.addEventListener("click", () => {
+      confirm2.hidden = false;
+      open.hidden = true;
+      no.focus();
+    });
+    no.addEventListener("click", () => {
+      confirm2.hidden = true;
+      open.hidden = false;
+      open.focus();
+    });
+    yes.addEventListener("click", () => {
+      void (async () => {
+        yes.disabled = true;
+        const answer = await call("POST", `${base}/recovery-codes`, {});
+        yes.disabled = false;
+        const codes2 = answer.ok ? readIssuedCodes(answer.body) : null;
+        if (codes2 === null) {
+          const why = changeRefusal(answer.status, answer.body);
+          if (why === "signed-out") {
+            followups.signedOut();
+            return;
+          }
+          say(refusedText(why, answer) ?? ACCOUNT_TEXT.unreadable);
+          return;
+        }
+        list.replaceChildren(
+          ...codes2.map((code) => {
+            const item = document.createElement("li");
+            const text2 = document.createElement("code");
+            text2.textContent = code;
+            item.append(text2);
+            return item;
+          })
+        );
+        confirm2.hidden = true;
+        shown.hidden = false;
+        say(ACCOUNT_TEXT.codesIssued);
+        saved.focus();
+        await followups.changed();
+      })();
+    });
+    saved.addEventListener("click", () => {
+      list.replaceChildren();
+      shown.hidden = true;
+      open.hidden = false;
+      open.focus();
+    });
   }
 
   // src/account.ts
@@ -357,6 +545,16 @@
     }
     showSessions(base, sessions);
   }
+  async function refreshAccount(base) {
+    const answer = await call("GET", `${base}/me`);
+    const me = answer.ok ? readMe(answer.body) : null;
+    if (me === null) {
+      refused(answer);
+      return;
+    }
+    showMe(me);
+    await refreshSessions(base);
+  }
   async function signOutEverywhere(base) {
     everywhereYes.disabled = true;
     const answer = await call("POST", `${base}/sessions/end-all`, {});
@@ -405,6 +603,12 @@
       everywhere.focus();
     });
     everywhereYes.addEventListener("click", () => void signOutEverywhere(base));
+    const followups = {
+      changed: () => refreshAccount(base),
+      signedOut: () => signedOut(ACCOUNT_TEXT.signedOut)
+    };
+    wirePassword(base, me.totp, followups);
+    wireRecoveryCodes(base, followups);
     account.hidden = false;
     say("");
   }

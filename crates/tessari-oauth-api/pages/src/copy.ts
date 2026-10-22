@@ -109,4 +109,17 @@ export const ACCOUNT_TEXT = {
   revoked: (client: string, endBy: number) =>
     `Removed ${client}'s access. Anything it already holds stops working by ${when(endBy)}.`,
   notRevoked: "That access was already removed.",
+  reauthenticate:
+    "Changing how you sign in needs a sign-in from the last ten minutes. " +
+    "Sign in again through an application, then come back.",
+  passwordHintAlone: "At least 15 characters. A few unrelated words work well.",
+  passwordHintWithApp: "At least 8 characters, since you also use an authenticator app.",
+  passwordRequired: "Enter a new password.",
+  passwordTooShort: "That password is too short for this account.",
+  passwordTooLong: "That password is too long. Use 64 characters or fewer.",
+  passwordNotPrintable: "That password has a character that can't be typed. Remove it and try again.",
+  passwordGuessable: "That password is too easy to guess. Don't use your email address.",
+  passwordRejected: "That password can't be used. Choose a longer one that isn't your email address.",
+  passwordChanged: "Password changed. You were signed out on your other devices.",
+  codesIssued: "New recovery codes are ready. Your old ones no longer work.",
 } as const;
