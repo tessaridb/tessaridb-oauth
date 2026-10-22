@@ -8,6 +8,7 @@ use tessari_oauth_constants::INTERACTION_TTL_SECS;
 use tessari_oauth_core::authentication::Method;
 use tessari_oauth_core::ceremony::{Ceremony, Identity, Stage};
 use tessari_oauth_storage::Storage;
+use tessari_oauth_storage::signins::Purpose;
 use tessari_oauth_types::{SigninBinding, TenantId, Timestamp, UserId};
 use tokio::sync::Barrier;
 
@@ -24,6 +25,11 @@ fn binding(value: &str) -> SigninBinding {
     SigninBinding::from_secret(value)
 }
 
+/// A sign-in answering the pending authorization `interaction`.
+fn asked(interaction: &str) -> Purpose {
+    Purpose::Authorization(interaction.to_owned())
+}
+
 fn identified() -> Ceremony {
     Ceremony::new()
         .identify(Identity::Known {
@@ -37,7 +43,12 @@ async fn begun(storage: &Storage) {
     assert_eq!(
         storage
             .signins
-            .begin(&tenant("acme"), &binding("browser-1"), "interaction-1", NOW)
+            .begin(
+                &tenant("acme"),
+                &binding("browser-1"),
+                &asked("interaction-1"),
+                NOW
+            )
             .await,
         Ok(true)
     );
@@ -52,7 +63,7 @@ async fn a_sign_in_is_found_by_its_browser_moved_on_from_where_it_was_read_and_f
     let acme = tenant("acme");
     assert_eq!(
         signins
-            .begin(&acme, &binding("browser-1"), "interaction-2", NOW)
+            .begin(&acme, &binding("browser-1"), &asked("interaction-2"), NOW)
             .await,
         Ok(false),
         "one sign-in per browser"
@@ -67,7 +78,7 @@ async fn a_sign_in_is_found_by_its_browser_moved_on_from_where_it_was_read_and_f
         .await
         .expect("read")
         .expect("a sign-in");
-    assert_eq!(started.interaction, "interaction-1");
+    assert_eq!(started.purpose, asked("interaction-1"));
     assert_eq!(started.ceremony.stage(), Stage::Identify);
     let step = identified();
     assert_eq!(
@@ -127,7 +138,7 @@ async fn a_sign_in_is_found_by_its_browser_moved_on_from_where_it_was_read_and_f
         .expect("a sign-in");
     assert_eq!(finished.ceremony, second, "the methods are kept in order");
     assert_eq!(finished.account.as_deref(), Some("key-1"));
-    assert_eq!(finished.interaction, "interaction-1");
+    assert_eq!(finished.purpose, asked("interaction-1"));
     assert_eq!(
         signins.finish(&acme, &binding("browser-1"), NOW).await,
         Ok(None),
@@ -213,4 +224,25 @@ async fn a_sign_in_ends_with_its_request_and_stays_in_its_tenant() {
         Ok(None),
         "another tenant"
     );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_sign_in_for_the_account_page_answers_no_authorization() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    let acme = tenant("acme");
+    assert_eq!(
+        storage
+            .signins
+            .begin(&acme, &binding("browser-a"), &Purpose::Account, NOW)
+            .await,
+        Ok(true)
+    );
+    let found = storage
+        .signins
+        .resume(&acme, &binding("browser-a"), NOW)
+        .await
+        .expect("the store answers")
+        .expect("the sign-in");
+    assert_eq!(found.purpose, Purpose::Account);
 }

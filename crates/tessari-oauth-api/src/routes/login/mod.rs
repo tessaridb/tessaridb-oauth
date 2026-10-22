@@ -32,7 +32,7 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use tessari_oauth_constants::{
-    AUTHORIZE_RESUME_PATH, INTERACTION_TTL_SECS, LOGIN_COOKIE, SESSION_ABSOLUTE_SECS,
+    ACCOUNT_PATH, AUTHORIZE_RESUME_PATH, INTERACTION_TTL_SECS, LOGIN_COOKIE, SESSION_ABSOLUTE_SECS,
     SESSION_COOKIE,
 };
 use tessari_oauth_core::authentication::Method;
@@ -40,6 +40,7 @@ use tessari_oauth_core::ceremony::{Ceremony, CeremonyRefused, Stage};
 use tessari_oauth_core::signin::SigninKey;
 use tessari_oauth_infrastructure::custody::random_secret;
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
+use tessari_oauth_storage::signins::Purpose;
 use tessari_oauth_types::{SessionSecret, SigninBinding, TenantId, Timestamp, UserId, base64url};
 
 use crate::state::PublicState;
@@ -187,10 +188,12 @@ async fn settled(
     record(state, tenant, &event, now).await;
     let completed = Completed {
         next: next(Stage::Complete),
-        continue_at: format!(
-            "{issuer}{AUTHORIZE_RESUME_PATH}?interaction={}",
-            signin.interaction
-        ),
+        continue_at: match &signin.purpose {
+            Purpose::Authorization(interaction) => {
+                format!("{issuer}{AUTHORIZE_RESUME_PATH}?interaction={interaction}")
+            }
+            Purpose::Account => format!("{issuer}{ACCOUNT_PATH}"),
+        },
     };
     let mut response = (StatusCode::OK, Json(completed)).into_response();
     let headers = response.headers_mut();

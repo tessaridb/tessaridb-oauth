@@ -4,6 +4,7 @@
 
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
+use tessari_oauth_storage::signins::Purpose;
 
 use axum::body::Body;
 use axum::extract::ConnectInfo;
@@ -59,7 +60,9 @@ pub(crate) async fn get(server: &Server, path: &str, session: Option<&str>) -> A
 pub(crate) async fn signed_in(server: &Server, email: &str) -> (String, String, UserId) {
     let user = with_password(server, email).await;
     let cookie = identified(server, email).await;
-    let interaction = signin(server, &cookie).await.interaction;
+    let Purpose::Authorization(interaction) = signin(server, &cookie).await.purpose else {
+        panic!("a sign-in begun for an authorization answers it");
+    };
     let answered = post(
         server,
         "password",

@@ -50,7 +50,10 @@ impl SigninRepository for TessaridbSigninRepository {
             ("id".to_owned(), Value::from(id)),
             (
                 "interaction".to_owned(),
-                Value::from(signin.interaction.as_str()),
+                signin
+                    .interaction
+                    .as_deref()
+                    .map_or(Value::None, Value::from),
             ),
             ("revision".to_owned(), Value::from(signin.revision)),
             ("at".to_owned(), Value::from(signin.created_at)),

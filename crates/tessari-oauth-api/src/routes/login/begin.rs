@@ -13,6 +13,7 @@ use axum::response::Response;
 use serde::Deserialize;
 use tessari_oauth_core::ceremony::Stage;
 use tessari_oauth_infrastructure::custody::random_secret;
+use tessari_oauth_storage::signins::Purpose;
 use tessari_oauth_types::{SigninBinding, base64url};
 
 use super::super::browser::held;
@@ -47,7 +48,7 @@ pub(in crate::routes) async fn begin(
     let binding = SigninBinding::from_secret(base64url::encode(&secret));
     let begun = state
         .signins
-        .begin(&tenant, &binding, &interaction, now)
+        .begin(&tenant, &binding, &Purpose::Authorization(interaction), now)
         .await
         .map_err(Error::Store)?;
     if !begun {

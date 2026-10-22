@@ -16,6 +16,9 @@ pub const LOGIN_API_PATH: &str = "/login/api";
 /// Where, under a tenant's path, the account portal's API is served to a signed-in user.
 pub const ACCOUNT_API_PATH: &str = "/account/api";
 
+/// The account page under a tenant's issuer, where a sign-in begun there continues.
+pub const ACCOUNT_PATH: &str = "/account";
+
 /// The largest sign-in step body read, in bytes. A passkey assertion is the longest step and stays well under this.
 pub const LOGIN_BODY_MAX_BYTES: usize = 16 * 1024;
 

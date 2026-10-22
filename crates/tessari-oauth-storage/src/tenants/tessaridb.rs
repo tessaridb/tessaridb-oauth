@@ -86,7 +86,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      ceremony string REQUIRED, user_id string, created_at int REQUIRED) \
      EXPIRE AFTER 5m; \
      DEFINE TABLE IF NOT EXISTS signins (\
-     interaction string REQUIRED, identified bool REQUIRED, user_id string, second_factor bool REQUIRED, \
+     interaction string, identified bool REQUIRED, user_id string, second_factor bool REQUIRED, \
      account string, methods array REQUIRED, revision int REQUIRED, created_at int REQUIRED) \
      EXPIRE AFTER 10m; \
      DEFINE TABLE IF NOT EXISTS sessions (\

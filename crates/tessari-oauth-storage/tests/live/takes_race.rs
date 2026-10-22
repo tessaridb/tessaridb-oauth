@@ -55,7 +55,7 @@ async fn sixteen_simultaneous_finishes_of_one_sign_in_finish_it_once() {
             .begin(
                 &tenant(),
                 &SigninBinding::from_secret(&browser),
-                "interaction-1",
+                &tessari_oauth_storage::signins::Purpose::Authorization("interaction-1".to_owned()),
                 NOW,
             )
             .await;

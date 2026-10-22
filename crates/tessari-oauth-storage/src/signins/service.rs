@@ -16,7 +16,7 @@ use tessari_oauth_core::ceremony::{Ceremony, Identity};
 use tessari_oauth_types::{ErrorCategory, SigninBinding, TenantId, Timestamp, UserId};
 
 use super::repository::SigninRepository;
-use super::{Signin, SigninEntity};
+use super::{Purpose, Signin, SigninEntity};
 use crate::{Error, Result, Tenancy, retry};
 
 /// Sign-ins in progress.
@@ -33,11 +33,11 @@ fn unreadable(reason: &str) -> Error {
     }
 }
 
-/// The row `ceremony` is kept as, at `revision`, for `interaction`, begun at `created_at`.
+/// The row `ceremony` is kept as, at `revision`, for `purpose`, begun at `created_at`.
 fn kept(
     ceremony: &Ceremony,
     account: Option<&str>,
-    interaction: &str,
+    purpose: &Purpose,
     revision: i64,
     created_at: i64,
 ) -> SigninEntity {
@@ -50,7 +50,10 @@ fn kept(
         }) => (true, Some(user.as_str().to_owned()), *second_factor),
     };
     SigninEntity {
-        interaction: interaction.to_owned(),
+        interaction: match purpose {
+            Purpose::Authorization(interaction) => Some(interaction.clone()),
+            Purpose::Account => None,
+        },
         identified,
         user_id,
         second_factor,
@@ -92,7 +95,9 @@ fn held(row: SigninEntity, now: Timestamp) -> Result<Option<Signin>> {
         .collect::<Result<Vec<_>>>()?;
     let ceremony = Ceremony::resume(identity, methods).map_err(|_| unreadable("progress"))?;
     Ok(Some(Signin {
-        interaction: row.interaction,
+        purpose: row
+            .interaction
+            .map_or(Purpose::Account, Purpose::Authorization),
         ceremony,
         account: row.account,
         revision: row.revision,
@@ -107,7 +112,7 @@ impl SigninService {
         }
     }
 
-    /// Begin a sign-in for the pending authorization `interaction` in `tenant`, bound to the browser holding
+    /// Begin a sign-in for `purpose` in `tenant`, bound to the browser holding
     /// `binding`, at `now`; `false` when that browser already has one.
     ///
     /// # Errors
@@ -117,13 +122,13 @@ impl SigninService {
         &self,
         tenant: &TenantId,
         binding: &SigninBinding,
-        interaction: &str,
+        purpose: &Purpose,
         now: Timestamp,
     ) -> Result<bool> {
         let place = self.tenancy.place(tenant)?;
         let id = binding.digest();
         let created_at = i64::try_from(now.unix_secs()).map_err(|_| unreadable("now"))?;
-        let row = kept(&Ceremony::new(), None, interaction, 0, created_at);
+        let row = kept(&Ceremony::new(), None, purpose, 0, created_at);
         let created = retry::bounded(SIGNIN_WRITE_ATTEMPTS, retry::on_store_retry, || {
             self.repository.create(&place, &id, &row)
         })
@@ -178,7 +183,7 @@ impl SigninService {
             .checked_add(1)
             .ok_or_else(|| unreadable("revision"))?;
         // The interaction and the start are not rewritten; the update names only the progress fields.
-        let row = kept(ceremony, account, "", next, 0);
+        let row = kept(ceremony, account, &Purpose::Account, next, 0);
         let advanced = retry::bounded(SIGNIN_WRITE_ATTEMPTS, retry::on_store_retry, || {
             self.repository.advance(&place, &id, revision, &row)
         })

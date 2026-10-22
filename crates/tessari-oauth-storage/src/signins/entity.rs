@@ -5,8 +5,8 @@ use tessari_oauth_infrastructure::tessaridb::{FromRecord, MappingFault, Row};
 /// One sign-in in progress; its record id is the digest of the browser's sign-in cookie value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SigninEntity {
-    /// The pending authorization the sign-in answers.
-    pub interaction: String,
+    /// The pending authorization the sign-in answers; absent for a sign-in to the account page.
+    pub interaction: Option<String>,
     /// Whether somebody was identified.
     pub identified: bool,
     /// The account identified; absent before identification and for an identifier that names nobody.

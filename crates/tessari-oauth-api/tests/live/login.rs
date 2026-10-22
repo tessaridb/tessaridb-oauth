@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::num::NonZeroU64;
 use std::sync::Arc;
+use tessari_oauth_storage::signins::Purpose;
 
 use axum::body::Body;
 use axum::extract::ConnectInfo;
@@ -236,7 +237,7 @@ async fn begin_binds_a_new_sign_in_to_a_fresh_cookie() {
         .await
         .expect("the store answers")
         .expect("bound to the cookie");
-    assert_eq!(signin.interaction, interaction);
+    assert_eq!(signin.purpose, Purpose::Authorization(interaction));
 }
 
 #[tokio::test]

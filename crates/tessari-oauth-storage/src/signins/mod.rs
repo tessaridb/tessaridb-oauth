@@ -8,6 +8,6 @@ mod service;
 mod tessaridb;
 
 pub use entity::SigninEntity;
-pub use model::Signin;
+pub use model::{Purpose, Signin};
 pub use service::SigninService;
 pub(crate) use tessaridb::TessaridbSigninRepository;

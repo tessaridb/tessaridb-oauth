@@ -6,6 +6,7 @@ use axum::http::StatusCode;
 use serde_json::json;
 use tessari_oauth_core::authentication::{Method, assess};
 use tessari_oauth_storage::sessions::Session;
+use tessari_oauth_storage::signins::Purpose;
 use tessari_oauth_types::{SessionSecret, Timestamp, UserId};
 
 use crate::authenticator::{Authenticator, ORIGIN, UP, UV};
@@ -86,7 +87,10 @@ async fn the_completing_step_opens_a_session_and_ends_the_sign_in() {
     let server = server(2).await;
     let user = with_password(&server, "grace@example.com").await;
     let cookie = identified(&server, "grace@example.com").await;
-    let interaction = crate::login::signin(&server, &cookie).await.interaction;
+    let Purpose::Authorization(interaction) = crate::login::signin(&server, &cookie).await.purpose
+    else {
+        panic!("a sign-in begun for an authorization answers it");
+    };
     let answered = post(
         &server,
         "password",
