@@ -30,7 +30,7 @@ use crate::Result;
 /// (`WEBAUTHN_CHALLENGE_TTL_SECS`) it may be answered in. `signins` holds one browser's sign-in in progress under the
 /// digest of its sign-in cookie value, for the ten minutes (`INTERACTION_TTL_SECS`) its authorization request is kept.
 /// `sessions` holds a user's session under the digest of its session cookie value, for at most the week
-/// (`SESSION_ABSOLUTE_SECS`) a session lasts.
+/// (`SESSION_ABSOLUTE_SECS`) a session lasts, found for its user's own list by `by_user`.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -86,7 +86,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      EXPIRE AFTER 10m; \
      DEFINE TABLE IF NOT EXISTS sessions (\
      user_id string REQUIRED, sid string REQUIRED, methods array REQUIRED, auth_time int REQUIRED, \
-     seen_at int REQUIRED) EXPIRE AFTER 7d;";
+     seen_at int REQUIRED) EXPIRE AFTER 7d; \
+     DEFINE INDEX IF NOT EXISTS by_user ON sessions FIELDS user_id;";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

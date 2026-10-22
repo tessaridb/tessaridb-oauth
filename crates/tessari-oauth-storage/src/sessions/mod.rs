@@ -8,6 +8,6 @@ mod service;
 mod tessaridb;
 
 pub use entity::SessionEntity;
-pub use model::Session;
+pub use model::{ListedSession, Session};
 pub use service::SessionService;
 pub(crate) use tessaridb::TessaridbSessionRepository;

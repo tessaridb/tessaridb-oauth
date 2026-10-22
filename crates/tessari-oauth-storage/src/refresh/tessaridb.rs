@@ -5,7 +5,7 @@ use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
 use super::repository::RefreshRepository;
 use super::{FamilyEntity, FamilyIdEntity, Holder, TokenEntity};
-use crate::{Error, Result, answers};
+use crate::{Result, answers};
 
 pub(crate) struct TessaridbRefreshRepository {
     database: Database,
@@ -49,15 +49,7 @@ fn token_values(id: &str, token: &TokenEntity) -> Vec<(String, Value)> {
 /// The text a text id spells: the node writes it in single quotes, like any other text. A family id is a digest, so a
 /// spelling with anything to unescape is not one this crate wrote and is refused rather than guessed at.
 fn text_id(spelled: &str) -> Result<String> {
-    spelled
-        .strip_prefix('\'')
-        .and_then(|rest| rest.strip_suffix('\''))
-        .filter(|inner| !inner.contains(['\'', '\\']))
-        .map(str::to_owned)
-        .ok_or_else(|| Error::Unreadable {
-            record: "refresh family",
-            reason: "an id that is not plain quoted text".to_owned(),
-        })
+    answers::text_id(spelled, "refresh family")
 }
 
 const CREATE_TOKEN: &str = "CREATE refresh_tokens:$token_id = { family_id: $token_family_id, \

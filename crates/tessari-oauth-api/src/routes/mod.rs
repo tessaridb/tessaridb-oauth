@@ -3,6 +3,7 @@
 //! theirs, the sign-in steps under theirs, and the account portal's requests under theirs, every body capped.
 
 mod account;
+mod account_sessions;
 mod authorize;
 mod browser;
 mod jwks;
@@ -115,6 +116,18 @@ pub fn public_router(state: PublicState) -> Router {
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/grants/revoke"),
             post(account::revoke),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions"),
+            get(account_sessions::sessions),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions/end"),
+            post(account_sessions::end),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions/end-all"),
+            post(account_sessions::end_all),
         )
         .layer(DefaultBodyLimit::max(LOGIN_BODY_MAX_BYTES))
         .route_layer(axum::middleware::from_fn_with_state(

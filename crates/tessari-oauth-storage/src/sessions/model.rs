@@ -17,3 +17,16 @@ pub struct Session {
     /// What the sign-in established, derived again from the methods it verified.
     pub assessment: Assessment,
 }
+
+/// A live session as its user's own list shows it: its public id and what is known about it, never its cookie.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListedSession {
+    /// The session's public id.
+    pub sid: String,
+    /// When it signed in.
+    pub auth_time: Timestamp,
+    /// When a request last found it.
+    pub seen_at: Timestamp,
+    /// The methods the sign-in verified, in order.
+    pub methods: Vec<Method>,
+}

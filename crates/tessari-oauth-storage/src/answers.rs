@@ -51,3 +51,14 @@ pub(crate) fn returned<T: FromRecord>(
         None => Ok(None),
     }
 }
+
+/// The text of a record id the node spelled as `spelled`: a text id in single quotes, as every id this crate writes
+/// is.
+pub(crate) fn text_id(spelled: &str, record: &'static str) -> Result<String> {
+    spelled
+        .strip_prefix('\'')
+        .and_then(|rest| rest.strip_suffix('\''))
+        .filter(|inner| !inner.contains(['\'', '\\']))
+        .map(str::to_owned)
+        .ok_or_else(|| unreadable(record, "an id that is not plain quoted text".to_owned()))
+}

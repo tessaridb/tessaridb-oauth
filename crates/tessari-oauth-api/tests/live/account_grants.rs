@@ -25,7 +25,7 @@ use crate::token_fixture::{
 const SESSION_COOKIE: &str = "__Host-tessari-session";
 
 /// Call `method` `path` on `acme`'s account API as the holder of `session`, with `body` as JSON when given.
-async fn call(
+pub(crate) async fn call(
     server: &Server,
     method: &str,
     path: &str,
@@ -66,7 +66,7 @@ fn portal() -> ClientId {
 }
 
 /// Start a refresh family for `user` at `portal`, answering its first token.
-async fn family(server: &Server, user: &UserId, secret: &str) -> RefreshToken {
+pub(crate) async fn family(server: &Server, user: &UserId, secret: &str) -> RefreshToken {
     let first = RefreshToken::from_secret(secret.to_owned());
     let grant = RefreshGrant {
         tenant: tenant("acme"),

@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
 
 use super::SessionEntity;
+use super::entity::ListedSessionEntity;
 use crate::Result;
 
 /// Sessions.
@@ -20,4 +21,8 @@ pub(crate) trait SessionRepository: Send + Sync {
 
     /// Delete the session under `id`, answering what it held when there was one.
     async fn take(&self, place: &Place, id: &str) -> Result<Option<SessionEntity>>;
+
+    /// Every session of `user_id` the store still holds, with its id.
+    async fn list_for_user(&self, place: &Place, user_id: &str)
+    -> Result<Vec<ListedSessionEntity>>;
 }

@@ -163,6 +163,16 @@ the time by which the access tokens it already holds stop working, at most five 
 is never recalled. Both act for the session's own user and nobody else, need the session cookie (`401 session_required`
 without it), take JSON only, are counted under their own limit and are never cached.
 
+### Your sessions: `<issuer>/account/api/sessions`
+
+`GET <issuer>/account/api/sessions` lists the signed-in user's live sessions at this issuer by their public id, with
+when each signed in, when it was last used, the methods it signed in with, and which one is asking; never a cookie.
+`POST <issuer>/account/api/sessions/end` with `{"sid": "<sid>"}` ends one of the user's own sessions (another
+user's id ends nothing), and `POST <issuer>/account/api/sessions/end-all` with `{}` signs the user out everywhere:
+every session, the asking one included, and every refresh family the user holds at any client. That answer says how
+many of each ended and when the access tokens already issued stop working. Every ending is recorded in the audit
+trail, and the same rules as the grant list apply: the session cookie, JSON only, their own limit, never cached.
+
 ### The audit trail
 
 Every outcome at the token and revocation endpoints, and every refusal at the authorization and UserInfo endpoints,

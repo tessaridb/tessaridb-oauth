@@ -14,9 +14,10 @@ use tessari_oauth_core::authentication::{Method, assess};
 use tessari_oauth_infrastructure::custody::token_id;
 use tessari_oauth_types::{SessionSecret, TenantId, Timestamp, UserId};
 
+use super::entity::ListedSessionEntity;
 use super::repository::SessionRepository;
-use super::{Session, SessionEntity};
-use crate::{Error, Result, Tenancy, retry};
+use super::{ListedSession, Session, SessionEntity};
+use crate::{Error, Result, Tenancy, answers, retry};
 
 fn unreadable(reason: &str) -> Error {
     Error::Unreadable {
@@ -147,5 +148,81 @@ impl SessionService {
         )
         .await?;
         Ok(taken.is_some())
+    }
+
+    /// The sessions of `user` in `tenant` still alive at `now`, oldest sign-in first.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, and [`Error::Unreadable`] for a record this service did not write.
+    pub async fn list(
+        &self,
+        tenant: &TenantId,
+        user: &UserId,
+        now: Timestamp,
+    ) -> Result<Vec<ListedSession>> {
+        let place = self.tenancy.place(tenant)?;
+        let now_secs = unix_secs(now)?;
+        let mut listed = Vec::new();
+        for ListedSessionEntity { session, .. } in
+            self.repository.list_for_user(&place, user.as_str()).await?
+        {
+            if !alive(session.auth_time, session.seen_at, now_secs)? {
+                continue;
+            }
+            listed.push(ListedSession {
+                auth_time: Timestamp::from_unix_secs(
+                    u64::try_from(session.auth_time).map_err(|_| unreadable("auth_time"))?,
+                ),
+                seen_at: Timestamp::from_unix_secs(
+                    u64::try_from(session.seen_at).map_err(|_| unreadable("seen_at"))?,
+                ),
+                methods: session
+                    .methods
+                    .iter()
+                    .map(|name| Method::named(name).ok_or_else(|| unreadable("methods")))
+                    .collect::<Result<Vec<_>>>()?,
+                sid: session.sid,
+            });
+        }
+        listed.sort_by_key(|session| session.auth_time.unix_secs());
+        Ok(listed)
+    }
+
+    /// End `user`'s session in `tenant` whose public id is `sid`, once; `false` when `user` has none by that id.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, and [`Error::Unreadable`] for a record id this service did not write.
+    pub async fn end_sid(&self, tenant: &TenantId, user: &UserId, sid: &str) -> Result<bool> {
+        let place = self.tenancy.place(tenant)?;
+        let held = self.repository.list_for_user(&place, user.as_str()).await?;
+        let Some(found) = held.into_iter().find(|listed| listed.session.sid == sid) else {
+            return Ok(false);
+        };
+        let id = answers::text_id(&found.spelled, "session")?;
+        Ok(self.repository.take(&place, &id).await?.is_some())
+    }
+
+    /// End every session of `user` in `tenant`, answering how many of them were still alive at `now`.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, and [`Error::Unreadable`] for a record this service did not write.
+    pub async fn end_all(&self, tenant: &TenantId, user: &UserId, now: Timestamp) -> Result<usize> {
+        let place = self.tenancy.place(tenant)?;
+        let now_secs = unix_secs(now)?;
+        // The store deletes many records only one by one, each by its id: read the user's, then end each.
+        let mut ended = 0_usize;
+        for listed in self.repository.list_for_user(&place, user.as_str()).await? {
+            let id = answers::text_id(&listed.spelled, "session")?;
+            let Some(taken) = self.repository.take(&place, &id).await? else {
+                continue;
+            };
+            if alive(taken.auth_time, taken.seen_at, now_secs)? {
+                ended = ended.checked_add(1).ok_or_else(|| unreadable("count"))?;
+            }
+        }
+        Ok(ended)
     }
 }

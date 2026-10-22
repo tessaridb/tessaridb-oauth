@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
 use super::SessionEntity;
+use super::entity::ListedSessionEntity;
 use super::repository::SessionRepository;
 use crate::{Result, answers};
 
@@ -83,5 +84,21 @@ impl SessionRepository for TessaridbSessionRepository {
             )
             .await?;
         answers::returned(answers, id, "session")
+    }
+
+    async fn list_for_user(
+        &self,
+        place: &Place,
+        user_id: &str,
+    ) -> Result<Vec<ListedSessionEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT * FROM sessions WHERE user_id = $user USING INDEX by_user;",
+                vec![("user".to_owned(), Value::from(user_id))],
+            )
+            .await?;
+        answers::records(answers, "session")
     }
 }

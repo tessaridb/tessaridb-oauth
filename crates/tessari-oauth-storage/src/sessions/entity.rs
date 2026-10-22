@@ -28,3 +28,20 @@ impl FromRecord for SessionEntity {
         })
     }
 }
+
+/// One session as its user's list reads it: the record id as the node spells it, and the row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ListedSessionEntity {
+    pub(crate) spelled: String,
+    pub(crate) session: SessionEntity,
+}
+
+impl FromRecord for ListedSessionEntity {
+    fn from_row(row: Row) -> Result<Self, MappingFault> {
+        let spelled = row.id().to_owned();
+        Ok(Self {
+            spelled,
+            session: SessionEntity::from_row(row)?,
+        })
+    }
+}
