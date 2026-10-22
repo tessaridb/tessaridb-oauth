@@ -7,6 +7,8 @@
 
 mod authorize;
 mod login;
+mod login_factors;
+mod login_factors_race;
 mod login_password;
 mod par;
 mod routes;

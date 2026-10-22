@@ -70,6 +70,11 @@ pub fn public_router(state: PublicState) -> Router {
             &format!("/{{tenant}}{LOGIN_API_PATH}/password"),
             post(login::password),
         )
+        .route(&format!("/{{tenant}}{LOGIN_API_PATH}/totp"), post(login::totp))
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/recovery"),
+            post(login::recovery),
+        )
         .layer(DefaultBodyLimit::max(LOGIN_BODY_MAX_BYTES))
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),

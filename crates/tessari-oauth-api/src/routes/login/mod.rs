@@ -8,10 +8,12 @@
 //! carry. No answer may be stored by a cache.
 
 mod begin;
+mod factors;
 mod identify;
 mod password;
 
 pub(super) use begin::begin;
+pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
 pub(super) use password::password;
 
@@ -21,8 +23,11 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use tessari_oauth_constants::{INTERACTION_TTL_SECS, LOGIN_COOKIE};
+use tessari_oauth_core::authentication::Method;
 use tessari_oauth_core::ceremony::{Ceremony, CeremonyRefused, Stage};
-use tessari_oauth_types::{SigninBinding, TenantId};
+use tessari_oauth_core::signin::SigninKey;
+use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
+use tessari_oauth_types::{SigninBinding, TenantId, Timestamp, UserId};
 
 use crate::state::PublicState;
 use crate::{Error, Result};
@@ -126,4 +131,86 @@ async fn step(
         return Err(Error::StepRefused);
     }
     Ok(moved.stage())
+}
+
+/// Refuse with the wait when any of `keys` is held at `now`; the same answer whichever key it is.
+async fn unless_held(
+    state: &PublicState,
+    keys: &[(SigninKey, &str)],
+    now: Timestamp,
+) -> Result<()> {
+    match state
+        .throttle
+        .signin_hold(keys, now)
+        .await
+        .map_err(Error::Store)?
+    {
+        Some(retry_after_secs) => Err(Error::Throttled { retry_after_secs }),
+        None => Ok(()),
+    }
+}
+
+/// Count a credential that proved nothing against `keys` at `now` and record it, `user` named when one was
+/// identified; answers the one rejection every such step gives.
+async fn rejected(
+    state: &PublicState,
+    tenant: &TenantId,
+    keys: &[(SigninKey, &str)],
+    user: Option<UserId>,
+    now: Timestamp,
+) -> Error {
+    if let Err(failure) = state.throttle.signin_failed(keys, now).await {
+        return Error::Store(failure);
+    }
+    tracing::warn!(
+        event = "signin_rejected",
+        tenant = tenant.as_str(),
+        "a sign-in credential was rejected"
+    );
+    let event = AuditEvent {
+        user,
+        reason: Some("credentials_rejected".to_owned()),
+        ..AuditEvent::of(AuditKind::Refused)
+    };
+    record(state, tenant, &event, now).await;
+    Error::CredentialsRejected
+}
+
+/// Append `event` to `tenant`'s trail; a trail that cannot take it is logged, never the reason a step fails.
+async fn record(state: &PublicState, tenant: &TenantId, event: &AuditEvent, now: Timestamp) {
+    if let Err(failure) = state.audit.record(tenant, event, now).await {
+        tracing::error!(
+            event = "audit_unrecorded",
+            tenant = tenant.as_str(),
+            category = ?failure.category(),
+            "a sign-in event could not be appended to the audit trail"
+        );
+    }
+}
+
+/// Record `method` as verified on the sign-in `binding` holds, forget the failures of the identified address's key
+/// `account`, and answer where the sign-in stands.
+async fn verified(
+    state: &PublicState,
+    tenant: &TenantId,
+    binding: &SigninBinding,
+    account: &str,
+    method: Method,
+) -> Result<Response> {
+    let stage = step(state, tenant, binding, None, |ceremony| {
+        ceremony.verified(method)
+    })
+    .await?;
+    // The step is taken; forgetting is housekeeping, and failures left counted lapse with their window. Under a
+    // run of failures against the same address the forget can keep losing to their counts, which must not turn a
+    // taken step into a refusal.
+    if let Err(failure) = state.throttle.signin_succeeded(account).await {
+        tracing::warn!(
+            event = "signin_failures_kept",
+            tenant = tenant.as_str(),
+            category = ?failure.category(),
+            "a sign-in step was taken but its address's failures could not be forgotten"
+        );
+    }
+    Ok(answer(stage, None))
 }

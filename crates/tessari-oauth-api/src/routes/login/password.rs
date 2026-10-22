@@ -17,10 +17,9 @@ use tessari_oauth_core::authentication::Method;
 use tessari_oauth_core::ceremony::{Identity, Stage};
 use tessari_oauth_core::signin::SigninKey;
 use tessari_oauth_infrastructure::custody::Verdict;
-use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_types::{TenantId, UserId};
 
-use super::{answer, binding, body, step};
+use super::{binding, body, rejected, unless_held, verified};
 use crate::state::PublicState;
 use crate::throttle::ClientAddress;
 use crate::{Error, Result};
@@ -63,37 +62,15 @@ pub(in crate::routes) async fn password(
         (SigninKey::Source, source.as_str()),
         (SigninKey::Pair, pair.as_str()),
     ];
-    if let Some(retry_after_secs) = state
-        .throttle
-        .signin_hold(&keys, now)
-        .await
-        .map_err(Error::Store)?
-    {
-        return Err(Error::Throttled { retry_after_secs });
-    }
+    unless_held(&state, &keys, now).await?;
     let user = match identity {
         Identity::Known { user, .. } => Some(user),
         Identity::Unknown => None,
     };
     if !proves(&state, &tenant, user.as_ref(), &password).await? {
-        state
-            .throttle
-            .signin_failed(&keys, now)
-            .await
-            .map_err(Error::Store)?;
-        record_rejection(&state, &tenant, user).await;
-        return Err(Error::CredentialsRejected);
+        return Err(rejected(&state, &tenant, &keys, user, now).await);
     }
-    let stage = step(&state, &tenant, &binding, None, |ceremony| {
-        ceremony.verified(Method::Password)
-    })
-    .await?;
-    state
-        .throttle
-        .signin_succeeded(&account)
-        .await
-        .map_err(Error::Store)?;
-    Ok(answer(stage, None))
+    verified(&state, &tenant, &binding, &account, Method::Password).await
 }
 
 /// Whether `password` is the password of `user` in `tenant`; with no user, or a user with no password, it is checked
@@ -118,26 +95,4 @@ async fn proves(
         .await
         .map_err(|_| Error::Internal)?;
     Ok(matches!(verdict, Verdict::Match { .. }))
-}
-
-/// Append a rejected password to `tenant`'s trail; the address and the password are never in it.
-async fn record_rejection(state: &PublicState, tenant: &TenantId, user: Option<UserId>) {
-    tracing::warn!(
-        event = "signin_rejected",
-        tenant = tenant.as_str(),
-        "a sign-in password was rejected"
-    );
-    let event = AuditEvent {
-        user,
-        reason: Some("credentials_rejected".to_owned()),
-        ..AuditEvent::of(AuditKind::Refused)
-    };
-    if let Err(failure) = state.audit.record(tenant, &event, (state.clock)()).await {
-        tracing::error!(
-            event = "audit_unrecorded",
-            tenant = tenant.as_str(),
-            category = ?failure.category(),
-            "a refusal could not be appended to the audit trail"
-        );
-    }
 }

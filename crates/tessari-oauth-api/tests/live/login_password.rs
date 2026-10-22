@@ -9,18 +9,18 @@ use tessari_oauth_core::authentication::Method;
 use tessari_oauth_core::signin::SigninKey;
 use tessari_oauth_storage::audit::AuditKind;
 use tessari_oauth_storage::users::StoredPassword;
-use tessari_oauth_types::Timestamp;
+use tessari_oauth_types::{Timestamp, UserId};
 
 use crate::login::{KNOWN, begun, post, refused, register, signin};
 use crate::token_fixture::{NOW, Server, passwords, server, tenant};
 
-const RIGHT: &str = "correct horse battery staple";
-const WRONG: &str = "incorrect horse battery staple";
+pub(crate) const RIGHT: &str = "correct horse battery staple";
+pub(crate) const WRONG: &str = "incorrect horse battery staple";
 /// The address `post` sends from, as the request counter names it.
-const SOURCE: &str = "192.0.2.1";
+pub(crate) const SOURCE: &str = "192.0.2.1";
 
 /// Register `email` with the password [`RIGHT`].
-async fn with_password(server: &Server, email: &str) {
+pub(crate) async fn with_password(server: &Server, email: &str) -> UserId {
     let user = register(server, email).await;
     let hash = passwords().hash(RIGHT).await.expect("hashed");
     server
@@ -34,10 +34,11 @@ async fn with_password(server: &Server, email: &str) {
         )
         .await
         .expect("set");
+    user
 }
 
 /// A sign-in that has identified `email`, by its cookie.
-async fn identified(server: &Server, email: &str) -> String {
+pub(crate) async fn identified(server: &Server, email: &str) -> String {
     let cookie = begun(server).await;
     let answered = post(server, "identify", Some(&cookie), json!({ "email": email })).await;
     assert_eq!(answered.status, StatusCode::OK);
@@ -45,7 +46,7 @@ async fn identified(server: &Server, email: &str) -> String {
 }
 
 /// Count `failures` failed sign-ins against `key` straight in the store.
-async fn fail(server: &Server, key: SigninKey, value: &str, failures: u64) {
+pub(crate) async fn fail(server: &Server, key: SigninKey, value: &str, failures: u64) {
     for _ in 0..failures {
         server
             .storage
@@ -56,7 +57,7 @@ async fn fail(server: &Server, key: SigninKey, value: &str, failures: u64) {
     }
 }
 
-fn account(email: &str) -> String {
+pub(crate) fn account(email: &str) -> String {
     passwords().signin_keys().account("acme", email)
 }
 
@@ -233,18 +234,7 @@ async fn the_right_password_moves_the_sign_in_on_and_forgets_the_failures() {
     assert_eq!(held, None, "the earlier failures were forgotten");
 
     let enrolled = "grace@example.com";
-    with_password(&server, enrolled).await;
-    let user = server
-        .storage
-        .users
-        .find_by_email(
-            &tenant("acme"),
-            &tessari_oauth_types::EmailAddress::parse(enrolled).expect("an address"),
-        )
-        .await
-        .expect("the store answers")
-        .expect("registered")
-        .user;
+    let user = with_password(&server, enrolled).await;
     server
         .storage
         .factors
