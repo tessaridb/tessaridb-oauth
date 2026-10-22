@@ -7,10 +7,12 @@
 
 mod kek;
 mod passwords;
+mod recovery;
 mod signing;
 mod token_id;
 
 pub use kek::Kek;
 pub use passwords::{PasswordCost, Passwords, Verdict};
+pub use recovery::{recovery_codes, recovery_digest};
 pub use signing::SigningKey;
 pub use token_id::{random_secret, token_id};

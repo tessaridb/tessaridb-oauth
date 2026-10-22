@@ -9,3 +9,10 @@ pub const TOTP_SKEW_STEPS: u64 = 1;
 
 /// Bytes of a shared secret: 160 bits, the length RFC 4226 §4 requirement R6 recommends for HMAC-SHA-1.
 pub const TOTP_SECRET_BYTES: usize = 20;
+
+/// Recovery codes issued at a time.
+pub const RECOVERY_CODE_COUNT: usize = 10;
+
+/// Random bytes in one recovery code: 80 bits, above the 64 a single-use recovery code needs, and exactly sixteen
+/// Crockford base32 characters.
+pub const RECOVERY_CODE_BYTES: usize = 10;
