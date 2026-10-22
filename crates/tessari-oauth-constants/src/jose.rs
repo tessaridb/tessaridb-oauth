@@ -10,6 +10,10 @@ pub const ACCESS_TOKEN_TTL_SECS: u64 = 300;
 /// so minutes are already generous (OpenID Connect Core §3.1.3.7 leaves the bound to the issuer).
 pub const ID_TOKEN_TTL_SECS: u64 = 300;
 
+/// How long a logout token may be accepted, in seconds: it is delivered the moment it is signed, and a short life
+/// bounds how long a copy of it could be presented again (Back-Channel Logout 1.0 §2.4 recommends two minutes).
+pub const LOGOUT_TOKEN_TTL_SECS: u64 = 120;
+
 /// Clock difference tolerated between this server and a client, in seconds. Seconds, not minutes: a wider allowance
 /// only hides unsynchronised hosts and lengthens every replay window by the same amount.
 pub const CLOCK_SKEW_SECS: u64 = 5;

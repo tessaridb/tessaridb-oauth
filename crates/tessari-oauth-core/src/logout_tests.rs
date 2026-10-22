@@ -1,7 +1,8 @@
 use ring::signature::{Ed25519KeyPair, KeyPair};
-use tessari_oauth_types::base64url;
+use tessari_oauth_constants::LOGOUT_TOKEN_TTL_SECS;
+use tessari_oauth_types::{ClientId, Timestamp, base64url};
 
-use super::{Hint, HintRefused, read_hint};
+use super::{Ended, Hint, HintRefused, LOGOUT_TOKEN_TYPE, logout_claims, read_hint};
 use crate::jose::{Algorithm, VerifyingKey};
 
 const ISSUER: &str = "https://id.example.com/acme";
@@ -89,4 +90,47 @@ fn a_hint_issued_for_another_tenant_is_refused() {
         &CLAIMS.replace("/acme", "/globex"),
     );
     assert_eq!(read(&elsewhere), Err(HintRefused::OtherIssuer));
+}
+
+fn logout_token_document() -> serde_json::Value {
+    let portal = ClientId::parse("portal").expect("a client id");
+    let claims = logout_claims(
+        &Ended {
+            issuer: ISSUER,
+            client_id: &portal,
+            subject: "pairwise-sub",
+            session_id: "session-1",
+        },
+        "jti-1",
+        Timestamp::from_unix_secs(1_800_000_000),
+    );
+    serde_json::to_value(&claims).expect("serialisable")
+}
+
+#[test]
+fn a_logout_token_names_the_session_and_the_event_and_carries_no_nonce() {
+    let document = logout_token_document();
+    assert_eq!(
+        document,
+        serde_json::json!({
+            "iss": ISSUER,
+            "sub": "pairwise-sub",
+            "aud": "portal",
+            "iat": 1_800_000_000_u64,
+            "exp": 1_800_000_000_u64 + LOGOUT_TOKEN_TTL_SECS,
+            "jti": "jti-1",
+            "sid": "session-1",
+            "events": { "http://schemas.openid.net/event/backchannel-logout": {} },
+        })
+    );
+}
+
+#[test]
+fn a_logout_token_is_never_read_as_an_id_token() {
+    let header = format!(r#"{{"typ":"{LOGOUT_TOKEN_TYPE}","alg":"EdDSA","kid":"k1"}}"#);
+    let claims = logout_token_document().to_string();
+    assert_eq!(
+        read(&signed(&issuer_pair(), &header, &claims)),
+        Err(HintRefused::NotAnIdToken)
+    );
 }
