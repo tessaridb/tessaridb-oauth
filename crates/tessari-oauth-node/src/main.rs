@@ -275,6 +275,8 @@ async fn run(
         brands: Arc::clone(&storage.brands),
         keys: Arc::clone(&storage.keys),
         mail_templates: Arc::clone(&storage.mail_templates),
+        outbox: Arc::clone(&storage.outbox),
+        mail: mailing.is_some(),
         kek: Arc::clone(&kek),
         signing_algorithm: SIGNING_ALGORITHM,
         users: Arc::clone(&storage.users),

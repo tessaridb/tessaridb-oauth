@@ -48,7 +48,7 @@ pub(in crate::routes) async fn send_verification(
         .map_err(Error::Store)?;
     let link = format!("{issuer}{LOGIN_PATH}/verify#token={}", token.expose());
     let mail = compose(
-        state,
+        &state.mail_templates,
         tenant,
         MailKind::Verify,
         Some(address.clone()),

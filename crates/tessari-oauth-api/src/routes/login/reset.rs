@@ -79,7 +79,7 @@ pub(in crate::routes) async fn request_reset(
         .map_err(Error::Store)?;
     let link = format!("{issuer}{LOGIN_PATH}/reset#token={}", token.expose());
     let mail = compose(
-        &state,
+        &state.mail_templates,
         &tenant,
         MailKind::Reset,
         to,

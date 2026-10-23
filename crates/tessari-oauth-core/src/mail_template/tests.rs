@@ -156,3 +156,21 @@ fn a_kind_is_named_and_read_back_by_its_name_alone() {
     assert_eq!(MailKind::parse("reset "), None);
     assert_eq!(MailKind::parse("Reset"), None);
 }
+
+#[test]
+fn the_enrolment_mail_carries_its_link_and_names_nothing_else_but_the_issuer() {
+    let enrolment = MailKind::parse("enrolment").expect("a kind");
+    assert_eq!(enrolment.required(), &[Placeholder::Link]);
+    assert_eq!(
+        check(
+            enrolment,
+            &template("Set your password", "Ask {issuer} for help.")
+        ),
+        Err(TemplateRefused::Missing(Placeholder::Link))
+    );
+    assert_eq!(
+        check(enrolment, &template("Hi", "{link} for {new_address}")),
+        Err(TemplateRefused::NotAllowed(Placeholder::NewAddress))
+    );
+    assert_eq!(check(enrolment, &enrolment.built_in()), Ok(()));
+}

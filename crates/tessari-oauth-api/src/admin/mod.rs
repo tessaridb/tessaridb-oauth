@@ -42,6 +42,7 @@ use tessari_oauth_storage::groups::GroupService;
 use tessari_oauth_storage::keys::KeyService;
 use tessari_oauth_storage::mail_templates::MailTemplateService;
 use tessari_oauth_storage::operators::OperatorService;
+use tessari_oauth_storage::outbox::OutboxService;
 use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::refresh::RefreshService;
 use tessari_oauth_storage::sessions::SessionService;
@@ -84,6 +85,10 @@ pub struct AdminState {
     pub keys: Arc<KeyService>,
     /// Each company's mail wording, which the console reads, replaces and resets.
     pub mail_templates: Arc<MailTemplateService>,
+    /// The mail owed and not yet sent.
+    pub outbox: Arc<OutboxService>,
+    /// Whether a mail relay is configured, so the console may send an enrolment code by mail.
+    pub mail: bool,
     /// The key-encryption key a key made from the console is sealed under.
     pub kek: Arc<Kek>,
     /// The algorithm a key made from the console signs with, as the rotation daemon's keys do.

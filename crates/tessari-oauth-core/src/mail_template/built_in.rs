@@ -57,5 +57,12 @@ pub(super) const fn wording(kind: MailKind) -> (&'static str, &'static str) {
             "Something changed in how your account at {issuer} signs in.\n\n{change}\n\n\
              If you did not do this, tell your administrator.\n",
         ),
+        MailKind::Enrolment => (
+            "Set the password of your new account",
+            "An account at {issuer} was opened for this address.\n\n\
+             To choose its password, open this link within 72 hours:\n{link}\n\n\
+             The link works once. If you did not expect this, ignore this mail; nobody can sign in until a password \
+             is set.\n",
+        ),
     }
 }

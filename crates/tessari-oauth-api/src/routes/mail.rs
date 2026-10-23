@@ -2,22 +2,21 @@
 //! the shipped text, each filled in with the values the kind carries.
 
 use tessari_oauth_core::mail_template::{self, MailKind, Placeholder, Rendered};
+use tessari_oauth_storage::mail_templates::MailTemplateService;
 use tessari_oauth_storage::outbox::NewMail;
 use tessari_oauth_types::{EmailAddress, TenantId};
 
-use crate::state::PublicState;
 use crate::{Error, Result};
 
-/// `kind`'s mail to `to` in `tenant`'s wording, filled in with `values`.
-pub(super) async fn compose(
-    state: &PublicState,
+/// `kind`'s mail to `to` in `tenant`'s wording, as `templates` keeps it, filled in with `values`.
+pub(crate) async fn compose(
+    templates: &MailTemplateService,
     tenant: &TenantId,
     kind: MailKind,
     to: Option<EmailAddress>,
     values: &[(Placeholder, &str)],
 ) -> Result<NewMail> {
-    let template = state
-        .mail_templates
+    let template = templates
         .resolve(tenant, kind)
         .await
         .map_err(Error::Store)?;

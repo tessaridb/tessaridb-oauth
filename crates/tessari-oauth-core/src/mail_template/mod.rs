@@ -38,6 +38,8 @@ pub enum MailKind {
     EmailRefused,
     /// The notice that something changed in how the account signs in.
     SigninChanged,
+    /// The link that lets an account an operator opened set its first password.
+    Enrolment,
 }
 
 /// A value a template may name.
@@ -92,7 +94,7 @@ pub enum TemplateRefused {
 
 impl MailKind {
     /// Every kind.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Reset,
         Self::Verify,
         Self::EmailConfirm,
@@ -102,6 +104,7 @@ impl MailKind {
         Self::EmailAppliedNew,
         Self::EmailRefused,
         Self::SigninChanged,
+        Self::Enrolment,
     ];
 
     /// The kind's name, as stored and as the console names it.
@@ -117,6 +120,7 @@ impl MailKind {
             Self::EmailAppliedNew => "email_applied_new",
             Self::EmailRefused => "email_refused",
             Self::SigninChanged => "signin_changed",
+            Self::Enrolment => "enrolment",
         }
     }
 
@@ -131,7 +135,7 @@ impl MailKind {
     pub const fn placeholders(self) -> &'static [Placeholder] {
         use Placeholder::{Change, Issuer, Link, NewAddress};
         match self {
-            Self::Reset | Self::Verify | Self::EmailConfirm => &[Issuer, Link],
+            Self::Reset | Self::Verify | Self::EmailConfirm | Self::Enrolment => &[Issuer, Link],
             Self::EmailCancel => &[Issuer, Link, NewAddress],
             Self::EmailAppliedOld => &[Issuer, NewAddress],
             Self::EmailTaken | Self::EmailAppliedNew | Self::EmailRefused => &[Issuer],
@@ -144,7 +148,7 @@ impl MailKind {
     pub const fn required(self) -> &'static [Placeholder] {
         use Placeholder::{Change, Link, NewAddress};
         match self {
-            Self::Reset | Self::Verify | Self::EmailConfirm => &[Link],
+            Self::Reset | Self::Verify | Self::EmailConfirm | Self::Enrolment => &[Link],
             Self::EmailCancel => &[Link, NewAddress],
             Self::EmailAppliedOld => &[NewAddress],
             Self::EmailTaken | Self::EmailAppliedNew | Self::EmailRefused => &[],

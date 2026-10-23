@@ -1,32 +1,51 @@
 //! An enrolment code issued in the console by an operator holding `users`, for an active account that has never set a
 //! password: the code is shown once, in the answer to the request that issued it, and kept only as its digest. A
-//! repeat of that request is answered without it, and a new code replaces the one before.
+//! repeat of that request is answered without it, and a new code replaces the one before. Sent by mail instead, the
+//! code goes to the account's own address as a link and is never shown to the operator.
 
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
-use serde::Serialize;
-use tessari_oauth_constants::ENROLMENT_TTL_SECS;
+use serde::{Deserialize, Serialize};
+use tessari_oauth_constants::{ENROLMENT_TTL_SECS, LOGIN_PATH};
+use tessari_oauth_core::mail_template::{MailKind, Placeholder};
 use tessari_oauth_storage::operators::OperatorRole;
 use tessari_oauth_storage::users::UserStatus;
 use tessari_oauth_types::{EnrolmentCode, UserId};
 
 use super::AdminState;
-use super::change::{Made, Refusal, apply};
+use super::change::{Made, Reasoned, Refusal, apply};
 use super::signin::fresh;
-use super::users::Move;
+use crate::routes::mail::compose;
 use crate::{Error, Result};
 
 /// The change `POST .../api/users/{id}/enrolment` names.
 const ENROL: &str = "users.enrol";
 
-/// A code issued: for whom, the code when this is the one answer allowed to carry it, and for how long it enrols.
+/// An enrolment asked for: why, and whether the code goes to the account's address instead of to the operator.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Enrolling {
+    reason: String,
+    #[serde(default)]
+    by_mail: bool,
+}
+
+impl Reasoned for Enrolling {
+    fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+/// A code issued: for whom, the code when this is the one answer allowed to carry it, whether it went by mail, and
+/// for how long it enrols.
 #[derive(Serialize)]
 struct Issued<'a> {
     user: &'a str,
     code: Option<&'a str>,
     shown_once: bool,
+    mailed: bool,
     valid_secs: u64,
 }
 
@@ -42,7 +61,10 @@ pub(super) async fn enrol(
         &state,
         (&company, &headers, &body),
         (OperatorRole::Users, ENROL),
-        |operator, _: Move| async move {
+        |operator, sent: Enrolling| async move {
+            if sent.by_mail && !issuing.mail {
+                return Err(Error::MailUnavailable);
+            }
             let tenant = &operator.tenant;
             let found = match UserId::parse(user) {
                 Ok(user) => issuing
@@ -81,8 +103,31 @@ pub(super) async fn enrol(
                 )
                 .await
                 .map_err(Error::Store)?;
-            let kept = issued(&user, None)?;
-            let shown = issued(&user, Some(code.expose()))?;
+            if sent.by_mail {
+                let issuer = issuing.served.issuer(tenant).ok_or(Error::NotFound)?;
+                let link = format!("{issuer}{LOGIN_PATH}/enrol#code={}", code.expose());
+                let mail = compose(
+                    &issuing.mail_templates,
+                    tenant,
+                    MailKind::Enrolment,
+                    Some(account.email),
+                    &[(Placeholder::Issuer, &issuer), (Placeholder::Link, &link)],
+                )
+                .await?;
+                issuing
+                    .outbox
+                    .enqueue(tenant, &issuing.kek, &mail)
+                    .await
+                    .map_err(Error::Store)?;
+                return Ok(Made {
+                    status: StatusCode::CREATED,
+                    body: issued(&user, None, true)?,
+                    shown: None,
+                    user: Some(user),
+                });
+            }
+            let kept = issued(&user, None, false)?;
+            let shown = issued(&user, Some(code.expose()), false)?;
             Ok(Made {
                 status: StatusCode::CREATED,
                 body: kept,
@@ -94,12 +139,14 @@ pub(super) async fn enrol(
     .await
 }
 
-/// The answer for a code issued to `user`, carrying `code` only when it is the answer that shows it.
-fn issued(user: &UserId, code: Option<&str>) -> Result<String> {
+/// The answer for a code issued to `user`, carrying `code` only when it is the answer that shows it; `mailed` when
+/// it went to the account's address and is shown to nobody.
+fn issued(user: &UserId, code: Option<&str>, mailed: bool) -> Result<String> {
     serde_json::to_string(&Issued {
         user: user.as_str(),
         code,
-        shown_once: true,
+        shown_once: !mailed,
+        mailed,
         valid_secs: ENROLMENT_TTL_SECS,
     })
     .map_err(|_| Error::Internal)

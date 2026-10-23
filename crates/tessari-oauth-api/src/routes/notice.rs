@@ -81,7 +81,7 @@ pub(super) async fn notify(state: &PublicState, tenant: &TenantId, user: &UserId
             return Ok(());
         };
         let mail = compose(
-            state,
+            &state.mail_templates,
             tenant,
             MailKind::SigninChanged,
             Some(account.email),

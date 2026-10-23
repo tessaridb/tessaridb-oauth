@@ -19,7 +19,7 @@ mod browser;
 mod jwks;
 mod login;
 mod logout;
-mod mail;
+pub(crate) mod mail;
 mod metadata;
 mod notice;
 mod pages;

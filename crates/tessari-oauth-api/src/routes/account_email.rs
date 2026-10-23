@@ -87,7 +87,7 @@ pub(super) async fn request(
     let issued = [(Placeholder::Issuer, issuer.as_ref())];
     let to_new = if held {
         compose(
-            &state,
+            &state.mail_templates,
             &tenant,
             MailKind::EmailTaken,
             Some(addresses.new.clone()),
@@ -101,7 +101,7 @@ pub(super) async fn request(
             (Placeholder::Link, link.as_str()),
         ];
         compose(
-            &state,
+            &state.mail_templates,
             &tenant,
             MailKind::EmailConfirm,
             Some(addresses.new.clone()),
@@ -111,7 +111,7 @@ pub(super) async fn request(
     };
     let cancel_link = format!("{issuer}{LOGIN_PATH}/email#cancel={}", cancel.expose());
     let to_old = compose(
-        &state,
+        &state.mail_templates,
         &tenant,
         MailKind::EmailCancel,
         Some(addresses.old.clone()),

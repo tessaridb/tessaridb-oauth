@@ -331,3 +331,83 @@ async fn an_enrolment_code_is_shown_once_and_kept_nowhere_but_as_its_digest() {
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert_eq!(refused.body["code"], "role_required");
 }
+
+/// An enrolment code for `user` sent by mail, asked by the console session `secret` under the key `key`.
+fn mailed_enrolment(user: &str, secret: &str, key: &str) -> Request<Body> {
+    Request::post(format!("/admin/acme/api/users/{user}/enrolment"))
+        .header(header::COOKIE, format!("__Host-tessari-admin={secret}"))
+        .header(header::ORIGIN, CONSOLE)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("idempotency-key", key)
+        .body(Body::from(
+            r#"{"reason":"first sign-in, ticket 54","by_mail":true}"#,
+        ))
+        .expect("a request")
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_enrolment_code_sent_by_mail_is_never_shown_and_its_link_enrols() {
+    let server = server(2).await;
+    let kim = opened(&server, "kim@acme.example").await;
+    let state = signed_in_as(
+        &server,
+        "operator-u",
+        &[OperatorRole::Users],
+        "issuer-u",
+        "console-u",
+    )
+    .await;
+    let unset = send(
+        AdminState {
+            mail: false,
+            ..state.clone()
+        },
+        mailed_enrolment(kim.as_str(), "console-u", "enrol-mail-000001"),
+    )
+    .await;
+    assert_eq!(
+        unset.status,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "{:?}",
+        unset.body
+    );
+    assert_eq!(unset.body["code"], "mail_unavailable");
+
+    let mailed = send(
+        state.clone(),
+        mailed_enrolment(kim.as_str(), "console-u", "enrol-mail-000002"),
+    )
+    .await;
+    assert_eq!(mailed.status, StatusCode::CREATED, "{:?}", mailed.body);
+    assert!(mailed.body["code"].is_null(), "{:?}", mailed.body);
+    assert_eq!(mailed.body["mailed"], true);
+    let mails = server
+        .storage
+        .outbox
+        .claim(&tenant("acme"), &server.kek, 50)
+        .await
+        .expect("claimed");
+    assert_eq!(mails.len(), 1, "one mail, and none for the refused request");
+    let mail = &mails[0];
+    assert_eq!(
+        mail.to.as_ref().map(|to| to.as_str()),
+        Some("kim@acme.example")
+    );
+    let (_, after) = mail
+        .text
+        .split_once("https://id.example.com/acme/login/enrol#code=")
+        .expect("the enrolment link");
+    let code = after.split_whitespace().next().expect("a code").to_owned();
+    let named = server
+        .storage
+        .enrolments
+        .find(&tenant("acme"), &EnrolmentCode::from_secret(code))
+        .await
+        .expect("an answer");
+    assert_eq!(
+        named.as_ref(),
+        Some(&kim),
+        "the mailed code enrols the account"
+    );
+}
