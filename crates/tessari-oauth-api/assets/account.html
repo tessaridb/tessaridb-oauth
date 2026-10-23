@@ -28,7 +28,21 @@
           <p class="who"><strong id="email"></strong> <span id="verified" class="badge"></span></p>
           <div class="actions">
             <button type="button" id="verify-send" class="secondary" hidden>Send a verification link</button>
+            <button type="button" id="email-open" class="secondary">Change your sign-in address</button>
           </div>
+          <form id="email-form" class="panel" hidden novalidate>
+            <div class="field">
+              <label for="new-email">New address</label>
+              <input id="new-email" name="email" type="email" autocomplete="email" required
+                     aria-required="true" aria-describedby="new-email-hint new-email-error">
+              <p id="new-email-hint" class="hint"></p>
+              <p id="new-email-error" class="field-error" hidden></p>
+            </div>
+            <div class="actions">
+              <button type="submit" class="primary">Send the link</button>
+              <button type="button" id="email-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
         </section>
 
         <section aria-labelledby="names-title">

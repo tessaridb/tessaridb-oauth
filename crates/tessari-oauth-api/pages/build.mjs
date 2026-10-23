@@ -17,7 +17,7 @@ function local(what, text) {
   }
 }
 
-for (const page of ["login", "reset", "verify", "consent", "account", "console"]) {
+for (const page of ["login", "reset", "verify", "email", "consent", "account", "console"]) {
   await build({
     entryPoints: [new URL(`./src/${page}.ts`, import.meta.url).pathname],
     outfile: new URL(`${page}.js`, ASSETS).pathname,
@@ -45,6 +45,7 @@ const COPIED = [
   "login.html",
   "reset.html",
   "verify.html",
+  "email.html",
   "consent.html",
   "account.html",
   "console.html",

@@ -248,6 +248,24 @@
     sent: "We sent a verification link to your address. It works for 24 hours.",
     unavailable: "Email verification isn't set up here. Ask your administrator."
   };
+  var EMAIL_TEXT = {
+    confirming: "Confirming your new sign-in address.",
+    confirmed: "New address confirmed",
+    confirmedNote: (effectiveAt) => `Your account signs in with this address from ${when(effectiveAt)}, unless the change is cancelled from your current address. You can close this page.`,
+    cancelPrompt: "Someone asked to change the address your account signs in with. If it wasn't you, keep your current address.",
+    cancelling: "Cancelling the change.",
+    cancelled: "Change cancelled",
+    cancelledNote: "Your account keeps signing in with this address. If you didn't ask for the change, change your password too.",
+    invalidLink: "This link isn't complete. Open the link from the email again.",
+    spentLink: "This link no longer works: it was already used, a newer request replaced it, or the change already took effect.",
+    hint: "We'll send a link to the new address. The change takes effect a day after you ask, and your current address can cancel it until then.",
+    required: "Enter the new address.",
+    invalid: "Enter an email address like name@example.com.",
+    sending: "Sending a message to the new address.",
+    sent: "We sent a message to the new address. Open its link within 24 hours to confirm the change.",
+    same: "That's already the address you sign in with.",
+    unavailable: "Changing your address isn't set up here. Ask your administrator."
+  };
   var ACCOUNT_TEXT = {
     loading: "Loading your account.",
     missing: "This page could not find its account. Check the address and try again.",
@@ -487,6 +505,98 @@
       shown.hidden = true;
       open.hidden = false;
       open.focus();
+    });
+  }
+
+  // src/email-read.ts
+  function askOutcome(status, body, retryAfter) {
+    if (status === 202) {
+      return { kind: "sent" };
+    }
+    if (status === 204) {
+      return { kind: "same" };
+    }
+    const code = field(body, "code");
+    if (status === 400 && code === "email_rejected") {
+      return { kind: "invalid" };
+    }
+    if (status === 401 && code === "reauthentication_required") {
+      return { kind: "reauthenticate" };
+    }
+    if (status === 401 && code === "session_required") {
+      return { kind: "signed-out" };
+    }
+    if (status === 503 && code === "mail_unavailable") {
+      return { kind: "unavailable" };
+    }
+    return status === 429 ? refusal(status, body, retryAfter) : { kind: "retry" };
+  }
+
+  // src/account-email.ts
+  function wireEmail(base, followups) {
+    const open = element("email-open", HTMLButtonElement);
+    const form = element("email-form", HTMLFormElement);
+    const input = element("new-email", HTMLInputElement);
+    const cancel = element("email-cancel", HTMLButtonElement);
+    element("new-email-hint", HTMLParagraphElement).textContent = EMAIL_TEXT.hint;
+    const close = () => {
+      input.value = "";
+      fieldError(input, null);
+      form.hidden = true;
+      open.hidden = false;
+      open.focus();
+    };
+    open.addEventListener("click", () => {
+      form.hidden = false;
+      open.hidden = true;
+      input.focus();
+    });
+    cancel.addEventListener("click", close);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void (async () => {
+        const address = input.value.trim();
+        if (address === "") {
+          fieldError(input, EMAIL_TEXT.required);
+          return;
+        }
+        const submit = form.querySelector("button[type=submit]");
+        if (submit instanceof HTMLButtonElement) {
+          submit.disabled = true;
+        }
+        say(EMAIL_TEXT.sending);
+        const answer = await call("POST", `${base}/me/email`, { email: address });
+        if (submit instanceof HTMLButtonElement) {
+          submit.disabled = false;
+        }
+        const outcome = askOutcome(answer.status, answer.body, answer.retryAfter);
+        switch (outcome.kind) {
+          case "sent":
+            close();
+            say(EMAIL_TEXT.sent);
+            return;
+          case "same":
+            say("");
+            fieldError(input, EMAIL_TEXT.same);
+            return;
+          case "invalid":
+            say("");
+            fieldError(input, EMAIL_TEXT.invalid);
+            return;
+          case "reauthenticate":
+            offerSignIn();
+            say(ACCOUNT_TEXT.reauthenticate);
+            return;
+          case "unavailable":
+            say(EMAIL_TEXT.unavailable);
+            return;
+          case "signed-out":
+            followups.signedOut();
+            return;
+          default:
+            say(refusalText(outcome));
+        }
+      })();
     });
   }
 
@@ -1155,6 +1265,7 @@
     wirePasskeyAdd(base, followups);
     wireProfile(base, me.profile, followups);
     wireVerify(base, followups);
+    wireEmail(base, followups);
     account.hidden = false;
     say("");
   }

@@ -15,6 +15,7 @@ import {
   readMe,
   readSessions,
 } from "./account-read.ts";
+import { wireEmail } from "./account-email.ts";
 import { removePasskey, wireApp, wireAppOff, wirePasskeyAdd } from "./account-enrol.ts";
 import { type Followups, wirePassword, wireRecoveryCodes } from "./account-factors.ts";
 import { showNames, wireProfile } from "./account-profile.ts";
@@ -270,6 +271,7 @@ async function main(): Promise<void> {
   wirePasskeyAdd(base, followups);
   wireProfile(base, me.profile, followups);
   wireVerify(base, followups);
+  wireEmail(base, followups);
   account.hidden = false;
   say("");
 }

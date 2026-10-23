@@ -115,6 +115,33 @@ export const VERIFY_TEXT = {
   unavailable: "Email verification isn't set up here. Ask your administrator.",
 } as const;
 
+/** The words the address-change page and the account page's change form show. */
+export const EMAIL_TEXT = {
+  confirming: "Confirming your new sign-in address.",
+  confirmed: "New address confirmed",
+  confirmedNote: (effectiveAt: number) =>
+    `Your account signs in with this address from ${when(effectiveAt)}, unless the change is cancelled ` +
+    "from your current address. You can close this page.",
+  cancelPrompt:
+    "Someone asked to change the address your account signs in with. If it wasn't you, keep your current address.",
+  cancelling: "Cancelling the change.",
+  cancelled: "Change cancelled",
+  cancelledNote:
+    "Your account keeps signing in with this address. If you didn't ask for the change, change your password too.",
+  invalidLink: "This link isn't complete. Open the link from the email again.",
+  spentLink:
+    "This link no longer works: it was already used, a newer request replaced it, or the change already took effect.",
+  hint:
+    "We'll send a link to the new address. The change takes effect a day after you ask, " +
+    "and your current address can cancel it until then.",
+  required: "Enter the new address.",
+  invalid: "Enter an email address like name@example.com.",
+  sending: "Sending a message to the new address.",
+  sent: "We sent a message to the new address. Open its link within 24 hours to confirm the change.",
+  same: "That's already the address you sign in with.",
+  unavailable: "Changing your address isn't set up here. Ask your administrator.",
+} as const;
+
 /** The words the account page shows, by place. */
 export const ACCOUNT_TEXT = {
   loading: "Loading your account.",

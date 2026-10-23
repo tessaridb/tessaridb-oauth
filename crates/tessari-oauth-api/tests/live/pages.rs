@@ -21,7 +21,7 @@ use crate::routes::{live_storage, state};
 const PAGE_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
                            connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'";
 
-const SERVED: [(&str, &str, &str); 12] = [
+const SERVED: [(&str, &str, &str); 14] = [
     ("/acme/login", "text/html; charset=utf-8", "login.html"),
     (
         "/acme/login/reset",
@@ -32,6 +32,11 @@ const SERVED: [(&str, &str, &str); 12] = [
         "/acme/login/verify",
         "text/html; charset=utf-8",
         "verify.html",
+    ),
+    (
+        "/acme/login/email",
+        "text/html; charset=utf-8",
+        "email.html",
     ),
     ("/acme/consent", "text/html; charset=utf-8", "consent.html"),
     ("/acme/account", "text/html; charset=utf-8", "account.html"),
@@ -49,6 +54,11 @@ const SERVED: [(&str, &str, &str); 12] = [
         "/acme/assets/verify.js",
         "text/javascript; charset=utf-8",
         "verify.js",
+    ),
+    (
+        "/acme/assets/email.js",
+        "text/javascript; charset=utf-8",
+        "email.js",
     ),
     (
         "/acme/assets/consent.js",
@@ -152,10 +162,11 @@ async fn the_pages_load_only_their_own_assets() {
             "{path} names the product until a company names itself"
         );
     }
-    // The reset and verification pages sit one level down, under the sign-in page, and reach the same assets.
+    // The reset, verification and address-change pages sit one level down, under the sign-in page, and reach the same assets.
     for (path, script) in [
         ("/acme/login/reset", "src=\"../assets/reset.js\""),
         ("/acme/login/verify", "src=\"../assets/verify.js\""),
+        ("/acme/login/email", "src=\"../assets/email.js\""),
     ] {
         let (_, _, body) = fetch(path).await;
         for asset in [
