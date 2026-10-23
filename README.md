@@ -25,8 +25,9 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 > set (RFC 7517) over TLS, its authorization, pushed authorization request, token, revocation and UserInfo endpoints,
 > the sign-in and consent pages, ID tokens, and the account API a signed-in user reads and manages their own sessions
 > and grants with, it rotates the tenants' signing keys and tells clients when a session ends. Operators open,
-> enrol, disable and enable accounts, grant operator roles, set the two-factor policy, read the audit trail and make
-> companies through the admin console; the account portal page comes next. No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
+> enrol, disable and enable accounts, grant operator roles, set the two-factor policy and the company's brand,
+> read the audit trail and make companies through the admin console; the account portal page comes next.
+> No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
 > page describes what the project is for, not a working system.
 
 ## What it is for
@@ -64,7 +65,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, groups, operators, audit trail, companies) and its pages |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page, each showing the company's brand; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, groups, operators, branding, audit trail, companies) and its pages |
 | Built, not served yet | enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
 | Planned | the account portal page, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
@@ -272,8 +273,9 @@ requests are counted per client address under the `LOGIN_LIMIT` and `LOGIN_WINDO
 The console itself is the page at `<ADMIN_URL>/admin/<company>/`, served by the binary with its script, style and mark
 under `.../assets/`, for an active company only, under the same policy as the sign-in pages and never cached. It holds
 no token, only the session cookie, and asks the API for everything it shows. It offers the sections the operator's roles
-can use (Users, Groups, Clients, Operators, Sign-in policy, Audit trail, and Companies in the `system` console); the API
-refuses the rest whatever is offered. Every change asks for a reason and is sent once under its own `Idempotency-Key`.
+can use (Users, Groups, Clients, Operators, Sign-in policy, Branding, Audit trail, and Companies in the `system`
+console); the API refuses the rest whatever is offered. Every change asks for a reason and is sent once under its own
+`Idempotency-Key`.
 Disabling an account names it and says what ends; removing a client says how many users hold a grant to it and asks for
 its id typed out; deleting a group says how many members it has and asks for its id typed out; a two-factor policy
 change or a company's suspension says what it does to every account and asks for the company's id typed out. Lists page
@@ -351,6 +353,21 @@ active account of the company for `valid_days` (90 unless given, at most 365; no
 permanent), recorded with who gave it; a grant to oneself is refused as `self_grant`. `POST
 .../grants/<role>/revoke` with a `reason` takes it away (`not_granted` when it was not held), and the console of an
 operator with no role left ends at their next request.
+
+Branding (role `policy`): `GET <ADMIN_URL>/admin/<company>/api/branding` reads the company's `name`, `accent` colour,
+`support_url`, `privacy_url`, when its `logo` was uploaded (Unix seconds), and the `revision` a change must name (0,
+with every value null, while none is set). `PUT .../api/branding` with `{"revision", "name", "accent", "support_url",
+"privacy_url", "reason"}` replaces the brand whole, only over the revision read (`409 changed_meanwhile` otherwise).
+The name is 1 to 64 characters with no control or direction character (`brand_name_invalid`); the colour is `#` and
+six hex digits (`accent_invalid`) on which white text reaches a contrast of 4.5 (`accent_low_contrast`); a link is an
+https address with a host and no credentials (`link_invalid`). `PUT .../api/branding/logo` with `{"png", "reason"}`
+takes a PNG as base64url, at most 256 KiB and 512 by 512 pixels (`logo_too_large`, `logo_not_png`,
+`logo_unreadable`, `logo_too_wide`), and keeps only the server's own re-encoding of its pixels, so nothing else in
+the file is ever served; `POST .../api/branding/logo/remove` takes it away (`404 no_logo`). The sign-in, consent and
+account pages read `<issuer>/assets/brand.json` and `brand.css`: the name is set as text, the colour replaces the
+house accent in the light theme, a link appears only when set, and the logo is `<issuer>/assets/logo.png`. With
+nothing set they show TessariDB's own. Every brand asset comes from the issuer's origin, so the pages' policy is
+unchanged.
 
 `POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` and `.../enable` (role `users`) move an account between
 `active` and `disabled`, each only from the other status (`changed_meanwhile` otherwise, `user_not_found` for an account
