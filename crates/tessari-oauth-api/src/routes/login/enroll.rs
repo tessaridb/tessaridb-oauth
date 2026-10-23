@@ -5,7 +5,8 @@
 //! which codes exist. The code is spent only once the password is accepted, so a refused password can be tried again;
 //! an account that already has a password is refused and keeps it, because an enrolment code is not a way to reset
 //! one. The password meets the rules for an account whose password is its only factor. No session is opened: the
-//! user signs in as anyone does. The value is never logged, recorded or echoed.
+//! user signs in as anyone does. With a relay configured a link that verifies the address is mailed to it. The value
+//! is never logged, recorded or echoed.
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
@@ -19,7 +20,7 @@ use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::users::StoredPassword;
 use tessari_oauth_types::EnrolmentCode;
 
-use super::{body, record};
+use super::{body, record, send_verification};
 use crate::state::PublicState;
 use crate::{Error, Result};
 
@@ -34,7 +35,7 @@ pub(in crate::routes) async fn enroll(
     Path(tenant): Path<String>,
     read: std::result::Result<Json<Enrolment>, JsonRejection>,
 ) -> Result<Response> {
-    let (tenant, _) = state.tenant(&tenant)?;
+    let (tenant, issuer) = state.tenant(&tenant)?;
     let Enrolment { code, password } = body(read)?;
     let now = (state.clock)();
     let code = EnrolmentCode::from_secret(code);
@@ -96,6 +97,18 @@ pub(in crate::routes) async fn enroll(
         )
         .await
         .map_err(Error::Store)?;
+    // The operator typed the address; nothing yet shows the user reads it, so a link goes to it.
+    if state.mail
+        && let Err(failure) =
+            send_verification(&state, &tenant, &issuer, &user, &account.email, now).await
+    {
+        tracing::warn!(
+            event = "verification_unqueued",
+            tenant = tenant.as_str(),
+            %failure,
+            "a verification link could not be queued; the enrolment stands"
+        );
+    }
     let event = AuditEvent {
         user: Some(user),
         reason: Some("enrolled".to_owned()),

@@ -20,6 +20,7 @@ mod identify;
 mod passkey;
 mod password;
 mod reset;
+mod verify;
 
 pub(super) use begin::begin;
 pub(super) use consent::{consent, decide, signed_in};
@@ -29,6 +30,7 @@ pub(super) use identify::identify;
 pub(super) use passkey::{passkey, passkey_options, relying_party};
 pub(super) use password::password;
 pub(super) use reset::{complete_reset, request_reset};
+pub(super) use verify::{complete_verification, send_verification};
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;

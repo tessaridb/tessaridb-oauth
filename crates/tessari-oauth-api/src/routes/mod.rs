@@ -11,6 +11,7 @@ mod account_password;
 mod account_profile;
 mod account_sessions;
 mod account_totp;
+mod account_verify;
 mod authorize;
 mod brand;
 mod browser;
@@ -132,6 +133,10 @@ pub fn public_router(state: PublicState) -> Router {
             post(login::complete_reset),
         )
         .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/verify"),
+            post(login::complete_verification),
+        )
+        .route(
             &format!("/{{tenant}}{LOGIN_API_PATH}/consent"),
             get(login::consent).post(login::decide),
         )
@@ -154,6 +159,10 @@ pub fn public_router(state: PublicState) -> Router {
             post(account::revoke),
         )
         .route(&format!("/{{tenant}}{ACCOUNT_API_PATH}/me"), get(account_me::me))
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/me/verify"),
+            post(account_verify::request),
+        )
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/options"),
             post(account_passkeys::options),

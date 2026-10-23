@@ -27,6 +27,7 @@ mod thumbprint;
 mod timestamp;
 mod trusted_proxies;
 mod user_id;
+mod verify_token;
 
 pub use algorithm::Algorithm;
 pub use authorization_code::AuthorizationCode;
@@ -52,3 +53,4 @@ pub use thumbprint::KeyThumbprint;
 pub use timestamp::{Clock, Timestamp};
 pub use trusted_proxies::TrustedProxies;
 pub use user_id::UserId;
+pub use verify_token::VerifyToken;

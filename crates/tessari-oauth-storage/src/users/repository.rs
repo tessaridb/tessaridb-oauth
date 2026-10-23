@@ -51,4 +51,15 @@ pub(crate) trait UserRepository: Send + Sync {
         user_id: &str,
         profile: &ProfileEntity,
     ) -> Result<()>;
+
+    /// Mark `address` verified at `verified_at` by `by`, when it is the address of `user_id`; the store refuses as a
+    /// conflict otherwise.
+    async fn mark_verified(
+        &self,
+        place: &Place,
+        address: &str,
+        user_id: &str,
+        verified_at: i64,
+        by: &str,
+    ) -> Result<()>;
 }

@@ -183,6 +183,31 @@ impl UserRepository for TessaridbUserRepository {
         Ok(())
     }
 
+    async fn mark_verified(
+        &self,
+        place: &Place,
+        address: &str,
+        user_id: &str,
+        verified_at: i64,
+        by: &str,
+    ) -> Result<()> {
+        // A condition on an edit is a compare-and-set: the store refuses it when the address is not this account's.
+        self.database
+            .run_at(
+                place,
+                "UPDATE user_emails:$address SET verified_at = $verified_at, verified_by = $by \
+                 WHERE user_id = $user;",
+                vec![
+                    ("address".to_owned(), Value::from(address)),
+                    ("user".to_owned(), Value::from(user_id)),
+                    ("verified_at".to_owned(), Value::from(verified_at)),
+                    ("by".to_owned(), Value::from(by)),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn find_profile(&self, place: &Place, user_id: &str) -> Result<Option<ProfileEntity>> {
         let answers = self
             .database

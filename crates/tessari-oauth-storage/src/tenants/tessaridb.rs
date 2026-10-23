@@ -128,6 +128,9 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE INDEX IF NOT EXISTS by_user ON enrolments FIELDS user_id; \
      DEFINE TABLE IF NOT EXISTS password_resets (user_id string REQUIRED, created_at int REQUIRED) EXPIRE AFTER 30m; \
      DEFINE INDEX IF NOT EXISTS by_user ON password_resets FIELDS user_id; \
+     DEFINE TABLE IF NOT EXISTS address_verifications (\
+     user_id string REQUIRED, address string REQUIRED, created_at int REQUIRED) EXPIRE AFTER 24h; \
+     DEFINE INDEX IF NOT EXISTS by_user ON address_verifications FIELDS user_id; \
      DEFINE TABLE IF NOT EXISTS operator_grants (\
      user_id string REQUIRED, role_name string REQUIRED, granted_by string REQUIRED, granted_at int REQUIRED, \
      reason string REQUIRED); \

@@ -46,6 +46,7 @@ mod takes_race;
 mod throttle;
 mod tls;
 mod users;
+mod verifications;
 
 use tessari_oauth_infrastructure::tessaridb::StoreConfig;
 use tessari_oauth_storage::Storage;

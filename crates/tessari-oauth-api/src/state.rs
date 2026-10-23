@@ -28,6 +28,7 @@ use tessari_oauth_storage::signins::SigninService;
 use tessari_oauth_storage::subjects::SubjectService;
 use tessari_oauth_storage::throttle::{Limit, ThrottleService};
 use tessari_oauth_storage::users::UserService;
+use tessari_oauth_storage::verifications::VerificationService;
 use tessari_oauth_types::{Algorithm, Clock, TenantId};
 
 use crate::{Error, Result};
@@ -97,6 +98,8 @@ pub struct PublicState {
     pub outbox: Arc<OutboxService>,
     /// Password-reset tokens.
     pub resets: Arc<ResetService>,
+    /// The address-verification tokens mail carries.
+    pub verifications: Arc<VerificationService>,
     /// Whether a mail relay is configured, so the flows that send mail are offered.
     pub mail: bool,
 }

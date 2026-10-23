@@ -13,6 +13,7 @@ mod account_notices;
 mod account_password;
 mod account_profile;
 mod account_sessions;
+mod account_verify;
 mod admin_audit;
 mod admin_branding;
 mod admin_callback;

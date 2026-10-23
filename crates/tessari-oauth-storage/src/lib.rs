@@ -35,6 +35,7 @@ mod tenancy;
 pub mod tenants;
 pub mod throttle;
 pub mod users;
+pub mod verifications;
 
 pub use bootstrap::Bootstrapped;
 pub use client_removal::{ClientRemovalService, Removed};

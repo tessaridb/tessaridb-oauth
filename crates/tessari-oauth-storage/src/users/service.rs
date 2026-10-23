@@ -238,6 +238,37 @@ impl UserService {
             .collect()
     }
 
+    /// Mark `address` of `user` in `tenant` verified at `now`, by a link mailed to it; `false`, changing nothing, when
+    /// the address is not that account's.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, and [`Error::Invalid`] for a time past the store's range.
+    pub async fn mark_verified(
+        &self,
+        tenant: &TenantId,
+        user: &UserId,
+        address: &EmailAddress,
+        now: Timestamp,
+    ) -> Result<bool> {
+        let place = self.tenancy.place(tenant)?;
+        let verified_at = i64::try_from(now.unix_secs()).map_err(|_| Error::Invalid {
+            record: "user email",
+            reason: "a verification time past the store's range",
+        })?;
+        match self
+            .repository
+            .mark_verified(&place, address.as_str(), user.as_str(), verified_at, "mail")
+            .await
+        {
+            Ok(()) => Ok(true),
+            // Another account's address, or no such address: the store refuses both as a conflict, and nothing
+            // changed.
+            Err(refused) if refused.category() == ErrorCategory::Conflict => Ok(false),
+            Err(failure) => Err(failure),
+        }
+    }
+
     /// Move `user` of `tenant` from status `from` to `to`; `false`, changing nothing, when the account is not in `from`
     /// (already moved, or no such account).
     ///
