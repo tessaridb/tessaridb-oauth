@@ -12,7 +12,7 @@ use std::str::FromStr;
 use tessari_oauth_constants::{
     PASSWORD_HASH_ITERATIONS_FLOOR, PASSWORD_HASH_MEMORY_KIB_FLOOR, PASSWORD_HASH_PARALLELISM_FLOOR,
 };
-use tessari_oauth_types::TenantId;
+use tessari_oauth_types::{TenantId, TrustedProxies};
 use url::{Host, Url};
 
 use super::peers::{PeerSettings, PeerVariables, peer_settings};
@@ -26,10 +26,11 @@ pub struct PublicConfig {
     pub url: String,
     /// The socket address the listener binds.
     pub address: SocketAddr,
-    /// The listener's certificate chain, PEM.
-    pub tls_cert: PathBuf,
-    /// The listener's private key, PEM.
-    pub tls_key: PathBuf,
+    /// The listener's certificate chain and private key, PEM; without them it serves in the clear, for a TLS
+    /// terminator in front of it.
+    pub tls: Option<TlsFiles>,
+    /// The proxies whose `X-Forwarded-For` names the client; empty believes no forwarded header.
+    pub trusted_proxies: TrustedProxies,
 }
 
 /// Where the admin console's own listener serves and the URL operators reach it by.
@@ -41,12 +42,12 @@ pub struct AdminConfig {
     /// The socket address the admin listener binds.
     pub address: SocketAddr,
     /// The admin listener's certificate chain and private key, PEM; without them it serves in the clear.
-    pub tls: Option<AdminTls>,
+    pub tls: Option<TlsFiles>,
 }
 
-/// The admin listener's certificate, given both or neither.
+/// A listener's certificate, given both or neither.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AdminTls {
+pub struct TlsFiles {
     /// The certificate chain, PEM.
     pub cert: PathBuf,
     /// The private key, PEM.
@@ -225,22 +226,37 @@ fn tenants(value: String) -> Result<Vec<TenantId>> {
     Ok(tenants)
 }
 
-/// The admin listener's certificate and key, both or neither; neither serves the console in the clear.
-fn admin_tls(variables: &Variables<impl Fn(&str) -> Option<String>>) -> Result<Option<AdminTls>> {
-    let cert = variables.optional("TESSARIDB_OAUTH_ADMIN_TLS_CERT");
-    let key = variables.optional("TESSARIDB_OAUTH_ADMIN_TLS_KEY");
+/// The proxies named by `TESSARIDB_OAUTH_TRUSTED_PROXIES`; unset trusts none.
+fn trusted_proxies(
+    variables: &Variables<impl Fn(&str) -> Option<String>>,
+) -> Result<TrustedProxies> {
+    let Some(value) = variables.optional("TESSARIDB_OAUTH_TRUSTED_PROXIES") else {
+        return Ok(TrustedProxies::default());
+    };
+    TrustedProxies::parse(&value).map_err(|_| Error::Invalid {
+        key: "TESSARIDB_OAUTH_TRUSTED_PROXIES",
+        value,
+        reason: "comma-separated IP addresses or address/prefix networks",
+    })
+}
+
+/// A listener's certificate and key from the variables `cert_key` and `key_key`, both or neither; neither serves
+/// that listener in the clear.
+fn listener_tls(
+    variables: &Variables<impl Fn(&str) -> Option<String>>,
+    cert_key: &'static str,
+    key_key: &'static str,
+) -> Result<Option<TlsFiles>> {
+    let cert = variables.optional(cert_key);
+    let key = variables.optional(key_key);
     match (cert, key) {
-        (Some(cert), Some(key)) => Ok(Some(AdminTls {
+        (Some(cert), Some(key)) => Ok(Some(TlsFiles {
             cert: cert.into(),
             key: key.into(),
         })),
         (None, None) => Ok(None),
-        (Some(_), None) => Err(Error::Unset {
-            key: "TESSARIDB_OAUTH_ADMIN_TLS_KEY",
-        }),
-        (None, Some(_)) => Err(Error::Unset {
-            key: "TESSARIDB_OAUTH_ADMIN_TLS_CERT",
-        }),
+        (Some(_), None) => Err(Error::Unset { key: key_key }),
+        (None, Some(_)) => Err(Error::Unset { key: cert_key }),
     }
 }
 
@@ -270,8 +286,12 @@ impl NodeConfig {
                 SocketAddr::from(([0, 0, 0, 0], 8443)),
                 "a socket address such as 0.0.0.0:8443",
             )?,
-            tls_cert: variables.required("TESSARIDB_OAUTH_TLS_CERT")?.into(),
-            tls_key: variables.required("TESSARIDB_OAUTH_TLS_KEY")?.into(),
+            tls: listener_tls(
+                &variables,
+                "TESSARIDB_OAUTH_TLS_CERT",
+                "TESSARIDB_OAUTH_TLS_KEY",
+            )?,
+            trusted_proxies: trusted_proxies(&variables)?,
         };
         let admin = AdminConfig {
             url: admin_url(
@@ -283,7 +303,11 @@ impl NodeConfig {
                 SocketAddr::from(([0, 0, 0, 0], 9443)),
                 "a socket address such as 0.0.0.0:9443",
             )?,
-            tls: admin_tls(&variables)?,
+            tls: listener_tls(
+                &variables,
+                "TESSARIDB_OAUTH_ADMIN_TLS_CERT",
+                "TESSARIDB_OAUTH_ADMIN_TLS_KEY",
+            )?,
         };
         let store = StoreSettings {
             address: variables.required("TESSARIDB_OAUTH_STORE")?,

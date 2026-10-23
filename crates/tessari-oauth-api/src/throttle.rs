@@ -1,21 +1,23 @@
 //! Request limits on the public routes, counted in the store per client address before any route runs.
 //!
 //! The client is the connection's peer address: an IPv4 address whole, an IPv6 address by its /64, which one
-//! subscriber is commonly given whole and could otherwise spend as many limits as it has addresses. A forwarded
-//! header is not read, because the client writes it unless a trusted proxy overwrites it. A request that arrives with
+//! subscriber is commonly given whole and could otherwise spend as many limits as it has addresses. Behind a proxy
+//! the server was told to trust, the client is the right-most `X-Forwarded-For` entry that is not itself a trusted
+//! proxy; from any other peer the header is not read, because the client writes it. A request that arrives with
 //! no peer address — never on the listener, which always records one — is counted under one shared name rather than
 //! not at all. Counting needs the store, and a store that does not answer refuses the request. Every counted answer,
 //! served or refused, says the limit, what is left of it and the group it belongs to, so a client can slow down
 //! before it is refused.
 
 use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
 
 use axum::extract::{ConnectInfo, Request, State};
 use axum::http::{HeaderName, HeaderValue};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use tessari_oauth_storage::throttle::{Admission, Limit, ThrottleService};
-use tessari_oauth_types::Timestamp;
+use tessari_oauth_types::{Timestamp, TrustedProxies};
 
 use crate::admin::AdminState;
 use crate::state::PublicState;
@@ -46,6 +48,42 @@ const NO_ADDRESS: &str = "no-address";
 #[derive(Clone)]
 pub(crate) struct ClientAddress(pub(crate) String);
 
+/// The address the request came from: the peer, or behind a trusted proxy the address the proxies say they saw.
+fn origin(request: &Request, peer: IpAddr) -> IpAddr {
+    let Some(proxies) = request.extensions().get::<Arc<TrustedProxies>>() else {
+        return peer;
+    };
+    if !proxies.contains(peer) {
+        return peer;
+    }
+    let forwarded = request
+        .headers()
+        .get_all("x-forwarded-for")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
+        .map(str::trim)
+        .collect::<Vec<_>>();
+    let mut client = peer;
+    // Each proxy appends what it saw, so the walk goes right to left and stops at the first hop not on the list.
+    for entry in forwarded.iter().rev() {
+        let Ok(address) = entry.parse::<IpAddr>() else {
+            break;
+        };
+        client = address;
+        if !proxies.contains(address) {
+            break;
+        }
+    }
+    client
+}
+
+/// `router` counting its clients through `proxies`: a request from one of them is counted by the address its
+/// `X-Forwarded-For` names.
+pub fn trusting(router: axum::Router, proxies: Arc<TrustedProxies>) -> axum::Router {
+    router.layer(axum::Extension(proxies))
+}
+
 /// The name a client is counted under.
 fn client(request: &Request) -> String {
     let Some(ConnectInfo(peer)) = request.extensions().get::<ConnectInfo<SocketAddr>>() else {
@@ -55,7 +93,7 @@ fn client(request: &Request) -> String {
         );
         return NO_ADDRESS.to_owned();
     };
-    match peer.ip() {
+    match origin(request, peer.ip()) {
         IpAddr::V4(address) => address.to_string(),
         IpAddr::V6(address) => match address.to_ipv4_mapped() {
             Some(mapped) => mapped.to_string(),
@@ -213,3 +251,7 @@ async fn count(
     );
     Ok(response)
 }
+
+#[cfg(test)]
+#[path = "throttle_tests.rs"]
+mod tests;

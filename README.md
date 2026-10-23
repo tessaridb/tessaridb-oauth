@@ -87,7 +87,8 @@ first, for development only.
 | `ADMIN_URL` | the admin console's base URL, at an origin other than `PUBLIC_URL`'s: https, or http on `127.0.0.1` or `[::1]` only; company `acme`'s console is `<ADMIN_URL>/admin/acme` | required |
 | `ADMIN_ADDRESS` | where the admin console's listener binds | `0.0.0.0:9443` |
 | `ADMIN_TLS_CERT`, `ADMIN_TLS_KEY` | the admin console over TLS: its certificate chain and private key, PEM, both or neither. Without them the console is served in the clear, so keep it on a loopback address or behind a TLS terminator | unset (plain) |
-| `TLS_CERT`, `TLS_KEY` | the listener's certificate chain and private key, PEM | required |
+| `TLS_CERT`, `TLS_KEY` | the public listener over TLS: its certificate chain and private key, PEM, both or neither. Without them it is served in the clear for a TLS terminator in front of it, which answers at the https `PUBLIC_URL` | unset (plain) |
+| `TRUSTED_PROXIES` | the proxies in front of the server, IP addresses or `address/prefix` networks, comma-separated; a request from one of them is counted by the right-most `X-Forwarded-For` address that is not itself a listed proxy. From any other peer the header is ignored | none |
 | `KEK` | the 32-byte key-encryption key file, mode 600 or 400; signing keys are stored sealed under it | required |
 | `PEPPER` | the password pepper file, at least 32 bytes, mode 600 or 400; passwords are hashed under it and the sign-in counters named by keys derived from it | required |
 | `PASSWORD_MEMORY_KIB`, `PASSWORD_ITERATIONS`, `PASSWORD_PARALLELISM` | the Argon2id cost of new password hashes; a value below the floor stops the start | `65536`, `3`, `1` |
@@ -107,8 +108,13 @@ first, for development only.
 
 ```sh
 cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary
-curl --cacert cert.pem https://localhost:8443/acme/.well-known/oauth-authorization-server
+curl http://localhost:8443/acme/.well-known/oauth-authorization-server
 ```
+
+Behind a reverse proxy, the proxy holds the certificate for `PUBLIC_URL`, passes requests on in the clear, and
+appends the client's address to `X-Forwarded-For`; list its address in `TRUSTED_PROXIES`, or every client is counted
+as the proxy and one client's failed sign-ins hold everyone's. Keep the plain listener reachable from the proxy
+alone, since passwords and tokens cross it.
 
 The server records its configured companies, provisions them and serves them at once; what it does after that is
 in [How the server runs](docs/server.md). The first operator of a new installation comes from the emergency path:

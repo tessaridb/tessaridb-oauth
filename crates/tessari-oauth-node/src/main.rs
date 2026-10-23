@@ -9,7 +9,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tessari_oauth_api::{AdminState, PublicState, admin_router, public_router, serve};
+use tessari_oauth_api::{AdminState, PublicState, admin_router, public_router, serve, trusting};
 use tessari_oauth_constants::{
     DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS,
     KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS,
@@ -37,7 +37,7 @@ pub(crate) type Failure = Box<dyn Error + Send + Sync>;
 
 /// The TLS configuration of each listener: the public one always, the admin console's when it was given one.
 struct Listeners {
-    public: Arc<rustls::ServerConfig>,
+    public: Option<Arc<rustls::ServerConfig>>,
     admin: Option<Arc<rustls::ServerConfig>>,
 }
 
@@ -82,10 +82,13 @@ fn start() -> Result<(), Failure> {
     let config = NodeConfig::from_env()?;
     tracing::debug!(?config, "loaded configuration");
     let tls = Listeners {
-        public: listener_config(&ListenerTls::new(
-            std::fs::read(&config.public.tls_cert)?,
-            std::fs::read(&config.public.tls_key)?,
-        ))?,
+        public: match &config.public.tls {
+            Some(public) => Some(listener_config(&ListenerTls::new(
+                std::fs::read(&public.cert)?,
+                std::fs::read(&public.key)?,
+            ))?),
+            None => None,
+        },
         admin: match &config.admin.tls {
             Some(admin) => Some(listener_config(&ListenerTls::new(
                 std::fs::read(&admin.cert)?,
@@ -292,6 +295,12 @@ async fn run(
     let mut interrupt = signal(SignalKind::interrupt())?;
     let mut terminate = signal(SignalKind::terminate())?;
     let listener = tokio::net::TcpListener::bind(config.public.address).await?;
+    if tls.public.is_none() {
+        tracing::warn!(
+            address = %config.public.address,
+            "the server serves in the clear; reach it only through a TLS terminator at its https PUBLIC_URL"
+        );
+    }
     tracing::info!(address = %config.public.address, tenants = config.tenants.len(), "server started");
     let admin_listener = tokio::net::TcpListener::bind(config.admin.address).await?;
     if tls.admin.is_none() {
@@ -301,11 +310,13 @@ async fn run(
         );
     }
     tracing::info!(address = %config.admin.address, "admin console started");
+    // The proxies whose forwarded header names the client, for the request limits on both listeners.
+    let proxies = Arc::new(config.public.trusted_proxies.clone());
     let mut until_stopped = stopped.clone();
     let serving = tokio::spawn(serve(
         listener,
-        public_router(state),
-        Some(tls.public),
+        trusting(public_router(state), Arc::clone(&proxies)),
+        tls.public,
         // A sender that is gone means stop as well.
         async move { until_stopped.changed().await.unwrap_or_default() },
         "public",
@@ -313,7 +324,7 @@ async fn run(
     let mut admin_until_stopped = stopped;
     let serving_admin = tokio::spawn(serve(
         admin_listener,
-        admin_router(console),
+        trusting(admin_router(console), proxies),
         tls.admin,
         async move { admin_until_stopped.changed().await.unwrap_or_default() },
         "admin",

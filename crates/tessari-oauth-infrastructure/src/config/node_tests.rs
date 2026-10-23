@@ -4,11 +4,9 @@ use super::NodeConfig;
 use crate::Error;
 use crate::custody::PasswordCost;
 
-const REQUIRED: [&str; 11] = [
+const REQUIRED: [&str; 9] = [
     "TESSARIDB_OAUTH_PUBLIC_URL",
     "TESSARIDB_OAUTH_ADMIN_URL",
-    "TESSARIDB_OAUTH_TLS_CERT",
-    "TESSARIDB_OAUTH_TLS_KEY",
     "TESSARIDB_OAUTH_KEK",
     "TESSARIDB_OAUTH_STORE",
     "TESSARIDB_OAUTH_STORE_USER",
@@ -28,8 +26,6 @@ fn environment() -> HashMap<&'static str, String> {
             "TESSARIDB_OAUTH_ADMIN_URL",
             "https://admin.example.com".to_owned(),
         ),
-        ("TESSARIDB_OAUTH_TLS_CERT", "/run/tls/cert.pem".to_owned()),
-        ("TESSARIDB_OAUTH_TLS_KEY", "/run/tls/key.pem".to_owned()),
         ("TESSARIDB_OAUTH_KEK", "/run/secrets/kek".to_owned()),
         ("TESSARIDB_OAUTH_STORE", "127.0.0.1:7000".to_owned()),
         ("TESSARIDB_OAUTH_STORE_USER", "oauth".to_owned()),
@@ -49,7 +45,11 @@ fn a_complete_environment_is_read_with_the_documented_defaults() {
     let config = read(&environment()).expect("a valid environment");
     assert_eq!(config.public.url, "https://id.example.com");
     assert_eq!(config.public.address.to_string(), "0.0.0.0:8443");
-    assert_eq!(config.public.tls_key.to_str(), Some("/run/tls/key.pem"));
+    assert_eq!(config.public.tls, None, "in the clear by default");
+    assert!(
+        config.public.trusted_proxies.is_empty(),
+        "no proxy trusted by default"
+    );
     assert_eq!(config.store.address, "127.0.0.1:7000");
     assert_eq!(config.store.connections.get(), 16);
     assert!(config.store.authority.is_none());
@@ -279,4 +279,64 @@ fn a_console_in_the_clear_is_reached_only_on_a_loopback_address() {
             "{refused} is refused"
         );
     }
+}
+
+#[test]
+fn the_public_listener_serves_in_the_clear_until_given_a_certificate() {
+    let mut secured = environment();
+    secured.insert("TESSARIDB_OAUTH_TLS_CERT", "/run/tls/cert.pem".to_owned());
+    secured.insert("TESSARIDB_OAUTH_TLS_KEY", "/run/tls/key.pem".to_owned());
+    let tls = read(&secured)
+        .expect("a valid environment")
+        .public
+        .tls
+        .expect("a certificate");
+    assert_eq!(
+        (tls.cert.to_str(), tls.key.to_str()),
+        (Some("/run/tls/cert.pem"), Some("/run/tls/key.pem"))
+    );
+    for (given, missing) in [
+        ("TESSARIDB_OAUTH_TLS_CERT", "TESSARIDB_OAUTH_TLS_KEY"),
+        ("TESSARIDB_OAUTH_TLS_KEY", "TESSARIDB_OAUTH_TLS_CERT"),
+    ] {
+        let mut half = environment();
+        half.insert(given, "/run/tls/file.pem".to_owned());
+        assert!(
+            matches!(read(&half), Err(Error::Unset { key }) if key == missing),
+            "{given} alone names {missing}"
+        );
+    }
+}
+
+#[test]
+fn trusted_proxies_are_read_and_a_list_that_does_not_parse_is_refused_by_name() {
+    let mut proxied = environment();
+    proxied.insert(
+        "TESSARIDB_OAUTH_TRUSTED_PROXIES",
+        "10.0.0.0/8, ::1".to_owned(),
+    );
+    let config = read(&proxied).expect("a valid environment");
+    assert!(
+        config
+            .public
+            .trusted_proxies
+            .contains("10.1.2.3".parse().expect("an address"))
+    );
+    assert!(
+        !config
+            .public
+            .trusted_proxies
+            .contains("192.0.2.1".parse().expect("an address"))
+    );
+    proxied.insert("TESSARIDB_OAUTH_TRUSTED_PROXIES", "nginx".to_owned());
+    assert!(
+        matches!(
+            read(&proxied),
+            Err(Error::Invalid {
+                key: "TESSARIDB_OAUTH_TRUSTED_PROXIES",
+                ..
+            })
+        ),
+        "a name is not an address"
+    );
 }

@@ -16,3 +16,4 @@ pub use error::{Error, Result};
 pub use routes::public_router;
 pub use serve::serve;
 pub use state::PublicState;
+pub use throttle::trusting;

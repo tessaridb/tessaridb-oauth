@@ -24,6 +24,7 @@ mod signin_binding;
 mod tenant_id;
 mod thumbprint;
 mod timestamp;
+mod trusted_proxies;
 mod user_id;
 
 pub use algorithm::Algorithm;
@@ -47,4 +48,5 @@ pub use signin_binding::SigninBinding;
 pub use tenant_id::TenantId;
 pub use thumbprint::KeyThumbprint;
 pub use timestamp::{Clock, Timestamp};
+pub use trusted_proxies::TrustedProxies;
 pub use user_id::UserId;

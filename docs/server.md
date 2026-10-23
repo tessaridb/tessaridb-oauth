@@ -10,7 +10,9 @@ active, makes a signing key for any company without one and then checks every fi
 Every node re-reads which companies are active every five seconds and serves exactly those: a company that is not
 active answers `404`, like a name that was never a company.
 Each read, authorization request, token request and sign-in step is
-counted per client address in TessariDB, under separate limits; past the limit the answer is `429` with
+counted per client address in TessariDB (the connection's peer, or behind a proxy listed in `TRUSTED_PROXIES` the
+right-most `X-Forwarded-For` address that is not a listed proxy), under separate limits; past the limit the answer
+is `429` with
 `Retry-After`, every counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`, and when the store
 cannot count the request is refused with `503` rather than served. A wrong password is also counted against the
 address being signed in to, the client address and the pair of the two (a wrong one-time or recovery code against
