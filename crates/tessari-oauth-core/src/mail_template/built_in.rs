@@ -64,5 +64,19 @@ pub(super) const fn wording(kind: MailKind) -> (&'static str, &'static str) {
              The link works once. If you did not expect this, ignore this mail; nobody can sign in until a password \
              is set.\n",
         ),
+        MailKind::Registration => (
+            "Set the password of your new account",
+            "Somebody asked to open an account at {issuer} for this address.\n\n\
+             To choose its password, open this link within 72 hours:\n{link}\n\n\
+             The link works once. If you did not ask for this, ignore this mail; nobody can sign in until a password \
+             is set.\n",
+        ),
+        MailKind::RegistrationExisting => (
+            "Somebody asked to open an account with your address",
+            "Somebody asked to open an account at {issuer} for this address, which already signs in there, so \
+             nothing was opened.\n\n\
+             If it was you and you have lost your password, ask for a reset on the sign-in page. If it was not you, \
+             you need do nothing.\n",
+        ),
     }
 }

@@ -69,6 +69,8 @@ test("every kind has a title, and an unknown one is named as it is", () => {
   assert.equal(mailTitle("reset"), "Password reset");
   assert.equal(mailTitle("signin_changed"), "Sign-in change notice");
   assert.equal(mailTitle("enrolment"), "Enrolment link");
+  assert.equal(mailTitle("registration"), "Registration: enrolment link");
+  assert.equal(mailTitle("registration_existing"), "Registration: notice to the owner");
   assert.equal(mailTitle("welcome"), "welcome");
 });
 

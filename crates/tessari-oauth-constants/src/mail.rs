@@ -42,3 +42,13 @@ pub const EMAIL_CHANGE_REQUEST_LIMIT: u64 = 5;
 
 /// The window `EMAIL_CHANGE_REQUEST_LIMIT` counts in, in seconds.
 pub const EMAIL_CHANGE_REQUEST_WINDOW_SECS: u64 = 3_600;
+
+/// How many registrations one address may be asked for per window: each mails that address, so the budget bounds
+/// what anybody can make arrive in somebody else's mailbox.
+pub const REGISTRATION_ADDRESS_LIMIT: u64 = 3;
+
+/// How many registrations one source may ask for per window, whatever the addresses.
+pub const REGISTRATION_SOURCE_LIMIT: u64 = 10;
+
+/// The window both registration budgets count in, in seconds.
+pub const REGISTRATION_WINDOW_SECS: u64 = 3_600;

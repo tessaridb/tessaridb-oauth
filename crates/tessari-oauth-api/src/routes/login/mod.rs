@@ -20,6 +20,7 @@ mod factors;
 mod identify;
 mod passkey;
 mod password;
+mod register;
 mod reset;
 mod verify;
 
@@ -31,6 +32,7 @@ pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
 pub(super) use passkey::{passkey, passkey_options, relying_party};
 pub(super) use password::password;
+pub(super) use register::{register, registration};
 pub(super) use reset::{complete_reset, request_reset};
 pub(super) use verify::{complete_verification, send_verification};
 

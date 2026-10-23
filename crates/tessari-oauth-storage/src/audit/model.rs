@@ -51,11 +51,13 @@ pub enum AuditKind {
     /// The operator `actor` made the console change `action` under `role`, to `user` when it concerns one; `reason`
     /// is the operator's own.
     AdminAction,
+    /// Somebody asked to open an account with an address; `reason` says what the address's mailbox was sent.
+    AccountRegistered,
 }
 
 impl AuditKind {
     /// Every kind.
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
         Self::IssuedCode,
         Self::IssuedRefresh,
         Self::IssuedClient,
@@ -77,6 +79,7 @@ impl AuditKind {
         Self::BreakGlass,
         Self::ConsoleSignedIn,
         Self::AdminAction,
+        Self::AccountRegistered,
     ];
 
     /// The name the message carries.
@@ -104,6 +107,7 @@ impl AuditKind {
             Self::BreakGlass => "break_glass",
             Self::ConsoleSignedIn => "console_signed_in",
             Self::AdminAction => "admin_action",
+            Self::AccountRegistered => "account_registered",
         }
     }
 

@@ -174,3 +174,26 @@ fn the_enrolment_mail_carries_its_link_and_names_nothing_else_but_the_issuer() {
     );
     assert_eq!(check(enrolment, &enrolment.built_in()), Ok(()));
 }
+
+#[test]
+fn a_registration_mail_carries_its_link_and_the_notice_to_an_owner_carries_none() {
+    let registration = MailKind::parse("registration").expect("a kind");
+    assert_eq!(registration.required(), &[Placeholder::Link]);
+    assert_eq!(
+        check(registration, &template("Welcome", "Ask {issuer}.")),
+        Err(TemplateRefused::Missing(Placeholder::Link))
+    );
+    assert_eq!(check(registration, &registration.built_in()), Ok(()));
+    let existing = MailKind::parse("registration_existing").expect("a kind");
+    assert_eq!(existing.required(), &[] as &[Placeholder]);
+    assert_eq!(
+        check(existing, &template("Hi", "{link}")),
+        Err(TemplateRefused::NotAllowed(Placeholder::Link)),
+        "the owner's notice carries no link a requester could have asked to be sent"
+    );
+    assert_eq!(check(existing, &existing.built_in()), Ok(()));
+    assert!(
+        existing.built_in().text.contains("{issuer}"),
+        "the notice names the sign-in service it is about"
+    );
+}

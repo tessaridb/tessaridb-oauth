@@ -40,6 +40,10 @@ pub enum MailKind {
     SigninChanged,
     /// The link that lets an account an operator opened set its first password.
     Enrolment,
+    /// The link that lets an account opened at its own request set its first password.
+    Registration,
+    /// The notice to an account's owner that somebody asked to open an account with its address.
+    RegistrationExisting,
 }
 
 /// A value a template may name.
@@ -94,7 +98,7 @@ pub enum TemplateRefused {
 
 impl MailKind {
     /// Every kind.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::Reset,
         Self::Verify,
         Self::EmailConfirm,
@@ -105,6 +109,8 @@ impl MailKind {
         Self::EmailRefused,
         Self::SigninChanged,
         Self::Enrolment,
+        Self::Registration,
+        Self::RegistrationExisting,
     ];
 
     /// The kind's name, as stored and as the console names it.
@@ -121,6 +127,8 @@ impl MailKind {
             Self::EmailRefused => "email_refused",
             Self::SigninChanged => "signin_changed",
             Self::Enrolment => "enrolment",
+            Self::Registration => "registration",
+            Self::RegistrationExisting => "registration_existing",
         }
     }
 
@@ -135,10 +143,17 @@ impl MailKind {
     pub const fn placeholders(self) -> &'static [Placeholder] {
         use Placeholder::{Change, Issuer, Link, NewAddress};
         match self {
-            Self::Reset | Self::Verify | Self::EmailConfirm | Self::Enrolment => &[Issuer, Link],
+            Self::Reset
+            | Self::Verify
+            | Self::EmailConfirm
+            | Self::Enrolment
+            | Self::Registration => &[Issuer, Link],
             Self::EmailCancel => &[Issuer, Link, NewAddress],
             Self::EmailAppliedOld => &[Issuer, NewAddress],
-            Self::EmailTaken | Self::EmailAppliedNew | Self::EmailRefused => &[Issuer],
+            Self::EmailTaken
+            | Self::EmailAppliedNew
+            | Self::EmailRefused
+            | Self::RegistrationExisting => &[Issuer],
             Self::SigninChanged => &[Issuer, Change],
         }
     }
@@ -148,10 +163,17 @@ impl MailKind {
     pub const fn required(self) -> &'static [Placeholder] {
         use Placeholder::{Change, Link, NewAddress};
         match self {
-            Self::Reset | Self::Verify | Self::EmailConfirm | Self::Enrolment => &[Link],
+            Self::Reset
+            | Self::Verify
+            | Self::EmailConfirm
+            | Self::Enrolment
+            | Self::Registration => &[Link],
             Self::EmailCancel => &[Link, NewAddress],
             Self::EmailAppliedOld => &[NewAddress],
-            Self::EmailTaken | Self::EmailAppliedNew | Self::EmailRefused => &[],
+            Self::EmailTaken
+            | Self::EmailAppliedNew
+            | Self::EmailRefused
+            | Self::RegistrationExisting => &[],
             Self::SigninChanged => &[Change],
         }
     }

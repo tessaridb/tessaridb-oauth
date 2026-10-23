@@ -1831,7 +1831,9 @@
     ["email_applied_new", "Address changed: to the new address"],
     ["email_refused", "Address change refused"],
     ["signin_changed", "Sign-in change notice"],
-    ["enrolment", "Enrolment link"]
+    ["enrolment", "Enrolment link"],
+    ["registration", "Registration: enrolment link"],
+    ["registration_existing", "Registration: notice to the owner"]
   ];
   function one(row2) {
     const kind = field(row2, "kind");

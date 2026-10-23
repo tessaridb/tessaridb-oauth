@@ -28,6 +28,8 @@ const TITLES: readonly [string, string][] = [
   ["email_refused", "Address change refused"],
   ["signin_changed", "Sign-in change notice"],
   ["enrolment", "Enrolment link"],
+  ["registration", "Registration: enrolment link"],
+  ["registration_existing", "Registration: notice to the owner"],
 ];
 
 function one(row: unknown): Mail | null {

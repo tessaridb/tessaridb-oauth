@@ -76,6 +76,10 @@ pub enum Error {
     /// The address asked for is not one an account can sign in with.
     #[error("the address was not accepted")]
     EmailRejected,
+    /// The company opens accounts only for addresses at its own domains, and this one is at another. Said about the
+    /// domain, so it is the same for every address there.
+    #[error("the address's domain is not one the company opens accounts for")]
+    AddressNotAccepted,
     /// The return to the admin console does not open a session: one answer for every reason, so it says nothing about
     /// which check failed.
     #[error("the console sign-in was refused")]
@@ -122,7 +126,8 @@ impl Error {
             Self::CodeRejected
             | Self::PasswordRejected(_)
             | Self::ProfileRejected
-            | Self::EmailRejected => ErrorCategory::Validation,
+            | Self::EmailRejected
+            | Self::AddressNotAccepted => ErrorCategory::Validation,
             Self::ConsoleRefused | Self::CrossOrigin | Self::RoleRequired => {
                 ErrorCategory::Forbidden
             }
@@ -237,6 +242,11 @@ impl IntoResponse for Error {
                 StatusCode::BAD_REQUEST,
                 "email_rejected",
                 "the address is not one an account can sign in with",
+            ),
+            (Self::AddressNotAccepted, _) => (
+                StatusCode::BAD_REQUEST,
+                "address_not_accepted",
+                "this company opens accounts only for addresses at its own domains",
             ),
             (Self::ConsoleRefused, _) => (
                 StatusCode::FORBIDDEN,

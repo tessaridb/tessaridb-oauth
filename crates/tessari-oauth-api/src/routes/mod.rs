@@ -127,6 +127,14 @@ pub fn public_router(state: PublicState) -> Router {
             post(login::enroll),
         )
         .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/registration"),
+            get(login::registration),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/register"),
+            post(login::register),
+        )
+        .route(
             &format!("/{{tenant}}{LOGIN_API_PATH}/reset"),
             post(login::request_reset),
         )
