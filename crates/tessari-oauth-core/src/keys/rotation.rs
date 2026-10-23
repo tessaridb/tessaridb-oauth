@@ -54,7 +54,8 @@ pub fn plan(records: &[KeyRecord], now: Timestamp) -> KeyPlan {
         .rev()
         .find(|key| waited(key))
         .map(|key| (*key, false))
-        .or_else(|| live.last().map(|key| (*key, true)));
+        // No key has waited yet: the one published longest is the likeliest to be in a verifier's cached set.
+        .or_else(|| live.first().map(|key| (*key, true)));
     let Some((signing, signing_unwaited)) = signer else {
         return KeyPlan {
             signing: None,

@@ -53,6 +53,21 @@ fn a_new_key_is_published_at_once_but_signs_only_after_the_jwks_max_age() {
 }
 
 #[test]
+fn a_successor_made_before_any_key_has_waited_does_not_sign_first() {
+    let keys = [key('a', T0), key('b', T0 + 10)];
+    let early = at(&keys, T0 + 20);
+    assert_eq!(
+        early.signing,
+        Some(kid('a')),
+        "the key published longest keeps signing"
+    );
+    assert!(early.signing_unwaited);
+    let ready = at(&keys, T0 + 10 + JWKS_MAX_AGE_SECS);
+    assert_eq!(ready.signing, Some(kid('b')));
+    assert!(!ready.signing_unwaited);
+}
+
+#[test]
 fn a_successor_is_asked_for_early_enough_to_have_waited_when_it_is_needed() {
     let due = T0 + SIGNING_KEY_LIFETIME_SECS - JWKS_MAX_AGE_SECS;
     assert!(!at(&[key('a', T0)], due - 1).generate);
