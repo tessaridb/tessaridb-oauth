@@ -26,9 +26,9 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 > the sign-in and consent pages, ID tokens, and the account API a signed-in user reads and manages their own sessions
 > and grants with, it rotates the tenants' signing keys and tells clients when a session ends. Operators open,
 > enrol, disable and enable accounts, grant operator roles, set the two-factor policy and the company's brand,
-> read the audit trail and make companies through the admin console; the account portal page comes next.
-> No release has been cut. Apart from the [Status](#status) section and the endpoints described below, this
-> page describes what the project is for, not a working system.
+> rotate and withdraw signing keys, read the audit trail and make companies through the admin console; the account
+> portal page comes next. No release has been cut. Apart from the [Status](#status) section and the endpoints
+> described below, this page describes what the project is for, not a working system.
 
 ## What it is for
 
@@ -65,7 +65,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page, each showing the company's brand; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, groups, operators, branding, audit trail, companies) and its pages |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page, each showing the company's brand; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, groups, operators, branding, signing keys, audit trail, companies) and its pages |
 | Built, not served yet | enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
 | Planned | the account portal page, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
@@ -273,9 +273,9 @@ requests are counted per client address under the `LOGIN_LIMIT` and `LOGIN_WINDO
 The console itself is the page at `<ADMIN_URL>/admin/<company>/`, served by the binary with its script, style and mark
 under `.../assets/`, for an active company only, under the same policy as the sign-in pages and never cached. It holds
 no token, only the session cookie, and asks the API for everything it shows. It offers the sections the operator's roles
-can use (Users, Groups, Clients, Operators, Sign-in policy, Branding, Audit trail, and Companies in the `system`
-console); the API refuses the rest whatever is offered. Every change asks for a reason and is sent once under its own
-`Idempotency-Key`.
+can use (Users, Groups, Clients, Operators, Sign-in policy, Branding, Signing keys, Audit trail, and Companies in the
+`system` console); the API refuses the rest whatever is offered. Every change asks for a reason and is sent once under
+its own `Idempotency-Key`.
 Disabling an account names it and says what ends; removing a client says how many users hold a grant to it and asks for
 its id typed out; deleting a group says how many members it has and asks for its id typed out; a two-factor policy
 change or a company's suspension says what it does to every account and asks for the company's id typed out. Lists page
@@ -368,6 +368,16 @@ account pages read `<issuer>/assets/brand.json` and `brand.css`: the name is set
 house accent in the light theme, a link appears only when set, and the logo is `<issuer>/assets/logo.png`. With
 nothing set they show TessariDB's own. Every brand asset comes from the issuer's origin, so the pages' policy is
 unchanged.
+
+Signing keys (role `keys`): `GET <ADMIN_URL>/admin/<company>/api/keys` lists the company's keys oldest first, each with
+its `kid`, `algorithm`, `created_at` and `state`: `signing`, `waiting` (published, signing from `signs_from`),
+`previous` (still published for the tokens it signed), `retiring` (no longer published) or `withdrawn`; no private
+part of a key is ever answered. `POST .../api/keys/rotate` with a `reason` makes a successor now, published at once
+and signing five minutes later (`409 successor_waiting` while one already waits). `POST .../api/keys/<kid>/withdraw`
+with a `reason` takes a key out of the key set at once, so every token it signed stops verifying, though a service
+that cached the key set may accept them for up to five minutes; when no other key could sign, a new one is made
+first and named as the `replacement` (`404 key_not_found` for a key the company does not have, `409
+already_withdrawn`). A withdrawal revokes no refresh token. The console asks for the key's id typed out first.
 
 `POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` and `.../enable` (role `users`) move an account between
 `active` and `disabled`, each only from the other status (`changed_meanwhile` otherwise, `user_not_found` for an account
@@ -497,13 +507,13 @@ is logged at `ERROR` as `break_glass` and recorded on the `system` company's aud
 
 With `--company`, the same path gives a company made since its first operator: the company must exist and be served
 (an unknown, provisioning or suspended one is refused and nothing is written), the account is found or registered in
-that company, it is given `users`, `clients`, `policy` and `audit` there (never `companies`), the code is for
+that company, it is given `users`, `clients`, `policy`, `keys` and `audit` there (never `companies`), the code is for
 `POST <PUBLIC_URL>/<company>/login/api/enroll`, and the run is recorded on that company's audit trail.
 
-Operator roles are held per company and per task: `users`, `clients`, `policy`, `audit`, and `companies`, which only
-users of the `system` company may hold. A grant names who gave it and why, may carry an expiry after which it no
-longer counts, and is refused when it names its own holder as the giver. Every grant and revoke is on the company's
-audit trail.
+Operator roles are held per company and per task: `users`, `clients`, `policy`, `keys`, `audit`, and `companies`,
+which only users of the `system` company may hold. A grant names who gave it and why, may carry an expiry after which
+it no longer counts, and is refused when it names its own holder as the giver. Every grant and revoke is on the
+company's audit trail.
 
 ## Building and checking
 
