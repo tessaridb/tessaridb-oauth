@@ -112,3 +112,44 @@ async fn of_simultaneous_policy_changes_from_one_policy_exactly_one_is_made() {
         expected = target;
     }
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn registration_is_closed_until_set_and_each_change_names_the_revision_it_replaces() {
+    use tessari_oauth_core::registration::RegistrationPolicy;
+
+    let acme = tenant("acme");
+    let storage = fresh(&acme, 2).await;
+    let policies = &storage.policies;
+    assert_eq!(
+        policies.registration(&acme).await,
+        Ok((RegistrationPolicy::default(), 0)),
+        "closed, at revision 0, before anything is kept"
+    );
+    let open = RegistrationPolicy::new(true, vec!["example.com".to_owned()]).expect("valid");
+    assert_eq!(
+        policies.set_registration(&acme, 1, &open).await,
+        Ok(None),
+        "nothing is kept at revision 1"
+    );
+    assert_eq!(
+        policies.set_registration(&acme, 0, &open).await,
+        Ok(Some(1))
+    );
+    assert_eq!(policies.registration(&acme).await, Ok((open.clone(), 1)));
+    assert_eq!(
+        policies
+            .set_registration(&acme, 0, &RegistrationPolicy::default())
+            .await,
+        Ok(None),
+        "a second operator still reading revision 0"
+    );
+    let any = RegistrationPolicy::new(true, Vec::new()).expect("valid");
+    assert_eq!(policies.set_registration(&acme, 1, &any).await, Ok(Some(2)));
+    assert_eq!(policies.registration(&acme).await, Ok((any, 2)));
+    assert_eq!(
+        policies.two_factor(&acme).await,
+        Ok(TwoFactorPolicy::Optional),
+        "the two-factor policy is untouched"
+    );
+}

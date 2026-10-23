@@ -26,6 +26,7 @@ mod params;
 pub mod password;
 pub mod refresh;
 mod refusal;
+pub mod registration;
 pub mod signin;
 pub mod subject;
 pub mod token;

@@ -106,6 +106,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      EXPIRE AFTER 5m; \
      DEFINE TABLE IF NOT EXISTS two_factor (\
      policy string REQUIRED ASSERT $value IN ['off', 'optional', 'required']); \
+     DEFINE TABLE IF NOT EXISTS registration (\
+     open bool REQUIRED, domains array REQUIRED, revision int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS signins (\
      interaction string, identified bool REQUIRED, user_id string, second_factor bool REQUIRED, \
      account string, methods array REQUIRED, revision int REQUIRED, created_at int REQUIRED) \

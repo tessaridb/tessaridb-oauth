@@ -1,10 +1,10 @@
-//! Policies on TessariDB: `two_factor:policy`, one record per company database.
+//! Policies on TessariDB: `two_factor:policy` and `registration:policy`, one record each per company database.
 
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
-use super::PolicyEntity;
 use super::repository::PolicyRepository;
+use super::{PolicyEntity, RegistrationEntity};
 use crate::{Result, answers};
 
 pub(crate) struct TessaridbPolicyRepository {
@@ -63,4 +63,61 @@ impl PolicyRepository for TessaridbPolicyRepository {
             .await?;
         Ok(())
     }
+
+    async fn find_registration(&self, place: &Place) -> Result<Option<RegistrationEntity>> {
+        let answers = self
+            .database
+            .run_at(place, "SELECT * FROM registration:'policy';", Vec::new())
+            .await?;
+        answers::single(answers, "registration policy")
+    }
+
+    async fn create_registration(&self, place: &Place, policy: &RegistrationEntity) -> Result<()> {
+        self.database
+            .run_at(
+                place,
+                "CREATE registration:'policy' = { open: $open, domains: $domains, revision: $revision };",
+                registration_values(policy),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn replace_registration(
+        &self,
+        place: &Place,
+        replaces: i64,
+        policy: &RegistrationEntity,
+    ) -> Result<()> {
+        // The whole record, and only from the revision the caller read: a condition on an edit is a compare-and-set.
+        let mut values = registration_values(policy);
+        values.push(("replaces".to_owned(), Value::from(replaces)));
+        self.database
+            .run_at(
+                place,
+                "UPDATE registration:'policy' = { open: $open, domains: $domains, revision: $revision } \
+                 WHERE revision = $replaces;",
+                values,
+            )
+            .await?;
+        Ok(())
+    }
+}
+
+/// The values every write of a registration policy binds.
+fn registration_values(policy: &RegistrationEntity) -> Vec<(String, Value)> {
+    vec![
+        ("open".to_owned(), Value::from(policy.open)),
+        (
+            "domains".to_owned(),
+            Value::Array(
+                policy
+                    .domains
+                    .iter()
+                    .map(|domain| Value::from(domain.as_str()))
+                    .collect(),
+            ),
+        ),
+        ("revision".to_owned(), Value::from(policy.revision)),
+    ]
 }
