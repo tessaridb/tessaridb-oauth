@@ -8,13 +8,14 @@
 
 use std::collections::BTreeSet;
 
-use tessari_oauth_constants::{ADMIN_CONSOLE_CLIENT, OPENID_SCOPE};
+use tessari_oauth_constants::{ADMIN_CONSOLE_CLIENT, COMPANY_PAGE_MAX, OPENID_SCOPE};
 use tessari_oauth_core::clients::AuthMethod;
 use tessari_oauth_types::{
     ClientId, ErrorCategory, RedirectUri, Resource, ScopeSet, TenantId, Timestamp,
 };
 
 use crate::clients::{ClientService, NewClient};
+use crate::companies::CompanyStatus;
 use crate::tenants::TenantService;
 use crate::{Error, Result, Storage};
 
@@ -72,9 +73,44 @@ impl Storage {
         )
         .await
     }
+
+    /// Provision again every company the region's directory serves, `active` or `suspended`, so the tables and fields
+    /// a release added reach the companies made before it; one still `provisioning` is left to the request making it.
+    /// Answers how many were provisioned.
+    ///
+    /// # Errors
+    ///
+    /// Store failures, and [`Error::Invalid`] when `console` does not make a callback URL.
+    pub async fn reprovision_companies(
+        &self,
+        public: &str,
+        console: &str,
+        now: Timestamp,
+    ) -> Result<u64> {
+        let mut provisioned: u64 = 0;
+        let mut after: Option<TenantId> = None;
+        loop {
+            let page = self
+                .companies
+                .page(after.as_ref(), COMPANY_PAGE_MAX)
+                .await?;
+            let Some(last) = page.last() else {
+                return Ok(provisioned);
+            };
+            after = Some(last.id.clone());
+            for company in page {
+                if company.status == CompanyStatus::Provisioning {
+                    continue;
+                }
+                self.provision_company(&company.id, public, console, now)
+                    .await?;
+                provisioned = provisioned.saturating_add(1);
+            }
+        }
+    }
 }
 
-/// [`Storage::provision_company`] over the two services it needs, for a caller that holds them rather than the
+/// [`Storage::provision_company`]) over the two services it needs, for a caller that holds them rather than the
 /// whole storage.
 ///
 /// # Errors

@@ -200,6 +200,11 @@ async fn run(
             .transition(tenant, CompanyStatus::Provisioning, CompanyStatus::Active)
             .await?;
     }
+    // A company made through the console is provisioned again too, so what a newer release declares reaches it.
+    let provisioned = storage
+        .reprovision_companies(&config.public.url, &config.admin.url, clock())
+        .await?;
+    tracing::info!(companies = provisioned, "companies provisioned");
     served.replace(storage.companies.active().await?);
     storage.throttle.prepare().await?;
     storage.mail_templates.seed_defaults(clock()).await?;

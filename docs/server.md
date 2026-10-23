@@ -6,7 +6,10 @@ At start the server records each configured company in the region's directory, p
 its admin console as the client `admin-console` of the company's issuer (redirected only to the console's own
 callback, asking for nothing past `openid`, addressed to `<PUBLIC_URL>/<company>/admin`, and with no grant the token
 endpoint will redeem) and makes it
-active, makes a signing key for any company without one and then checks every five minutes for keys due to rotate.
+active. It then provisions again every company the directory serves, active or suspended, those made in the console
+included, so a table or field a newer release declares reaches each of them; a company still being provisioned is
+left to the request making it, and start-up takes longer the more companies there are. It makes a signing key for
+any company without one and then checks every five minutes for keys due to rotate.
 Every node re-reads which companies are active every five seconds and serves exactly those: a company that is not
 active answers `404`, like a name that was never a company.
 Each read, authorization request, token request and sign-in step is

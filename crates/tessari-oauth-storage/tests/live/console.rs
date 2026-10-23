@@ -138,3 +138,57 @@ async fn a_console_served_in_the_clear_on_loopback_is_registered() {
         .collect();
     assert_eq!(redirects, ["http://127.0.0.1:9443/admin/acme/callback"]);
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn start_up_provisions_again_every_company_the_directory_serves() {
+    use tessari_oauth_storage::companies::CompanyStatus;
+
+    let storage = fresh_on(
+        tessari_oauth_test_support::plain_node().expect("the plain node is named"),
+        2,
+    );
+    storage.companies.prepare().await.expect("prepared");
+    let at = Timestamp::from_unix_secs(1_800_000_000);
+    let console_id = ClientId::parse(ADMIN_CONSOLE_CLIENT).expect("a client id");
+    // Made by the console under the tables an older release declared: listed, active, its database never provisioned
+    // by this release.
+    let (served, pending) = (
+        TenantId::parse("acme").expect("a tenant id"),
+        TenantId::parse("beta").expect("a tenant id"),
+    );
+    for company in [&served, &pending] {
+        storage
+            .companies
+            .create(company, company.as_str(), "user-1", at)
+            .await
+            .expect("created");
+    }
+    assert!(
+        storage
+            .companies
+            .transition(&served, CompanyStatus::Provisioning, CompanyStatus::Active)
+            .await
+            .expect("an answer")
+    );
+
+    let provisioned = storage
+        .reprovision_companies("https://id.example.com", "https://admin.example.com", at)
+        .await
+        .expect("provisioned");
+
+    assert_eq!(provisioned, 1, "only the company the directory serves");
+    assert!(
+        storage
+            .clients
+            .find(&served, &console_id)
+            .await
+            .expect("its tables exist")
+            .is_some(),
+        "the served company has its tables and its console"
+    );
+    assert!(
+        storage.clients.find(&pending, &console_id).await.is_err(),
+        "a company still being provisioned is left to the request making it"
+    );
+}
