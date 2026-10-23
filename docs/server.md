@@ -55,7 +55,9 @@ address when its sign-in changes (password changed or reset, a passkey or authen
 recovery codes, a recovery code used, every session signed out). A notice carries no link. A request only writes the
 mail, sealed under the KEK, to a queue in the company's database; a background task sends what is due every five
 seconds, each send bounded to 20 seconds, tries a mail the relay did not take again after 30 seconds and then twice
-as long each time, and drops it after its sixth try. No address, subject or text is logged.
+as long each time, and drops it after its sixth try. No address, subject or text is logged. Each mail goes out with
+the company's own wording when its console keeps one, and with the region's default otherwise (see
+[the admin console](admin-console.md)).
 
 A user who forgot the password asks from the sign-in page. `POST <issuer>/login/api/reset` with an address answers
 `202` for every address, with or without an account, and does the same store work for each, so the answer says

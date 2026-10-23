@@ -23,9 +23,9 @@ requests are counted per client address under the `LOGIN_LIMIT` and `LOGIN_WINDO
 The console itself is the page at `<ADMIN_URL>/admin/<company>/`, served by the binary with its script, style and mark
 under `.../assets/`, for an active company only, under the same policy as the sign-in pages and never cached. It holds
 no token, only the session cookie, and asks the API for everything it shows. It offers the sections the operator's roles
-can use (Users, Groups, Clients, Operators, Sign-in policy, Branding, Signing keys, Audit trail, and Companies in the
-`system` console); the API refuses the rest whatever is offered. Every change asks for a reason and is sent once under
-its own `Idempotency-Key`.
+can use (Users, Groups, Clients, Operators, Sign-in policy, Branding, Mail, Signing keys, Audit trail, and Companies in
+the `system` console); the API refuses the rest whatever is offered. Every change asks for a reason and is sent once
+under its own `Idempotency-Key`.
 Disabling an account names it and says what ends; removing a client says how many users hold a grant to it and asks for
 its id typed out; deleting a group says how many members it has and asks for its id typed out; a two-factor policy
 change or a company's suspension says what it does to every account and asks for the company's id typed out. Lists page
@@ -118,6 +118,22 @@ account pages read `<issuer>/assets/brand.json` and `brand.css`: the name is set
 house accent in the light theme, a link appears only when set, and the logo is `<issuer>/assets/logo.png`. With
 nothing set they show TessariDB's own. Every brand asset comes from the issuer's origin, so the pages' policy is
 unchanged.
+
+Mail (role `policy`): `GET <ADMIN_URL>/admin/<company>/api/mail` lists the nine mails the server sends (`reset`,
+`verify`, `email_confirm`, `email_taken`, `email_cancel`, `email_applied_old`, `email_applied_new`, `email_refused`,
+`signin_changed`), each with the `subject` and `text` it goes out with, whether that wording is the company's `own`, the
+`revision` a change must name (0 while the company keeps none), the `placeholders` it may carry and those it is
+`required` to. `PUT .../api/mail/<kind>` with `{"revision", "subject", "text", "reason"}` keeps the company's own
+wording, only over the revision read (`409 changed_meanwhile` otherwise). The wording is plain text: a subject of 1 to
+200 characters on one line, a text of 1 to 10 000 characters with no control character but a line break, `{name}` for a
+placeholder of that mail, `{{` and `}}` for a brace. A mail that works by its link must keep `{link}`, the cancellation
+also names `{new_address}`, the notice to the old address names it too, and the sign-in notice keeps `{change}`;
+anything else is refused as `400 template_rejected`, with the rule in the message. `POST .../api/mail/<kind>/reset` with
+`{"revision", "reason"}` sends the default again (`404 not_found` when the company keeps none). The default is the
+region's: a node writes the wording the server ships with at start for every mail the region has none for, and never
+replaces one already kept. A stored wording that no longer passes its rules is skipped, and the shipped wording is used
+when nothing else is. Who gets a mail, and when, stays the server's decision whatever the wording says. The trail
+records each change with its reason, never the wording.
 
 Signing keys (role `keys`): `GET <ADMIN_URL>/admin/<company>/api/keys` lists the company's keys oldest first, each with
 its `kid`, `algorithm`, `created_at` and `state`: `signing`, `waiting` (published, signing from `signs_from`),
