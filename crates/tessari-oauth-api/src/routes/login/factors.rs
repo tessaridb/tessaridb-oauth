@@ -21,6 +21,7 @@ use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_types::{SigninBinding, TenantId, Timestamp, UserId};
 
 use super::{binding, body, record, rejected, unless_held, verified};
+use crate::routes::notice::{Change, notify};
 use crate::state::PublicState;
 use crate::throttle::ClientAddress;
 use crate::{Error, Result};
@@ -105,10 +106,11 @@ pub(in crate::routes) async fn recovery(
         "a recovery code stood in for a second factor"
     );
     let event = AuditEvent {
-        user: Some(user),
+        user: Some(user.clone()),
         ..AuditEvent::of(AuditKind::RecoveryUsed)
     };
     record(&state, &tenant, &event, now).await;
+    notify(&state, &tenant, &user, Change::RecoveryCodeUsed).await;
     verified(
         &state,
         (&tenant, issuer),

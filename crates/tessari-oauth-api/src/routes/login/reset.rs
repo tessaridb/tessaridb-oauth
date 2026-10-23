@@ -28,11 +28,9 @@ use tessari_oauth_storage::users::StoredPassword;
 use tessari_oauth_types::{EmailAddress, ResetToken, TenantId, Timestamp, UserId, base64url};
 
 use super::{body, record};
+use crate::routes::notice::{Change, notify};
 use crate::state::PublicState;
 use crate::{Error, Result};
-
-/// Why a reset revoked the account's refresh families.
-const PASSWORD_RESET: &str = "password_reset";
 
 /// The subject of every reset mail, known address or not.
 const RESET_SUBJECT: &str = "Reset your password";
@@ -111,7 +109,7 @@ pub(in crate::routes) async fn complete_reset(
     Path(tenant): Path<String>,
     read: std::result::Result<Json<ResetCompletion>, JsonRejection>,
 ) -> Result<Response> {
-    let (tenant, issuer) = state.tenant(&tenant)?;
+    let (tenant, _) = state.tenant(&tenant)?;
     let ResetCompletion { token, password } = body(read)?;
     let now = (state.clock)();
     let token = ResetToken::from_secret(token);
@@ -166,19 +164,7 @@ pub(in crate::routes) async fn complete_reset(
         .await
         .map_err(Error::Store)?;
     cascade(&state, &tenant, &user, now).await?;
-    let notice = NewMail {
-        to: Some(account.email.clone()),
-        subject: "Your password was changed".to_owned(),
-        text: format!(
-            "The password of your account at {issuer} was changed with a reset link, and every session was \
-             signed out.\n\nIf you did not do this, tell your administrator.\n"
-        ),
-    };
-    state
-        .outbox
-        .enqueue(&tenant, &state.kek, &notice)
-        .await
-        .map_err(Error::Store)?;
+    notify(&state, &tenant, &user, Change::PasswordReset).await;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
@@ -216,12 +202,17 @@ async fn cascade(
         .map_err(Error::Store)?;
     let families = state
         .refresh
-        .revoke_standing(tenant, &Holder::User(user), PASSWORD_RESET, now)
+        .revoke_standing(
+            tenant,
+            &Holder::User(user),
+            Change::PasswordReset.reason(),
+            now,
+        )
         .await
         .map_err(Error::Store)?;
     let event = AuditEvent {
         user: Some(user.clone()),
-        reason: Some(PASSWORD_RESET.to_owned()),
+        reason: Some(Change::PasswordReset.reason().to_owned()),
         families: Some(u64::try_from(families).map_err(|_| Error::Internal)?),
         ..AuditEvent::of(AuditKind::FactorChanged)
     };

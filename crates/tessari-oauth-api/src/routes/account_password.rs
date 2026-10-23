@@ -23,6 +23,7 @@ use tessari_oauth_storage::users::StoredPassword;
 
 use super::account_factors::{changed, may_change};
 use super::login::{body, signed_in};
+use super::notice::Change;
 use crate::state::PublicState;
 use crate::{Error, Result};
 
@@ -91,7 +92,7 @@ pub(super) async fn change(
         .await
         .map_err(Error::Store)?;
     let (sessions, families, access_tokens_end_by) =
-        changed(&state, &tenant, &asking, "password_changed", now).await?;
+        changed(&state, &tenant, &asking, Change::PasswordChanged, now).await?;
     let changed = Changed {
         sessions,
         families,

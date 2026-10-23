@@ -20,6 +20,7 @@ use tessari_oauth_storage::refresh::Holder;
 use tessari_oauth_types::{TenantId, Timestamp, UserId};
 
 use super::login::{body, record, signed_in};
+use super::notice::{Change, notify};
 use crate::state::PublicState;
 use crate::{Error, Result};
 
@@ -131,6 +132,7 @@ pub(super) async fn end_all(
         .map_err(Error::Store)?;
     let count = u64::try_from(families).map_err(|_| Error::Internal)?;
     recorded(&state, &tenant, &user, ("everywhere", Some(count)), now).await;
+    notify(&state, &tenant, &user, Change::SignedOutEverywhere).await;
     let access_tokens_end_by = now
         .unix_secs()
         .checked_add(ACCESS_TOKEN_TTL_SECS)

@@ -18,6 +18,7 @@ mod jwks;
 mod login;
 mod logout;
 mod metadata;
+mod notice;
 mod pages;
 mod resume;
 mod token;

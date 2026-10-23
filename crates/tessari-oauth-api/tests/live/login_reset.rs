@@ -39,11 +39,7 @@ fn token_for(mails: &[QueuedMail], address: &str) -> String {
         .find(|mail| mail.to.as_ref().map(|to| to.as_str()) == Some(address))
         .expect("a mail to the address");
     let (_, after) = mail.text.split_once(LINK).expect("a link");
-    after
-        .split_whitespace()
-        .next()
-        .expect("a token")
-        .to_owned()
+    after.split_whitespace().next().expect("a token").to_owned()
 }
 
 /// Whether `password` is the stored password of `user`.

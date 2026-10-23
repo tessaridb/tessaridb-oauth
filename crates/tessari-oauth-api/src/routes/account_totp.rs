@@ -27,6 +27,7 @@ use tessari_oauth_infrastructure::custody::random_secret;
 
 use super::account_factors::{Nothing, changed, may_change};
 use super::login::{body, signed_in};
+use super::notice::Change;
 use crate::state::PublicState;
 use crate::{Error, Result};
 
@@ -114,7 +115,7 @@ pub(super) async fn confirm(
         .await
         .map_err(Error::Store)?;
     let (sessions, families, access_tokens_end_by) =
-        changed(&state, &tenant, &asking, "totp_enrolled", now).await?;
+        changed(&state, &tenant, &asking, Change::AppEnrolled, now).await?;
     let enrolled = Enrolled {
         sessions,
         families,
@@ -160,7 +161,7 @@ pub(super) async fn remove(
         return Ok((StatusCode::OK, Json(NotRemoved { removed: false })).into_response());
     }
     let (sessions, families, access_tokens_end_by) =
-        changed(&state, &tenant, &asking, "totp_removed", now).await?;
+        changed(&state, &tenant, &asking, Change::AppRemoved, now).await?;
     let removed = Removed {
         removed: true,
         sessions,

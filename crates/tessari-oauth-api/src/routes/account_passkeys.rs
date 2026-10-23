@@ -24,6 +24,7 @@ use tessari_oauth_types::base64url;
 
 use super::account_factors::{Nothing, changed, may_change};
 use super::login::{body, relying_party, signed_in};
+use super::notice::Change;
 use crate::state::PublicState;
 use crate::{Error, Result};
 
@@ -152,7 +153,7 @@ pub(super) async fn register(
         return Err(Error::AlreadyEnrolled);
     }
     let (sessions, families, access_tokens_end_by) =
-        changed(&state, &tenant, &asking, "passkey_added", now).await?;
+        changed(&state, &tenant, &asking, Change::PasskeyAdded, now).await?;
     let added = Added {
         id: base64url::encode(&registered.credential_id),
         sessions,

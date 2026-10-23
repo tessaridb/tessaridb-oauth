@@ -28,6 +28,7 @@ use tessari_oauth_storage::sessions::Session;
 use tessari_oauth_types::{TenantId, Timestamp};
 
 use super::login::{body, record, signed_in};
+use super::notice::{Change, notify};
 use crate::state::PublicState;
 use crate::{Error, Result};
 
@@ -113,7 +114,7 @@ pub(super) async fn remove_passkey(
         return Ok((StatusCode::OK, Json(NotRemoved { removed: false })).into_response());
     }
     let (sessions, families, access_tokens_end_by) =
-        changed(&state, &tenant, &asking, "passkey_removed", now).await?;
+        changed(&state, &tenant, &asking, Change::PasskeyRemoved, now).await?;
     let removed = Removed {
         removed: true,
         sessions,
@@ -145,7 +146,7 @@ pub(super) async fn issue_recovery_codes(
         .await
         .map_err(Error::Store)?;
     let (sessions, families, access_tokens_end_by) =
-        changed(&state, &tenant, &asking, "recovery_codes_issued", now).await?;
+        changed(&state, &tenant, &asking, Change::RecoveryCodesIssued, now).await?;
     let issued = Issued {
         codes,
         sessions,
@@ -195,7 +196,7 @@ pub(super) async fn changed(
     state: &PublicState,
     tenant: &TenantId,
     asking: &Session,
-    reason: &str,
+    change: Change,
     now: Timestamp,
 ) -> Result<(usize, usize, u64)> {
     let user = &asking.user;
@@ -211,11 +212,12 @@ pub(super) async fn changed(
         .map_err(Error::Store)?;
     let event = AuditEvent {
         user: Some(user.clone()),
-        reason: Some(reason.to_owned()),
+        reason: Some(change.reason().to_owned()),
         families: Some(u64::try_from(families).map_err(|_| Error::Internal)?),
         ..AuditEvent::of(AuditKind::FactorChanged)
     };
     record(state, tenant, &event, now).await;
+    notify(state, tenant, user, change).await;
     let access_tokens_end_by = now
         .unix_secs()
         .checked_add(ACCESS_TOKEN_TTL_SECS)
