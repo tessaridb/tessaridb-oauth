@@ -11,6 +11,7 @@ import { companiesView } from "./companies.ts";
 import { groupView } from "./group.ts";
 import { groupsView } from "./groups.ts";
 import { keysView } from "./keys.ts";
+import { mailView } from "./mail.ts";
 import { clientsView } from "./clients.ts";
 import { operatorsView } from "./operators.ts";
 import { policyView } from "./policy.ts";
@@ -129,6 +130,9 @@ function draw(who: Me): void {
       return;
     case "branding":
       void brandingView(screen);
+      return;
+    case "mail":
+      void mailView(screen);
       return;
     case "keys":
       void keysView(screen);

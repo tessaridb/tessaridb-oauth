@@ -246,6 +246,51 @@
   margin: 0;
 }
 
+/* One disclosure per mail: the title and whether the wording is the company's, the form beneath it. */
+.mail-kind {
+  max-width: 34rem;
+  margin-block-start: var(--s-4);
+  border-block-end: 1px solid var(--border);
+}
+
+.mail-kind > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--control-height);
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mail-kind > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mail-kind > summary::before {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.mail-kind[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.mail-kind > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--control-radius);
+}
+
+.mail-kind .change-form {
+  margin-block: var(--s-3) var(--s-5);
+}
+
 .change-form .mono {
   font-family: var(--mono);
 }

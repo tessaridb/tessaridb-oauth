@@ -32,6 +32,7 @@
     ["operators", null],
     ["policy", "policy"],
     ["branding", "policy"],
+    ["mail", "policy"],
     ["keys", "keys"],
     ["audit", "audit"],
     ["companies", "companies"]
@@ -74,6 +75,8 @@
         return { kind: "policy" };
       case "branding":
         return { kind: "branding" };
+      case "mail":
+        return { kind: "mail" };
       case "keys":
         return { kind: "keys" };
       case "audit": {
@@ -1805,6 +1808,186 @@
     say(message);
   }
 
+  // src/mail-read.ts
+  var TITLES = [
+    ["reset", "Password reset"],
+    ["verify", "Address verification"],
+    ["email_confirm", "New address: confirm"],
+    ["email_taken", "New address: already in use"],
+    ["email_cancel", "Address change: cancel link"],
+    ["email_applied_old", "Address changed: to the old address"],
+    ["email_applied_new", "Address changed: to the new address"],
+    ["email_refused", "Address change refused"],
+    ["signin_changed", "Sign-in change notice"]
+  ];
+  function one(row2) {
+    const kind = field(row2, "kind");
+    const subject = field(row2, "subject");
+    const text2 = field(row2, "text");
+    const own = field(row2, "own");
+    const revision = field(row2, "revision");
+    const placeholders = strings(field(row2, "placeholders"));
+    const required = strings(field(row2, "required"));
+    if (typeof kind !== "string" || typeof subject !== "string" || typeof text2 !== "string" || typeof own !== "boolean" || typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0 || placeholders === null || required === null) {
+      return null;
+    }
+    return { kind, subject, text: text2, own, revision, placeholders, required };
+  }
+  function readMail(body) {
+    const rows = field(body, "mail");
+    if (!Array.isArray(rows)) {
+      return null;
+    }
+    const read = rows.map(one);
+    return read.every((row2) => row2 !== null) ? read : null;
+  }
+  function mailBody(revision, subject, text2, reason) {
+    return { revision, subject, text: text2, reason };
+  }
+  function resetBody(revision, reason) {
+    return { revision, reason };
+  }
+  function ruleMessage(body) {
+    const message = field(body, "message");
+    return field(body, "code") === "template_rejected" && typeof message === "string" ? message : null;
+  }
+  function mailTitle(kind) {
+    return TITLES.find(([name2]) => name2 === kind)?.[1] ?? kind;
+  }
+
+  // src/mail.ts
+  var PATH3 = "api/mail";
+  function sayIn2(said, text2) {
+    if (text2 !== null) {
+      said.textContent = text2;
+      said.hidden = false;
+    }
+  }
+  function braced(names) {
+    return names.map((name2) => `{${name2}}`).join(", ");
+  }
+  function help(mail) {
+    const may = mail.placeholders.length === 0 ? "This mail fills in nothing." : `It may use ${braced(mail.placeholders)}.`;
+    const must = mail.required.length === 0 ? "" : ` It must keep ${braced(mail.required)}.`;
+    return make("p", "muted", `${may}${must} Write {{ or }} for a brace itself. Plain text only.`);
+  }
+  function mailForm(screen, mail, redraw) {
+    const keyFor = keys();
+    const id = `mail-${mail.kind}`;
+    const subject = make("input", "");
+    subject.type = "text";
+    subject.value = mail.subject;
+    subject.maxLength = 200;
+    subject.autocomplete = "off";
+    const text2 = make("textarea", "mono");
+    text2.id = `${id}-text`;
+    text2.value = mail.text;
+    text2.rows = 8;
+    text2.maxLength = 1e4;
+    text2.spellcheck = true;
+    const textLabel = make("label", "", "Text");
+    textLabel.htmlFor = text2.id;
+    const reason = reasonField(`${id}-reason`);
+    const said = notice();
+    const title = mailTitle(mail.kind);
+    const answered = (done) => (answer) => {
+      if (!screen.live()) {
+        return;
+      }
+      if (answer.ok && readMail({ mail: [answer.body] }) !== null) {
+        redraw(done);
+        return;
+      }
+      if (answer.status === 409) {
+        redraw(changeRefusalText("changed_meanwhile"));
+        return;
+      }
+      const rule = ruleMessage(answer.body);
+      if (rule !== null) {
+        text2.setAttribute("aria-invalid", "true");
+        sayIn2(said, `The server keeps this mail as it was: ${rule}.`);
+        return;
+      }
+      const unread = "The server answered in a shape the console cannot read.";
+      sayIn2(said, answer.ok ? unread : refusedText(screen, answer, title));
+    };
+    const save = button("Save the wording", "primary", () => {
+      said.hidden = true;
+      text2.removeAttribute("aria-invalid");
+      const why = reasonIn(reason.input, said);
+      if (why !== null) {
+        const body = mailBody(mail.revision, subject.value, text2.value, why);
+        void change(`${PATH3}/${mail.kind}`, keyFor, body, "PUT").then(
+          answered(`${title}: the company's wording is saved. The next mail goes out with it.`)
+        );
+      }
+    });
+    const actions = make("div", "actions", save);
+    if (mail.own) {
+      actions.append(
+        button("Use the default", "secondary", () => {
+          said.hidden = true;
+          const why = reasonIn(reason.input, said);
+          if (why !== null) {
+            void change(`${PATH3}/${mail.kind}/reset`, keyFor, resetBody(mail.revision, why)).then(
+              answered(`${title}: the default wording is back. The next mail goes out with it.`)
+            );
+          }
+        })
+      );
+    }
+    const summary = make(
+      "summary",
+      "",
+      make("span", "", title),
+      " ",
+      make("span", "pill", mail.own ? "Company wording" : "Default")
+    );
+    return make(
+      "details",
+      "mail-kind",
+      summary,
+      make(
+        "div",
+        "change-form",
+        labelled(`${id}-subject`, "Subject", subject),
+        make("div", "field", textLabel, text2),
+        help(mail),
+        reason.row,
+        said,
+        actions
+      )
+    );
+  }
+  async function mailView(screen, message = "") {
+    say("Loading the mail.");
+    const answer = await call("GET", PATH3);
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Mail", answer, "The mail");
+      return;
+    }
+    const mail = readMail(answer.body);
+    if (mail === null) {
+      unreadable(screen, "Mail");
+      return;
+    }
+    const redraw = (said) => void mailView(screen, said);
+    show(
+      screen.view,
+      heading("Mail"),
+      make(
+        "p",
+        "lead",
+        "The words of each mail the server sends the company's users. Who gets a mail, and when, stays the server's."
+      ),
+      ...mail.map((kind) => mailForm(screen, kind, redraw))
+    );
+    say(message);
+  }
+
   // src/clients-read.ts
   var ALGORITHMS = ["EdDSA", "ES256"];
   var GRANTS = ["authorization_code", "refresh_token", "client_credentials"];
@@ -2508,7 +2691,7 @@
   }
 
   // src/policy.ts
-  var PATH3 = "api/policy/two-factor";
+  var PATH4 = "api/policy/two-factor";
   function badge(policy) {
     const made = make("span", "badge", policy);
     made.dataset["state"] = policy === "off" ? "warn" : "ok";
@@ -2564,7 +2747,7 @@
         return;
       }
       typed.removeAttribute("aria-invalid");
-      void change(PATH3, keyFor, { expected: current, policy: chosen, reason: why }, "PUT").then((answer) => {
+      void change(PATH4, keyFor, { expected: current, policy: chosen, reason: why }, "PUT").then((answer) => {
         if (!screen.live()) {
           return;
         }
@@ -2593,7 +2776,7 @@
   }
   async function policyView(screen, company2, message = "") {
     say("Loading the policy.");
-    const answer = await call("GET", PATH3);
+    const answer = await call("GET", PATH4);
     if (!screen.live()) {
       return;
     }
@@ -3060,6 +3243,9 @@
         return;
       case "branding":
         void brandingView(screen);
+        return;
+      case "mail":
+        void mailView(screen);
         return;
       case "keys":
         void keysView(screen);

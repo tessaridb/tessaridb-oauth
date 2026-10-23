@@ -23,6 +23,7 @@ export type Section =
   | "operators"
   | "policy"
   | "branding"
+  | "mail"
   | "keys"
   | "audit"
   | "companies";
@@ -35,6 +36,7 @@ const NEEDS: readonly [Section, Role | null][] = [
   ["operators", null],
   ["policy", "policy"],
   ["branding", "policy"],
+  ["mail", "policy"],
   ["keys", "keys"],
   ["audit", "audit"],
   ["companies", "companies"],
@@ -51,6 +53,7 @@ export type Route =
   | { kind: "operators"; after: string | null }
   | { kind: "policy" }
   | { kind: "branding" }
+  | { kind: "mail" }
   | { kind: "keys" }
   | { kind: "audit"; after: number | null }
   | { kind: "companies"; after: string | null };
@@ -100,6 +103,8 @@ export function route(hash: string): Route {
       return { kind: "policy" };
     case "branding":
       return { kind: "branding" };
+    case "mail":
+      return { kind: "mail" };
     case "keys":
       return { kind: "keys" };
     case "audit": {
