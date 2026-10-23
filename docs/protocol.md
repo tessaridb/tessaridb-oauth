@@ -5,9 +5,10 @@ What each endpoint of a tenant's issuer accepts, refuses and answers. A tenant's
 ## Clients
 
 Confidential clients authenticate with `private_key_jwt`: an Ed25519 or ES256 assertion signed by a key the client
-registered, addressed to the tenant's issuer alone, and valid for at most five minutes. Each assertion is accepted
-once: its `jti` is recorded in a TessariDB space until it could no longer be accepted, and a second presentation is
-refused as a replay. A client redeems only the grant types it registered.
+registered, addressed to the tenant's issuer alone, and valid for at most five minutes. Its subject names the
+client, so `client_id` may be left out beside it (RFC 7521 §4.2); when sent, it must be that subject. Each
+assertion is accepted once: its `jti` is recorded in a TessariDB space until it could no longer be accepted, and a
+second presentation is refused as a replay. A client redeems only the grant types it registered.
 
 DPoP proofs (RFC 9449) are checked the same way: typed `dpop+jwt`, signed by the public key they carry under the
 server's algorithms, bound to this method and URI, at most a minute old, and accepted once per key; the token they

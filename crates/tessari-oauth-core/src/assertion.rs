@@ -47,6 +47,20 @@ struct Claims {
     jti: Option<String>,
 }
 
+/// The `sub` of `compact`, read without verifying anything: the client an assertion sent without `client_id` names
+/// (RFC 7521 §4.2), used only to find the registration it is then verified against.
+pub(crate) fn named_client(compact: &str) -> Option<String> {
+    #[derive(Deserialize)]
+    struct Named {
+        sub: String,
+    }
+    let payload = compact.split('.').nth(1)?;
+    let decoded = tessari_oauth_types::base64url::decode(payload).ok()?;
+    serde_json::from_slice::<Named>(&decoded)
+        .ok()
+        .map(|named| named.sub)
+}
+
 /// Verify `compact` as `client`'s assertion for the tenant whose issuer is `issuer`, at `now`.
 ///
 /// # Errors

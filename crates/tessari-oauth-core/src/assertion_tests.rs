@@ -232,6 +232,22 @@ mod at_the_token_endpoint {
     }
 
     #[test]
+    fn an_assertion_sent_without_client_id_names_its_client_by_its_subject() {
+        // RFC 7521 §4.2: `client_id` is optional beside an assertion, whose subject identifies the client.
+        let assertion = signed(HEADER, &good());
+        let pairs = vec![
+            ("client_assertion_type", ASSERTION_TYPE.to_owned()),
+            ("client_assertion", assertion),
+        ];
+        let used = authenticate(
+            PresentedAuth::PrivateKeyJwt,
+            &read(pairs).expect("no repeats"),
+        )
+        .expect("authenticated");
+        assert_eq!(used.map(|used| used.jti), Some("a-1".to_owned()));
+    }
+
+    #[test]
     fn the_pinned_method_holds_in_both_directions() {
         let not_pinned = Err(Refusal {
             error: ErrorCode::InvalidClient,

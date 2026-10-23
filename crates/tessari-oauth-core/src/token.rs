@@ -109,10 +109,9 @@ pub fn authenticate_client(
     params: &Params,
 ) -> Result<Authenticated, Refusal> {
     let tenant = &endpoint.tenant;
-    let raw = params
-        .get("client_id")
+    let raw = claimed_client_id(params)
         .ok_or(refuse(ErrorCode::InvalidClient, Reason::MissingParameter))?;
-    let client_id = ClientId::parse(raw)
+    let client_id = ClientId::parse(&raw)
         .map_err(|_| refuse(ErrorCode::InvalidClient, Reason::MalformedParameter))?;
     let client = directory
         .find(tenant, &client_id)
@@ -132,6 +131,18 @@ pub fn authenticate_client(
         }
     };
     Ok(Authenticated { client, assertion })
+}
+
+/// The client `params` names: its `client_id`, or, for a client assertion sent without one, the assertion's subject
+/// (RFC 7521 §4.2). Unverified: it says which registration the request is authenticated against, nothing more.
+#[must_use]
+pub fn claimed_client_id(params: &Params) -> Option<String> {
+    match params.get("client_id") {
+        Some(raw) => Some(raw.to_owned()),
+        None => params
+            .get("client_assertion")
+            .and_then(assertion::named_client),
+    }
 }
 
 /// The JWT assertion `params` carries, verified as `client`'s.

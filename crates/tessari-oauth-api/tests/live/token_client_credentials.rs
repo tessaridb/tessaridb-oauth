@@ -112,6 +112,23 @@ async fn a_confidential_client_gets_its_own_token_and_no_refresh_token() {
 
 #[tokio::test]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_assertion_sent_without_client_id_authenticates_the_client_it_names() {
+    // RFC 7521 §4.2: beside an assertion `client_id` is optional; the assertion's subject names the client.
+    let server = server(2).await;
+    let key = machine(&server).await;
+    let mut pairs = request(
+        &key,
+        "cc-unnamed",
+        &[("scope", "api:read"), ("resource", API)],
+    );
+    pairs.retain(|(name, _)| name != "client_id");
+    let answer = post(&server, "acme", &borrowed(&pairs)).await;
+    assert_eq!(answer.status, StatusCode::OK, "{}", answer.body);
+    assert_eq!(payload(&answer)["client_id"], "machine");
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
 async fn a_client_names_its_scopes_within_its_ceiling_at_a_resource_it_registered() {
     let server = server(2).await;
     let key = machine(&server).await;

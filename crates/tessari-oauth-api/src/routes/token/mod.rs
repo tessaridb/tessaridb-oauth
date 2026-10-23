@@ -123,8 +123,8 @@ async fn respond(
     let client_id = params
         .as_ref()
         .ok()
-        .and_then(|params| params.get("client_id"))
-        .and_then(|raw| ClientId::parse(raw).ok());
+        .and_then(token::claimed_client_id)
+        .and_then(|raw| ClientId::parse(&raw).ok());
     let outcome = match (params, operation) {
         (Ok(params), Operation::Token) => {
             exchange(state, &endpoint, headers, &params, client_id.as_ref())
