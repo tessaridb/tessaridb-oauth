@@ -41,7 +41,12 @@ pub(super) async fn css(
     Path(tenant): Path<String>,
 ) -> Result<Response> {
     let (tenant, _) = state.tenant(&tenant)?;
-    let brand = state.brands.find(&tenant).await.map_err(Error::Store)?;
+    let brand = state
+        .brands
+        .find(&tenant)
+        .await
+        .map_err(Error::Store)?
+        .map(|revised| revised.brand);
     let body = brand.map_or_else(
         || "/* No company brand is set; the pages keep their own colours. */\n".to_owned(),
         |brand| {
@@ -58,7 +63,12 @@ pub(super) async fn json(
     Path(tenant): Path<String>,
 ) -> Result<Response> {
     let (tenant, _) = state.tenant(&tenant)?;
-    let brand = state.brands.find(&tenant).await.map_err(Error::Store)?;
+    let brand = state
+        .brands
+        .find(&tenant)
+        .await
+        .map_err(Error::Store)?
+        .map(|revised| revised.brand);
     let logo = state
         .brands
         .logo_updated(&tenant)

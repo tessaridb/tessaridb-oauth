@@ -15,6 +15,8 @@ pub struct BrandEntity {
     pub privacy_url: Option<String>,
     /// Unix seconds of the last change.
     pub updated_at: i64,
+    /// How many times the brand was set: 1 for the first.
+    pub revision: i64,
 }
 
 impl FromRecord for BrandEntity {
@@ -25,6 +27,7 @@ impl FromRecord for BrandEntity {
             support_url: row.take("support_url")?,
             privacy_url: row.take("privacy_url")?,
             updated_at: row.take("updated_at")?,
+            revision: row.take("revision")?,
         })
     }
 }

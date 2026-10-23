@@ -2,6 +2,7 @@
 //! and the console keeps their session on its own origin.
 
 mod audit;
+mod branding;
 mod callback;
 mod change;
 mod clients;
@@ -28,6 +29,7 @@ use tessari_oauth_storage::ClientRemovalService;
 use tessari_oauth_storage::admin::AdminService;
 use tessari_oauth_storage::audit::AuditEvent;
 use tessari_oauth_storage::audit::AuditService;
+use tessari_oauth_storage::brands::BrandService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::{CompanyService, Served};
@@ -71,6 +73,8 @@ pub struct AdminState {
     pub sessions: Arc<SessionService>,
     /// Company policies the console reads and changes.
     pub policies: Arc<PolicyService>,
+    /// Each company's brand and logo, which the console reads and sets.
+    pub brands: Arc<BrandService>,
     /// The company's user accounts the console lists and moves between active and disabled.
     pub users: Arc<UserService>,
     /// The company's groups and who is in them.
@@ -153,6 +157,18 @@ pub fn admin_router(state: AdminState) -> Router {
         .route(
             "/admin/{company}/api/policy/two-factor",
             get(policy::two_factor).put(policy::set_two_factor),
+        )
+        .route(
+            "/admin/{company}/api/branding",
+            get(branding::read).put(branding::set),
+        )
+        .route(
+            "/admin/{company}/api/branding/logo",
+            axum::routing::put(branding::set_logo),
+        )
+        .route(
+            "/admin/{company}/api/branding/logo/remove",
+            post(branding::remove_logo),
         )
         .route(
             "/admin/{company}/api/users",

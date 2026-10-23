@@ -217,10 +217,11 @@ async fn a_companys_brand_reaches_the_pages_only_as_a_colour_token_text_links_an
     let acme = TenantId::parse("acme").expect("a tenant id");
     storage.tenants.provision(&acme).await.expect("provisioned");
     let at = Timestamp::from_unix_secs(1_800_000_000);
-    storage
+    let set = storage
         .brands
         .set(
             &acme,
+            0,
             &Brand {
                 name: BrandName::parse("Acme <b>Bank</b>").expect("a name"),
                 accent: Accent::parse("#1f4fd8").expect("an accent"),
@@ -231,6 +232,7 @@ async fn a_companys_brand_reaches_the_pages_only_as_a_colour_token_text_links_an
         )
         .await
         .expect("a brand");
+    assert!(set, "a brand set where none was");
     let png = logo();
     storage
         .brands

@@ -7,5 +7,5 @@ mod service;
 mod tessaridb;
 
 pub use entity::{BrandEntity, LogoEntity};
-pub use service::{Brand, BrandService};
+pub use service::{Brand, BrandService, Revised};
 pub(crate) use tessaridb::TessaridbBrandRepository;

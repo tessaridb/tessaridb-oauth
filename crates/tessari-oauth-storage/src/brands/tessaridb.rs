@@ -12,6 +12,30 @@ pub(crate) struct TessaridbBrandRepository {
     database: Database,
 }
 
+/// The values a brand is written with; a link left out of the brand is written as no field at all.
+fn values(brand: &BrandEntity) -> Vec<(String, Value)> {
+    vec![
+        ("name".to_owned(), Value::from(brand.name.as_str())),
+        ("accent".to_owned(), Value::from(brand.accent.as_str())),
+        (
+            "support".to_owned(),
+            brand
+                .support_url
+                .as_deref()
+                .map_or(Value::None, Value::from),
+        ),
+        (
+            "privacy".to_owned(),
+            brand
+                .privacy_url
+                .as_deref()
+                .map_or(Value::None, Value::from),
+        ),
+        ("at".to_owned(), Value::from(brand.updated_at)),
+        ("revision".to_owned(), Value::from(brand.revision)),
+    ]
+}
+
 impl TessaridbBrandRepository {
     pub(crate) const fn new(database: Database) -> Self {
         Self { database }
@@ -28,32 +52,28 @@ impl BrandRepository for TessaridbBrandRepository {
         answers::single(answers, "brand")
     }
 
-    async fn put(&self, place: &Place, brand: &BrandEntity) -> Result<()> {
-        // The whole record: a link left out of this brand is not kept from the last one.
+    async fn create(&self, place: &Place, brand: &BrandEntity) -> Result<()> {
         self.database
             .run_at(
                 place,
-                "UPSERT brand:'current' = { name: $name, accent: $accent, support_url: $support, \
-                 privacy_url: $privacy, updated_at: $at };",
-                vec![
-                    ("name".to_owned(), Value::from(brand.name.as_str())),
-                    ("accent".to_owned(), Value::from(brand.accent.as_str())),
-                    (
-                        "support".to_owned(),
-                        brand
-                            .support_url
-                            .as_deref()
-                            .map_or(Value::None, Value::from),
-                    ),
-                    (
-                        "privacy".to_owned(),
-                        brand
-                            .privacy_url
-                            .as_deref()
-                            .map_or(Value::None, Value::from),
-                    ),
-                    ("at".to_owned(), Value::from(brand.updated_at)),
-                ],
+                "CREATE brand:'current' = { name: $name, accent: $accent, support_url: $support, \
+                 privacy_url: $privacy, updated_at: $at, revision: $revision };",
+                values(brand),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn replace(&self, place: &Place, replaces: i64, brand: &BrandEntity) -> Result<()> {
+        // The whole record, and only from the revision the caller read: a condition on an edit is a compare-and-set.
+        let mut values = values(brand);
+        values.push(("replaces".to_owned(), Value::from(replaces)));
+        self.database
+            .run_at(
+                place,
+                "UPDATE brand:'current' = { name: $name, accent: $accent, support_url: $support, \
+                 privacy_url: $privacy, updated_at: $at, revision: $revision } WHERE revision = $replaces;",
+                values,
             )
             .await?;
         Ok(())

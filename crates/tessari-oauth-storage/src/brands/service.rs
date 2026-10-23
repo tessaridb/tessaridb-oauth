@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tessari_oauth_core::branding::{Accent, BrandLink, BrandName};
 use tessari_oauth_core::logo::Png;
-use tessari_oauth_types::{TenantId, Timestamp, base64url};
+use tessari_oauth_types::{ErrorCategory, TenantId, Timestamp, base64url};
 
 use super::repository::BrandRepository;
 use super::{BrandEntity, LogoEntity};
@@ -24,6 +24,15 @@ pub struct Brand {
     pub privacy: Option<BrandLink>,
     /// When it was last set.
     pub updated_at: Timestamp,
+}
+
+/// A company's brand as read, with the revision a change to it must name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Revised {
+    /// The brand.
+    pub brand: Brand,
+    /// How many times it was set: 1 for the first.
+    pub revision: u64,
 }
 
 /// Reads and sets each company's brand and logo.
@@ -46,6 +55,13 @@ fn seconds(at: Timestamp) -> Result<i64> {
     })
 }
 
+fn stored_revision(revision: u64) -> Result<i64> {
+    i64::try_from(revision).map_err(|_| Error::Invalid {
+        record: "brand",
+        reason: "a revision past the store's range",
+    })
+}
+
 fn instant(stored: i64, record: &'static str) -> Result<Timestamp> {
     u64::try_from(stored)
         .map(Timestamp::from_unix_secs)
@@ -60,8 +76,8 @@ fn link(stored: Option<String>) -> Result<Option<BrandLink>> {
         .transpose()
 }
 
-fn to_brand(entity: BrandEntity) -> Result<Brand> {
-    Ok(Brand {
+fn to_revised(entity: BrandEntity) -> Result<Revised> {
+    let brand = Brand {
         name: BrandName::parse(&entity.name)
             .map_err(|_| unreadable("brand", "a name the brand rules refuse"))?,
         accent: Accent::parse(&entity.accent)
@@ -69,7 +85,12 @@ fn to_brand(entity: BrandEntity) -> Result<Brand> {
         support: link(entity.support_url)?,
         privacy: link(entity.privacy_url)?,
         updated_at: instant(entity.updated_at, "brand")?,
-    })
+    };
+    let revision = u64::try_from(entity.revision)
+        .ok()
+        .filter(|revision| *revision > 0)
+        .ok_or_else(|| unreadable("brand", "a revision below 1"))?;
+    Ok(Revised { brand, revision })
 }
 
 impl BrandService {
@@ -80,35 +101,53 @@ impl BrandService {
         }
     }
 
-    /// `tenant`'s brand, when one is set.
+    /// `tenant`'s brand and its revision, when one is set.
     ///
     /// # Errors
     ///
     /// Store failures, and [`Error::Unreadable`] for a stored value the brand rules refuse.
-    pub async fn find(&self, tenant: &TenantId) -> Result<Option<Brand>> {
+    pub async fn find(&self, tenant: &TenantId) -> Result<Option<Revised>> {
         let place = self.tenancy.place(tenant)?;
         self.repository
             .find(&place)
             .await?
-            .map(to_brand)
+            .map(to_revised)
             .transpose()
     }
 
-    /// Set `tenant`'s brand to `brand` whole; a link it leaves out is removed.
+    /// Set `tenant`'s brand to `brand` whole, a link it leaves out removed, only over the revision `replaces` (0 when
+    /// none is set); whether it was set, false when the brand moved since that revision was read.
     ///
     /// # Errors
     ///
     /// Store failures.
-    pub async fn set(&self, tenant: &TenantId, brand: &Brand) -> Result<()> {
+    pub async fn set(&self, tenant: &TenantId, replaces: u64, brand: &Brand) -> Result<bool> {
         let place = self.tenancy.place(tenant)?;
+        let next = replaces.checked_add(1).ok_or(Error::Invalid {
+            record: "brand",
+            reason: "a revision past the store's range",
+        })?;
         let entity = BrandEntity {
             name: brand.name.as_str().to_owned(),
             accent: brand.accent.as_str().to_owned(),
             support_url: brand.support.as_ref().map(|link| link.as_str().to_owned()),
             privacy_url: brand.privacy.as_ref().map(|link| link.as_str().to_owned()),
             updated_at: seconds(brand.updated_at)?,
+            revision: stored_revision(next)?,
         };
-        self.repository.put(&place, &entity).await
+        let written = if replaces == 0 {
+            self.repository.create(&place, &entity).await
+        } else {
+            self.repository
+                .replace(&place, stored_revision(replaces)?, &entity)
+                .await
+        };
+        match written {
+            Ok(()) => Ok(true),
+            // Set or changed by somebody else since the revision was read.
+            Err(refused) if refused.category() == ErrorCategory::Conflict => Ok(false),
+            Err(failure) => Err(failure),
+        }
     }
 
     /// `tenant`'s logo, the PNG bytes this server wrote, when one is set.

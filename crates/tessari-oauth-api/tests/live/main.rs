@@ -12,6 +12,7 @@ mod account_me;
 mod account_password;
 mod account_sessions;
 mod admin_audit;
+mod admin_branding;
 mod admin_callback;
 mod admin_clients;
 mod admin_companies;

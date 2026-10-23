@@ -3,7 +3,7 @@
 
 use tessari_oauth_core::branding::{Accent, BrandLink, BrandName};
 use tessari_oauth_core::logo::{Png, reencode};
-use tessari_oauth_storage::brands::Brand;
+use tessari_oauth_storage::brands::{Brand, Revised};
 use tessari_oauth_types::{TenantId, Timestamp};
 
 use crate::fresh;
@@ -41,20 +41,52 @@ fn logo(shade: u8) -> Png {
 
 #[tokio::test]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
-async fn a_brand_is_absent_until_set_and_is_replaced_whole() {
+async fn a_brand_is_absent_until_set_and_is_replaced_whole_only_from_the_revision_seen() {
     let acme = tenant("acme");
     let storage = fresh(&acme, 2).await;
     let brands = &storage.brands;
     assert_eq!(brands.find(&acme).await, Ok(None));
     let first = brand("Acme Bank", "#1f4fd8", Some("https://help.acme.example/"));
-    brands.set(&acme, &first).await.expect("set");
-    assert_eq!(brands.find(&acme).await, Ok(Some(first)));
-    let second = brand("Acme", "#000000", None);
-    brands.set(&acme, &second).await.expect("set again");
+    assert_eq!(brands.set(&acme, 0, &first).await, Ok(true));
     assert_eq!(
         brands.find(&acme).await,
-        Ok(Some(second)),
+        Ok(Some(Revised {
+            brand: first.clone(),
+            revision: 1
+        }))
+    );
+    let second = brand("Acme", "#000000", None);
+    assert_eq!(
+        brands.set(&acme, 0, &second).await,
+        Ok(false),
+        "a brand set over one already there"
+    );
+    assert_eq!(
+        brands.set(&acme, 2, &second).await,
+        Ok(false),
+        "a revision ahead"
+    );
+    assert_eq!(
+        brands
+            .find(&acme)
+            .await
+            .map(|found| found.map(|revised| revised.brand)),
+        Ok(Some(first)),
+        "a refused change changes nothing"
+    );
+    assert_eq!(brands.set(&acme, 1, &second).await, Ok(true));
+    assert_eq!(
+        brands.find(&acme).await,
+        Ok(Some(Revised {
+            brand: second.clone(),
+            revision: 2
+        })),
         "the support link set first is gone with the replacement"
+    );
+    assert_eq!(
+        brands.set(&acme, 1, &second).await,
+        Ok(false),
+        "the revision already replaced"
     );
 }
 
@@ -110,7 +142,7 @@ async fn another_company_never_sees_a_brand_or_a_logo() {
         .expect("a second company");
     let brands = &storage.brands;
     brands
-        .set(&acme, &brand("Acme Bank", "#1f4fd8", None))
+        .set(&acme, 0, &brand("Acme Bank", "#1f4fd8", None))
         .await
         .expect("set");
     brands.set_logo(&acme, &logo(0), NOW).await.expect("logo");

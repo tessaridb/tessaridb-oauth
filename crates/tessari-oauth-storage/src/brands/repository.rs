@@ -13,8 +13,12 @@ pub(crate) trait BrandRepository: Send + Sync {
     /// The stored brand, when one was ever set.
     async fn find(&self, place: &Place) -> Result<Option<BrandEntity>>;
 
-    /// Store `brand` whole, replacing any before.
-    async fn put(&self, place: &Place, brand: &BrandEntity) -> Result<()>;
+    /// Store `brand` where none is stored; refused as a conflict when one is.
+    async fn create(&self, place: &Place, brand: &BrandEntity) -> Result<()>;
+
+    /// Replace the stored brand whole with `brand` only while it is at revision `replaces`; refused as a conflict
+    /// otherwise.
+    async fn replace(&self, place: &Place, replaces: i64, brand: &BrandEntity) -> Result<()>;
 
     /// The stored logo, when one is set.
     async fn find_logo(&self, place: &Place) -> Result<Option<LogoEntity>>;

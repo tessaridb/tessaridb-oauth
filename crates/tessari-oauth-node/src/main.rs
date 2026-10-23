@@ -211,6 +211,7 @@ async fn run(
         audit: Arc::clone(&storage.audit),
         sessions: Arc::clone(&storage.sessions),
         policies: Arc::clone(&storage.policies),
+        brands: Arc::clone(&storage.brands),
         users: Arc::clone(&storage.users),
         refresh: Arc::clone(&storage.refresh),
         enrolments: Arc::clone(&storage.enrolments),
