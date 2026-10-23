@@ -58,7 +58,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | per-tenant discovery and key set; authorization (with PAR), token (code, refresh, client credentials), revocation, UserInfo, RP-initiated and back-channel logout; sign-in with password, TOTP, recovery codes and passkeys; consent; the account API; the admin console; signing-key rotation; per-address limits; the audit trail; regions |
+| Served | per-tenant discovery and key set; authorization (with PAR), token (code, refresh, client credentials), revocation, UserInfo, RP-initiated and back-channel logout; sign-in with password, TOTP, recovery codes and passkeys; password reset and sign-in notices by mail; consent; the account API; the admin console; signing-key rotation; per-address limits; the audit trail; regions |
 | Next | the account portal page; a container image |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
@@ -69,7 +69,7 @@ claimed until a test backs them.
 | [Protocol endpoints](docs/protocol.md) | clients, authorization, tokens, revocation, UserInfo, logout, first password |
 | [Account API](docs/account.md) | a user's own account, grants and sessions |
 | [Admin console](docs/admin-console.md) | the console's API and pages, operator roles in use, the audit trail |
-| [How the server runs](docs/server.md) | start-up, limits and sign-in holds, the pages it carries, logs and shutdown |
+| [How the server runs](docs/server.md) | start-up, limits and sign-in holds, the pages it carries, mail and password reset, logs and shutdown |
 | [Regions](docs/regions.md) | home regions, peer directories and the redirect |
 | [Platform operators](docs/operators.md) | the emergency path for the first operator |
 | [Development](docs/development.md) | workspace layout and the live test suites |
@@ -105,6 +105,10 @@ first, for development only.
 | `TOKEN_LIMIT`, `TOKEN_WINDOW_SECS` | token requests one client address may make per window | `60`, `60` |
 | `AUTHORIZE_LIMIT`, `AUTHORIZE_WINDOW_SECS` | authorization requests one client address may make per window | `120`, `60` |
 | `LOGIN_LIMIT`, `LOGIN_WINDOW_SECS` | sign-in steps one client address may post per window | `30`, `60` |
+| `SMTP_URL` | the mail relay for password-reset links and sign-in notices: `smtps://host[:port]` (TLS from the start, port 465), `smtp://host[:port]` (STARTTLS required, port 587), or `smtp://<loopback IP>:port?plain` in the clear on a loopback address only; no credentials in the URL. Without it no mail is sent and a password reset answers `503` | unset (no mail) |
+| `SMTP_FROM` | the sender, `address` or `Name <address>`; required with `SMTP_URL` | none |
+| `SMTP_USER`, `SMTP_PASSWORD_FILE` | the relay account, both or neither; the password file must be mode 600 or 400 | none |
+| `SMTP_AUTHORITY` | the PEM the relay's certificate must lead to; without it the system's roots are used | none |
 
 ```sh
 cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary

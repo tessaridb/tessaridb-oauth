@@ -34,8 +34,9 @@ authorization belongs to the browser that brought it to `/oauth2/authorize`, by 
 (kept when the browser has one, drawn otherwise): another browser holding the request's id cannot sign in for it,
 answer its consent or receive its code.
 
-The sign-in, consent and account pages are served by the binary itself at `<issuer>/login`, `<issuer>/consent` and
-`<issuer>/account`, with their script, style and mark under `<issuer>/assets/`. The account page shows the signed-in
+The sign-in, password-reset, consent and account pages are served by the binary itself at `<issuer>/login`,
+`<issuer>/login/reset`, `<issuer>/consent` and `<issuer>/account`, with their script, style and mark under
+`<issuer>/assets/`. The account page shows the signed-in
 user's address, how the account signs in, where it is signed in and which applications hold access; it signs out one
 session or every session after a confirmation, takes an application's access back, saying when the tokens it already
 holds stop working, changes the password, issues new recovery codes shown once, turns on an authenticator app from a
@@ -47,6 +48,24 @@ one. Their TypeScript source is in `crates/tessari-oauth-api/pages/`, and its bu
 `crates/tessari-oauth-api/assets/`, so building the server needs no Node. After changing the source, `npm install`
 once and `npm run build` there; `npm run verify` type-checks, runs the page tests and fails when the committed
 assets differ from a rebuild.
+
+With `SMTP_URL` set the server sends mail through that relay: a password-reset link, and a notice to the account's
+address when its sign-in changes (password changed or reset, a passkey or authenticator app added or removed, new
+recovery codes, a recovery code used, every session signed out). A notice carries no link. A request only writes the
+mail, sealed under the KEK, to a queue in the company's database; a background task sends what is due every five
+seconds, each send bounded to 20 seconds, tries a mail the relay did not take again after 30 seconds and then twice
+as long each time, and drops it after its sixth try. No address, subject or text is logged.
+
+A user who forgot the password asks from the sign-in page. `POST <issuer>/login/api/reset` with an address answers
+`202` for every address, with or without an account, and does the same store work for each, so the answer says
+nothing about who has an account; without a relay it answers `503` with `mail_unavailable` for every address. An
+address with an account gets a link to `<issuer>/login/reset#token=<token>`. It works once, for 30 minutes, and stops
+working when a newer link is asked for or the account signs in. The token travels in the fragment, which reaches
+neither the server's logs nor a `Referer`, and the page takes it out of the address before it sends anything. Setting
+the new password (`POST <issuer>/login/api/reset/complete`) changes the password only: the authenticator app and
+passkeys stay, so the next sign-in still asks for them. Every session ends, every refresh token is revoked, the
+change is recorded and a notice goes to the address. A link that was never issued, was used, was replaced or has
+lapsed gets `400` `code_rejected`.
 
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listeners stop accepting, the requests in flight
