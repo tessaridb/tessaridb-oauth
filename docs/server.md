@@ -51,7 +51,8 @@ once and `npm run build` there; `npm run verify` type-checks, runs the page test
 assets differ from a rebuild.
 
 With `SMTP_URL` set the server sends mail through that relay: a password-reset link, an enrolment link an operator
-sends or a registration asks for, a notice to an address that asked to open an account it already has, and a notice to the account's address when its sign-in changes (password changed or reset, a passkey or
+sends or a registration asks for, a notice to an address that asked to open an account it already has,
+and a notice to the account's address when its sign-in changes (password changed or reset, a passkey or
 authenticator app added or removed, new
 recovery codes, a recovery code used, every session signed out). A notice carries no link. A request only writes the
 mail, sealed under the KEK, to a queue in the company's database; a background task sends what is due every five
