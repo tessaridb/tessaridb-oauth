@@ -71,7 +71,7 @@ claimed until a test backs them.
 | [Admin console](docs/admin-console.md) | the console's API and pages, operator roles in use, the audit trail |
 | [How the server runs](docs/server.md) | start-up, limits and sign-in holds, the pages it carries, mail and password reset, logs and shutdown |
 | [Regions](docs/regions.md) | home regions, peer directories and the redirect |
-| [Platform operators](docs/operators.md) | the first operator's emergency path; incident playbooks |
+| [Platform operators](docs/operators.md) | the first operator's emergency path; incidents; backup and restore |
 | [Development](docs/development.md) | workspace layout and the live test suites |
 
 ## Running

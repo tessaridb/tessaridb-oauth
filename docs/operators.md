@@ -1,7 +1,7 @@
 # Platform operators
 
-The emergency path for the first operator, operator roles, and what to do in an incident: an exposed signing key,
-a leaked client credential, a taken account.
+The emergency path for the first operator, operator roles, what to do in an incident (an exposed signing key,
+a leaked client credential, a taken account), and backup and restore.
 
 
 ```sh
@@ -68,3 +68,23 @@ When an account may be used by someone other than its owner, disable it with an 
 access tokens stop working by the `access_tokens_end_by` the answer gives. Once the owner is reached, enable it again
 (`POST .../users/<user>/enable`, which gives back none of what was ended) and have the owner ask for a password reset
 from the sign-in page; the reset keeps the account's second factor.
+
+## Backup and restore
+
+Everything the server keeps is in its TessariDB store, so a backup is a snapshot of the node, taken while it serves:
+`TESSARIDB_PASSWORD=<owner password> tessaridb --at <store address> --user <owner> --backup <file>`. Start the node
+with `--encryption-key-file` and every snapshot it writes is sealed under that key; check each one where it was
+written, before keeping it, with `tessaridb --verify <file> --backup-key-file <key file>`, which says what the file
+holds and exits non-zero for a file cut short or a wrong key. A passing verify is not a restore: rehearse one.
+
+A snapshot does not hold the server's key-encryption key (`TESSARIDB_OAUTH_KEK`) or its password pepper
+(`TESSARIDB_OAUTH_PEPPER`): without them the restored signing keys cannot be opened and no password verifies. Keep
+both with the store's encryption key, apart from the snapshots. To restore, replay the snapshot into an empty
+directory (`tessaridb <dir> --restore <file> --encryption-key-file <key file>`), serve that directory, and start the
+server with the same key-encryption key, pepper and `TESSARIDB_OAUTH_REGION`. Users sign in with the passwords they
+had, the keys that signed are published again, and refresh tokens issued before the snapshot work. A signing key
+withdrawn after the snapshot was taken comes back as it stood, so withdraw it again before serving traffic.
+
+Nothing bounds how long snapshot files are kept; delete them on a schedule. Each one holds every account's password
+hash and every company's sealed signing keys, and an older one brings back sessions, grants and keys that have since
+ended.
