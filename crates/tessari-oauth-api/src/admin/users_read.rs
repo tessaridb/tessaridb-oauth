@@ -17,7 +17,7 @@ use tessari_oauth_types::{EmailAddress, UserId};
 
 use super::AdminState;
 use super::change::{Reasoned, Refusal, reason_of};
-use super::operator::{from_console, signed_in};
+use super::operator::{Operator, from_console, signed_in};
 use crate::{Error, Result};
 
 /// The read the routes below name when it is refused.
@@ -91,6 +91,7 @@ pub(super) async fn list(
             .find_by_email(tenant, &email)
             .await
             .map_err(Error::Store)?;
+        shown_to(&state, &operator, usize::from(found.is_some())).await?;
         let users = found.iter().map(shown).collect();
         return Ok(Json(Page { users, next: None }).into_response());
     }
@@ -112,6 +113,7 @@ pub(super) async fn list(
         .last()
         .filter(|_| full)
         .map(|account| account.user.as_str().to_owned());
+    shown_to(&state, &operator, accounts.len()).await?;
     let users = accounts.iter().map(shown).collect();
     Ok(Json(Page { users, next }).into_response())
 }
@@ -132,7 +134,11 @@ pub(super) async fn one(
             .map_err(Error::Store)?,
         Err(_) => None,
     };
-    Ok(found.map_or_else(missing, |account| Json(shown(&account)).into_response()))
+    let Some(account) = found else {
+        return Ok(missing());
+    };
+    shown_to(&state, &operator, 1).await?;
+    Ok(Json(shown(&account)).into_response())
 }
 
 /// Show the address of the company's account `user` whole, recorded with the operator's reason before it is shown.
@@ -174,11 +180,36 @@ pub(super) async fn reveal(
         .record(&operator.tenant, &event, (state.clock)())
         .await
         .map_err(Error::Store)?;
+    shown_to(&state, &operator, 1).await?;
     Ok(Json(Revealed {
         user: account.user.as_str(),
         email: account.email.as_str(),
     })
     .into_response())
+}
+
+/// Count `accounts` shown to `operator` before they are answered, and log the read that takes the operator's count for
+/// the hour to the number worth noticing (admin console reads are personal data).
+async fn shown_to(state: &AdminState, operator: &Operator, accounts: usize) -> Result<()> {
+    if accounts == 0 {
+        return Ok(());
+    }
+    let accounts = u64::try_from(accounts).map_err(|_| Error::Internal)?;
+    let reads = state
+        .throttle
+        .operator_read(&operator.tenant, &operator.user, accounts, (state.clock)())
+        .await
+        .map_err(Error::Store)?;
+    if reads.noticed {
+        tracing::warn!(
+            event = "operator_reads_high",
+            tenant = operator.tenant.as_str(),
+            operator = operator.user.as_str(),
+            accounts = reads.total,
+            "an operator was shown more accounts this hour than is usual"
+        );
+    }
+    Ok(())
 }
 
 /// The answer for an account the company does not have.

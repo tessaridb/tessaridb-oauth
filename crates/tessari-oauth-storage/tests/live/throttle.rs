@@ -3,12 +3,14 @@
 
 use std::num::NonZeroU64;
 
-use tessari_oauth_constants::THROTTLE_SPACE_MAX_KEYS;
+use tessari_oauth_constants::{
+    OPERATOR_READ_WINDOW_SECS, OPERATOR_READS_NOTICED, THROTTLE_SPACE_MAX_KEYS,
+};
 use tessari_oauth_infrastructure::tessaridb::{Answer, Database, Place, Value};
-use tessari_oauth_storage::throttle::{Admission, Limit};
+use tessari_oauth_storage::throttle::{Admission, Limit, OperatorReads};
 use tessari_oauth_storage::{Storage, Tenancy};
 use tessari_oauth_test_support::{earlier_runs_removed, plain_node, unique};
-use tessari_oauth_types::Timestamp;
+use tessari_oauth_types::{TenantId, Timestamp, UserId};
 
 const NOW: u64 = 1_800_000_010;
 
@@ -128,6 +130,59 @@ async fn request_counters_are_held_in_the_store_nodes_memory_and_failures_on_dis
             format!("DEFINE SPACE requests IN MEMORY MAX {THROTTLE_SPACE_MAX_KEYS};"),
             format!("DEFINE SPACE counters MAX {THROTTLE_SPACE_MAX_KEYS};"),
         ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_operators_reads_add_up_per_hour_apart_from_other_operators_and_companies() {
+    let (storage, _, _) = prepared(2).await;
+    let acme = TenantId::parse("acme").expect("a tenant");
+    let initech = TenantId::parse("initech").expect("a tenant");
+    let anna = UserId::parse("operator-a").expect("an id");
+    let ben = UserId::parse("operator-b").expect("an id");
+    let read = |tenant: &TenantId, operator: &UserId, accounts: u64, at: u64| {
+        let storage = storage.clone();
+        let (tenant, operator) = (tenant.clone(), operator.clone());
+        async move {
+            storage
+                .throttle
+                .operator_read(&tenant, &operator, accounts, Timestamp::from_unix_secs(at))
+                .await
+                .expect("counted")
+        }
+    };
+    let below = OPERATOR_READS_NOTICED - 1;
+    assert_eq!(
+        read(&acme, &anna, below, NOW).await,
+        OperatorReads {
+            total: below,
+            noticed: false
+        }
+    );
+    assert_eq!(
+        read(&acme, &anna, 1, NOW).await,
+        OperatorReads {
+            total: OPERATOR_READS_NOTICED,
+            noticed: true
+        }
+    );
+    assert_eq!(
+        read(&acme, &anna, 5, NOW).await,
+        OperatorReads {
+            total: OPERATOR_READS_NOTICED + 5,
+            noticed: false
+        }
+    );
+    let apart = OperatorReads {
+        total: 1,
+        noticed: false,
+    };
+    assert_eq!(read(&acme, &ben, 1, NOW).await, apart);
+    assert_eq!(read(&initech, &anna, 1, NOW).await, apart);
+    assert_eq!(
+        read(&acme, &anna, 1, NOW + OPERATOR_READ_WINDOW_SECS).await,
+        apart
     );
 }
 

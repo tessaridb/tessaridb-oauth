@@ -52,7 +52,7 @@ pub struct ThrottleService {
 }
 
 /// The window `now` falls in under `limit`, and the seconds left in it (at least one).
-fn window(limit: Limit, now: Timestamp) -> (u64, u64) {
+pub(super) fn window(limit: Limit, now: Timestamp) -> (u64, u64) {
     let length = limit.window_secs;
     let secs = now.unix_secs();
     let index = secs / length;
@@ -62,8 +62,13 @@ fn window(limit: Limit, now: Timestamp) -> (u64, u64) {
 
 /// The counter's key. `group` is a name the caller's code chooses, never part of a request, and the window index
 /// holds no `:`, so the client, which may, comes last and cannot make two counters share a key.
-fn counter_key(group: &str, index: u64, client: &str) -> String {
+pub(super) fn counter_key(group: &str, index: u64, client: &str) -> String {
     format!("{group}:{index}:{client}")
+}
+
+/// Whether `added`, taking a count to `total`, is what took it to `threshold`: true for exactly one addition.
+pub(super) const fn noticed(total: u64, added: u64, threshold: u64) -> bool {
+    total >= threshold && total.saturating_sub(added) < threshold
 }
 
 impl ThrottleService {
@@ -101,8 +106,13 @@ impl ThrottleService {
         let seconds = left.saturating_add(limit.window_secs.get());
         let key = counter_key(group, index, client);
         let count = retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
-            self.repository
-                .count(self.tenancy.throttle(), Counters::Requests, &key, seconds)
+            self.repository.count(
+                self.tenancy.throttle(),
+                Counters::Requests,
+                &key,
+                1,
+                seconds,
+            )
         })
         .await?;
         Ok(if count > limit.requests.get() {

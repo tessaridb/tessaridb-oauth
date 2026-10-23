@@ -47,7 +47,7 @@ impl ThrottleService {
             let counted = count_key(key, value);
             let failures = retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
                 self.repository
-                    .count(place, Counters::Signins, &counted, SIGNIN_MEMORY_SECS)
+                    .count(place, Counters::Signins, &counted, 1, SIGNIN_MEMORY_SECS)
             })
             .await?;
             let hold = hold_secs(key, failures);

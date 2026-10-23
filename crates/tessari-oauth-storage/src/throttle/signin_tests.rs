@@ -28,7 +28,7 @@ impl ThrottleRepository for Kept {
         Ok(())
     }
 
-    async fn count(&self, _: &Place, counters: Counters, _: &str, _: u64) -> Result<u64> {
+    async fn count(&self, _: &Place, counters: Counters, _: &str, _: u64, _: u64) -> Result<u64> {
         // A sign-in failure is counted on disk, so a restart does not clear it.
         assert_eq!(counters, Counters::Signins);
         Ok(self.failures)

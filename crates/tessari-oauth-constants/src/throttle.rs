@@ -29,3 +29,10 @@ pub const SIGNIN_FREE_FAILURES_PAIR: u64 = 3;
 
 /// The longest a credential pair is held, in seconds.
 pub const SIGNIN_MAX_HOLD_PAIR_SECS: u64 = 900;
+
+/// The window an operator's account reads are counted in, in seconds.
+pub const OPERATOR_READ_WINDOW_SECS: u64 = 3_600;
+
+/// Accounts one operator may be shown in a window before the read that reaches this number is logged as
+/// `operator_reads_high`: ten full pages of the largest a console list answers.
+pub const OPERATOR_READS_NOTICED: u64 = 1_000;

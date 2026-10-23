@@ -13,12 +13,13 @@ pub(crate) trait ThrottleRepository: Send + Sync {
     /// Make the counters exist at `place`; running it again changes nothing.
     async fn prepare(&self, place: &Place) -> Result<()>;
 
-    /// Add one to the counter `key` in `counters`, created to live `seconds` when absent, answering its new count.
+    /// Add `by` to the counter `key` in `counters`, created to live `seconds` when absent, answering its new count.
     async fn count(
         &self,
         place: &Place,
         counters: Counters,
         key: &str,
+        by: u64,
         seconds: u64,
     ) -> Result<u64>;
 

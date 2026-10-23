@@ -161,6 +161,20 @@ async fn the_company_accounts_are_read_a_page_at_a_time_with_their_addresses_mas
         .await;
         assert_eq!(refused.status, StatusCode::BAD_REQUEST, "limit {limit}");
     }
+
+    // Two pages, a lookup and the account itself showed five accounts; the operator's count for the hour holds them.
+    let counted = server
+        .storage
+        .throttle
+        .operator_read(
+            &tenant("acme"),
+            &UserId::parse("operator-u").expect("an id"),
+            1,
+            Timestamp::from_unix_secs(NOW),
+        )
+        .await
+        .expect("counted");
+    assert_eq!(counted.total, 6);
 }
 
 #[tokio::test]

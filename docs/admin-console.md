@@ -55,7 +55,9 @@ and no total; `?email=<address>` instead finds the one account that exact addres
 `GET .../api/users/<user>` reads one account. Every address in these answers is masked to its first character and
 domain (`k***@acme.example`). `POST .../api/users/<user>/email/reveal` (role `users`, from the console's origin, with
 a `reason`) shows one address whole, and is recorded as `admin_action` `users.reveal_email` with the operator and the
-reason before it is shown; when the record cannot be written, nothing is shown.
+reason before it is shown; when the record cannot be written, nothing is shown. The accounts each operator is shown
+(a page, a lookup, an account, a reveal) are counted per hour before they are answered, and the read that takes an
+operator to 1 000 in an hour is logged as `operator_reads_high`.
 
 `POST <ADMIN_URL>/admin/<company>/api/users` (role `users`) with `{"email", "reason"}` opens an active account that
 signs in with that address and answers `201` with its id and the address masked; an address the company already

@@ -51,10 +51,12 @@ impl ThrottleRepository for TessaridbThrottleRepository {
         place: &Place,
         counters: Counters,
         key: &str,
+        by: u64,
         seconds: u64,
     ) -> Result<u64> {
         let seconds =
             i64::try_from(seconds).map_err(|_| unreadable("a lifetime beyond i64 seconds"))?;
+        let by = i64::try_from(by).map_err(|_| unreadable("an addition beyond i64"))?;
         // `INCR` keeps an existing expiry but gives a missing key none, so the counter is first created with its
         // expiry. Each statement reads and writes the key atomically; should the key lapse between the two, the
         // `INCR` makes a counter without expiry, which its window index retires from use and the space's bound
@@ -62,7 +64,7 @@ impl ThrottleRepository for TessaridbThrottleRepository {
         // The space's name is one of this crate's own, never a request's.
         let space = counters.space();
         let statement = format!(
-            "SET {space}:$key = 0 IF ABSENT EXPIRE duration::from_secs($seconds); INCR {space}:$key;"
+            "SET {space}:$key = 0 IF ABSENT EXPIRE duration::from_secs($seconds); INCR {space}:$key BY $by;"
         );
         let answers = self
             .database
@@ -71,6 +73,7 @@ impl ThrottleRepository for TessaridbThrottleRepository {
                 &statement,
                 vec![
                     ("key".to_owned(), Value::from(key)),
+                    ("by".to_owned(), Value::from(by)),
                     ("seconds".to_owned(), Value::from(seconds)),
                 ],
             )

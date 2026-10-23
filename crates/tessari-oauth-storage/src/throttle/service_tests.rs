@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
 use tessari_oauth_types::Timestamp;
 
-use super::{Admission, Limit, ThrottleService, counter_key, window};
+use super::{Admission, Limit, ThrottleService, counter_key, noticed, window};
 use crate::throttle::model::Counters;
 use crate::throttle::repository::ThrottleRepository;
 use crate::{Error, Result, Tenancy};
@@ -38,6 +38,15 @@ fn a_counter_is_keyed_by_its_group_its_window_and_its_client() {
     );
 }
 
+#[test]
+fn an_operator_is_noticed_once_per_window_by_the_read_that_reaches_the_threshold() {
+    assert!(!noticed(999, 1, 1_000));
+    assert!(noticed(1_000, 1, 1_000));
+    assert!(noticed(1_050, 100, 1_000));
+    assert!(!noticed(1_100, 50, 1_000));
+    assert!(!noticed(1_000, 0, 1_000));
+}
+
 /// A backend answering the counts it is given, in order, and recording what it was asked.
 struct Counts {
     answers: Mutex<Vec<u64>>,
@@ -55,6 +64,7 @@ impl ThrottleRepository for Counts {
         place: &Place,
         counters: Counters,
         key: &str,
+        _: u64,
         seconds: u64,
     ) -> Result<u64> {
         self.asked.lock().expect("unpoisoned").push((
@@ -130,7 +140,7 @@ impl ThrottleRepository for Down {
         Err(down())
     }
 
-    async fn count(&self, _: &Place, _: Counters, _: &str, _: u64) -> Result<u64> {
+    async fn count(&self, _: &Place, _: Counters, _: &str, _: u64, _: u64) -> Result<u64> {
         Err(down())
     }
 
