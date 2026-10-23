@@ -2,9 +2,8 @@
 //!
 //! The store reports contention rather than resolving it, and the retry is the caller's decision (only the caller
 //! knows whether the work is still worth doing). Each domain names which refusals it retries and how many times;
-//! this is only the loop. The two refusals worth retrying want different pauses: a lost compare-and-set means
-//! another write already committed, so reading again after a short fixed pause finds it; a `retry` means a commit is
-//! still landing, and the pause grows until it has.
+//! this is only the loop. The pause grows each time: a commit still landing needs time, and many writers of one
+//! record commit one at a time.
 
 use std::future::Future;
 use std::time::Duration;
@@ -17,9 +16,7 @@ use crate::{Error, Result};
 pub(crate) enum Again {
     /// Stop and answer the failure.
     No,
-    /// Try again after the short fixed pause: another writer won and its write is there to read.
-    Soon,
-    /// Try again after a pause that doubles each time: the store is still landing a commit.
+    /// Try again after a pause that doubles each time.
     Later,
 }
 
@@ -47,7 +44,6 @@ where
         let pause = match again {
             Again::No => return outcome,
             _ if made >= attempts => return outcome,
-            Again::Soon => short,
             Again::Later => {
                 let pause = growing;
                 growing = growing.saturating_mul(2).min(longest);

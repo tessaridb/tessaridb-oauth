@@ -41,11 +41,11 @@ fn record_id(user: &UserId, client: &ClientId) -> String {
 }
 
 /// A write of the record lost to another writer, whether the store says so as a conflict or as a `retry`: that
-/// writer committed, and the write is read, merged and tried again after the short pause. Waiting longer only lets
-/// the other losers collide again.
+/// writer committed, and the write is read, merged and tried again after a pause that grows. Many writers of one
+/// record commit one at a time, so a fixed short pause runs out of attempts before the last of them is through.
 fn contended(failure: &Error) -> Again {
     match failure {
-        Error::Store(store) if store.category() == ErrorCategory::Conflict => Again::Soon,
+        Error::Store(store) if store.category() == ErrorCategory::Conflict => Again::Later,
         _ => Again::No,
     }
 }
