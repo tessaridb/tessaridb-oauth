@@ -107,3 +107,23 @@ export function rolesOf(text: string): string[] | null {
   const roles = text.split(/\s+/).filter((role) => role !== "");
   return roles.every((role) => NAME.test(role)) ? roles : null;
 }
+
+/** What a deletion says about the members it ends: `count` on the page read, `more` when that page was full. */
+export function membersCountText(count: number, more: boolean): string {
+  if (more) {
+    return `It has more than ${count} members, whose memberships end.`;
+  }
+  if (count === 0) {
+    return "It has no members.";
+  }
+  return count === 1 ? "It has 1 member, whose membership ends." : `It has ${count} members, whose memberships end.`;
+}
+
+/** The codes a group change is refused with as not found, each naming a different thing that is missing. */
+const NOT_FOUND = ["group_not_found", "user_not_found", "member_not_found"];
+
+/** The code of a group change refused as not found, which the console's general reading folds into one, or null. */
+export function groupRefusalCode(status: number, body: unknown): string | null {
+  const code = field(body, "code");
+  return status === 404 && typeof code === "string" && NOT_FOUND.includes(code) ? code : null;
+}

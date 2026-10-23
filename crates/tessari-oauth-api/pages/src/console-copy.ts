@@ -94,3 +94,21 @@ export function companyRefusalText(code: string): string {
       return changeRefusalText(code);
   }
 }
+
+/** The words for a group change the server refused with `code`. */
+export function groupRefusalText(code: string): string {
+  switch (code) {
+    case "group_taken":
+      return "This company already has a group with this id. Choose another id, or open that group.";
+    case "group_not_found":
+      return "This group is not in this company any more. Go back to the groups list.";
+    case "user_not_found":
+      return "No account in this company has this id. Look the account up under Users and copy its id.";
+    case "member_not_found":
+      return "This account is not in this group any more. Reload the view to see the current members.";
+    case "too_many_groups":
+      return "This account is already in as many groups as one account may be. Take it out of one first.";
+    default:
+      return changeRefusalText(code);
+  }
+}

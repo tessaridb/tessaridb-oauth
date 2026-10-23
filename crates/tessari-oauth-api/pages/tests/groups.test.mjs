@@ -4,10 +4,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { offered, route } from "../src/console-read.ts";
+import { groupRefusalText } from "../src/console-copy.ts";
 import {
   groupFormOf,
   groupPath,
+  groupRefusalCode,
   groupsPath,
+  membersCountText,
   membersPath,
   readGroup,
   readGroupsPage,
@@ -60,4 +63,29 @@ test("a group form names the field to fix, or the request it makes", () => {
   ]) {
     assert.deepEqual(groupFormOf({ id, description: "", roles }), { wrong }, `${id} ${roles}`);
   }
+});
+
+test("each refused group change says what happened and what to do next", () => {
+  for (const code of ["group_taken", "group_not_found", "user_not_found", "member_not_found", "too_many_groups"]) {
+    const text = groupRefusalText(code);
+    assert.notEqual(text, groupRefusalText("unknown_code"), code);
+    assert.doesNotMatch(text, /_/, code);
+  }
+  assert.equal(groupRefusalText("reason_required"), "Say why, in 1 to 500 characters.");
+});
+
+test("a deletion counts the members it ends, and says when the page was full", () => {
+  assert.equal(membersCountText(0, false), "It has no members.");
+  assert.equal(membersCountText(1, false), "It has 1 member, whose membership ends.");
+  assert.equal(membersCountText(3, false), "It has 3 members, whose memberships end.");
+  assert.equal(membersCountText(50, true), "It has more than 50 members, whose memberships end.");
+});
+
+test("a group change refused as not found keeps which thing was not found", () => {
+  assert.equal(groupRefusalCode(404, { code: "user_not_found", message: "x" }), "user_not_found");
+  assert.equal(groupRefusalCode(404, { code: "member_not_found", message: "x" }), "member_not_found");
+  assert.equal(groupRefusalCode(404, { code: "group_not_found", message: "x" }), "group_not_found");
+  assert.equal(groupRefusalCode(404, { code: "elsewhere", message: "x" }), null);
+  assert.equal(groupRefusalCode(409, { code: "user_not_found", message: "x" }), null);
+  assert.equal(groupRefusalCode(404, null), null);
 });

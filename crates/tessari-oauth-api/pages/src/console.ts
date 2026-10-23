@@ -7,6 +7,8 @@ import { type Screen, heading, link, make, show } from "./console-dom.ts";
 import { call, element, say } from "./dom.ts";
 import { auditView } from "./audit.ts";
 import { companiesView } from "./companies.ts";
+import { groupView } from "./group.ts";
+import { groupsView } from "./groups.ts";
 import { clientsView } from "./clients.ts";
 import { operatorsView } from "./operators.ts";
 import { policyView } from "./policy.ts";
@@ -107,6 +109,12 @@ function draw(who: Me): void {
       return;
     case "user":
       void userView(screen, at.id);
+      return;
+    case "groups":
+      void groupsView(screen, at.after);
+      return;
+    case "group":
+      void groupView(screen, at.id, at.after);
       return;
     case "clients":
       void clientsView(screen, at.after);

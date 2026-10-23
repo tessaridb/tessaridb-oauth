@@ -260,6 +260,22 @@
         return changeRefusalText(code);
     }
   }
+  function groupRefusalText(code) {
+    switch (code) {
+      case "group_taken":
+        return "This company already has a group with this id. Choose another id, or open that group.";
+      case "group_not_found":
+        return "This group is not in this company any more. Go back to the groups list.";
+      case "user_not_found":
+        return "No account in this company has this id. Look the account up under Users and copy its id.";
+      case "member_not_found":
+        return "This account is not in this group any more. Reload the view to see the current members.";
+      case "too_many_groups":
+        return "This account is already in as many groups as one account may be. Take it out of one first.";
+      default:
+        return changeRefusalText(code);
+    }
+  }
 
   // src/users-change.ts
   var REASON_MAX_CHARS = 500;
@@ -764,6 +780,519 @@
     say(message);
   }
 
+  // src/groups-read.ts
+  var NAME = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+  function groupsPath(after) {
+    return after === null ? "api/groups" : `api/groups?${new URLSearchParams({ after }).toString()}`;
+  }
+  function groupPath(id) {
+    return `api/groups/${encodeURIComponent(id)}`;
+  }
+  function membersPath(id, after) {
+    const base = `${groupPath(id)}/members`;
+    return after === null ? base : `${base}?${new URLSearchParams({ after }).toString()}`;
+  }
+  function readGroup(value) {
+    const id = field(value, "group");
+    const description = field(value, "description");
+    const roles = strings(field(value, "roles"));
+    if (typeof id !== "string" || id === "" || typeof description !== "string" || roles === null) {
+      return null;
+    }
+    return { id, description, roles };
+  }
+  function readGroupsPage(body) {
+    const listed = field(body, "groups");
+    const next = field(body, "next");
+    if (!Array.isArray(listed) || next !== null && typeof next !== "string") {
+      return null;
+    }
+    const groups = [];
+    for (const value of listed) {
+      const group = readGroup(value);
+      if (group === null) {
+        return null;
+      }
+      groups.push(group);
+    }
+    return { groups, next };
+  }
+  function readMembersPage(body) {
+    const listed = field(body, "members");
+    const next = field(body, "next");
+    if (!Array.isArray(listed) || next !== null && typeof next !== "string") {
+      return null;
+    }
+    const members = [];
+    for (const value of listed) {
+      const user = field(value, "user");
+      const addedBy = field(value, "added_by");
+      if (typeof user !== "string" || user === "" || typeof addedBy !== "string") {
+        return null;
+      }
+      members.push({ user, addedBy });
+    }
+    return { members, next };
+  }
+  function groupFormOf(form) {
+    const id = form.id.trim();
+    if (!NAME.test(id)) {
+      return { wrong: "id" };
+    }
+    const roles = rolesOf(form.roles);
+    if (roles === null) {
+      return { wrong: "roles" };
+    }
+    return { body: { group: id, description: form.description.trim(), roles } };
+  }
+  function rolesOf(text) {
+    const roles = text.split(/\s+/).filter((role) => role !== "");
+    return roles.every((role) => NAME.test(role)) ? roles : null;
+  }
+  function membersCountText(count3, more) {
+    if (more) {
+      return `It has more than ${count3} members, whose memberships end.`;
+    }
+    if (count3 === 0) {
+      return "It has no members.";
+    }
+    return count3 === 1 ? "It has 1 member, whose membership ends." : `It has ${count3} members, whose memberships end.`;
+  }
+  var NOT_FOUND = ["group_not_found", "user_not_found", "member_not_found"];
+  function groupRefusalCode(status, body) {
+    const code = field(body, "code");
+    return status === 404 && typeof code === "string" && NOT_FOUND.includes(code) ? code : null;
+  }
+
+  // src/group-remove.ts
+  async function deletePanel(screen, group, { host, opener }, deleted) {
+    say(`Counting the members of ${group.id}.`);
+    const read = await call("GET", membersPath(group.id, null));
+    if (!screen.live()) {
+      return;
+    }
+    const page = read.ok ? readMembersPage(read.body) : null;
+    if (page === null) {
+      const text = read.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, read, "That group", groupRefusalText);
+      if (text !== null) {
+        say(text);
+      }
+      return;
+    }
+    const keyFor = keys();
+    const typed = make("input", "mono");
+    typed.type = "text";
+    typed.autocomplete = "off";
+    typed.spellcheck = false;
+    const reason = reasonField("group-delete-reason");
+    const said = notice();
+    const remove = button("Delete the group", "danger", () => {
+      if (!confirmedBy(typed.value, group.id)) {
+        return;
+      }
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      remove.disabled = true;
+      void change(`${groupPath(group.id)}/remove`, keyFor, { reason: why }).then((answer) => {
+        remove.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        if (answer.ok) {
+          deleted(`Group ${group.id} deleted.`);
+          return;
+        }
+        const missing = groupRefusalCode(answer.status, answer.body);
+        const text = missing !== null ? groupRefusalText(missing) : refusedText(screen, answer, "That group", groupRefusalText);
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    remove.disabled = true;
+    typed.addEventListener("input", () => {
+      remove.disabled = !confirmedBy(typed.value, group.id);
+    });
+    const keep = button("Keep it", "secondary", () => {
+      host.replaceChildren();
+      opener.hidden = false;
+      say(`${group.id} kept.`);
+    });
+    opener.hidden = true;
+    host.replaceChildren(
+      make(
+        "section",
+        "change-form confirm",
+        make("h2", "", "Delete ", make("code", "", group.id), "?"),
+        make(
+          "p",
+          "",
+          `${membersCountText(page.members.length, page.next !== null)} Applications stop receiving this group and its roles for those accounts at their next request. This cannot be undone.`
+        ),
+        labelled("group-delete-typed", "Type the group id to confirm", typed),
+        reason.row,
+        said,
+        make("div", "actions", remove, keep)
+      )
+    );
+    typed.focus();
+    say(`Confirm deleting ${group.id}.`);
+  }
+
+  // src/group.ts
+  var pending = "";
+  function groupHash(id) {
+    return `#/groups/${encodeURIComponent(id)}`;
+  }
+  function openGroup(id, message) {
+    pending = message;
+    location.hash = groupHash(id);
+  }
+  function rolePills(roles) {
+    if (roles.length === 0) {
+      return make("span", "muted", "None");
+    }
+    const pills = make("ul", "pills");
+    for (const role of roles) {
+      pills.append(make("li", "pill", role));
+    }
+    return pills;
+  }
+  function refusedHere(screen, answer, said) {
+    const missing = groupRefusalCode(answer.status, answer.body);
+    const text = answer.ok ? "The server answered in a shape the console cannot read." : missing !== null ? groupRefusalText(missing) : refusedText(screen, answer, "This group", groupRefusalText);
+    if (text !== null) {
+      said.textContent = text;
+      said.hidden = false;
+    }
+  }
+  function rolesForm(screen, group, redraw) {
+    const keyFor = keys();
+    const roles = make("input", "mono");
+    roles.type = "text";
+    roles.autocomplete = "off";
+    roles.spellcheck = false;
+    roles.value = group.roles.join(" ");
+    const reason = reasonField("group-roles-reason");
+    const said = notice();
+    const submit = make("button", "secondary", "Set roles");
+    submit.type = "submit";
+    const form = make(
+      "form",
+      "change-form",
+      make("h2", "", "Roles it carries"),
+      labelled("group-roles", "Roles, separated by spaces (empty for none)", roles),
+      reason.row,
+      said,
+      submit
+    );
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const set = rolesOf(roles.value);
+      if (set === null) {
+        said.textContent = "Give roles as lowercase words separated by spaces, each like a group id.";
+        said.hidden = false;
+        roles.setAttribute("aria-invalid", "true");
+        roles.focus();
+        return;
+      }
+      roles.removeAttribute("aria-invalid");
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      submit.disabled = true;
+      void change(`${groupPath(group.id)}/roles`, keyFor, { roles: set, reason: why }).then((answer) => {
+        submit.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        if (answer.ok && readGroup(answer.body) !== null) {
+          redraw("Roles set.");
+          return;
+        }
+        refusedHere(screen, answer, said);
+      });
+    });
+    return form;
+  }
+  function membersSection(screen, group, page, after, redraw) {
+    const keyFor = keys();
+    const reason = reasonField("group-members-reason");
+    const said = notice();
+    const send = (path, body, done, sent) => {
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      sent.disabled = true;
+      void change(path, keyFor, { ...body, reason: why }).then((answer) => {
+        sent.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        if (answer.ok) {
+          redraw(done);
+          return;
+        }
+        refusedHere(screen, answer, said);
+      });
+    };
+    const base = groupPath(group.id);
+    const parts = [make("h2", "", "Members")];
+    if (page.members.length === 0) {
+      parts.push(make("p", "empty", after === null ? "No account is in this group." : "No more members after this one."));
+    } else {
+      const head = make("tr", "", make("th", "", "Account"), make("th", "", "Added by"), make("th", "", "Membership"));
+      for (const cell of head.children) {
+        cell.setAttribute("scope", "col");
+      }
+      const body = make("tbody", "");
+      for (const member of page.members) {
+        const remove = button("Take out", "secondary", () => {
+          send(`${base}/members/${encodeURIComponent(member.user)}/remove`, {}, `${member.user} taken out.`, remove);
+        });
+        remove.setAttribute("aria-label", `Take ${member.user} out of ${group.id}`);
+        body.append(
+          make(
+            "tr",
+            "",
+            make("td", "", link(`#/users/${encodeURIComponent(member.user)}`, member.user, "mono-link")),
+            make("td", "", make("code", "", member.addedBy)),
+            make("td", "", remove)
+          )
+        );
+      }
+      parts.push(make("table", "grid", make("thead", "", head), body));
+    }
+    const paging = make("p", "paging");
+    if (after !== null) {
+      paging.append(link(groupHash(group.id), "First page"));
+    }
+    if (page.next !== null) {
+      paging.append(link(`${groupHash(group.id)}?${new URLSearchParams({ after: page.next }).toString()}`, "Next page"));
+    }
+    if (paging.childElementCount > 0) {
+      parts.push(paging);
+    }
+    const user = make("input", "mono");
+    user.type = "text";
+    user.autocomplete = "off";
+    user.spellcheck = false;
+    const add = make("button", "secondary", "Add member");
+    add.type = "submit";
+    const form = make("form", "inline-form", labelled("group-add-user", "Account id", user), add);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const typed = user.value.trim();
+      if (typed === "") {
+        said.textContent = "Give the account's id, as the Users view shows it.";
+        said.hidden = false;
+        user.focus();
+        return;
+      }
+      send(`${base}/members`, { user: typed }, `${typed} added.`, add);
+    });
+    parts.push(reason.row, form, said);
+    return make("section", "change-form", ...parts);
+  }
+  async function groupView(screen, id, after, message = "") {
+    say("Loading the group.");
+    const [read, listed] = await Promise.all([call("GET", groupPath(id)), call("GET", membersPath(id, after))]);
+    if (!screen.live()) {
+      return;
+    }
+    if (!read.ok || !listed.ok) {
+      refusedOn(screen, "Group", read.ok ? listed : read, "That group");
+      return;
+    }
+    const group = readGroup(read.body);
+    const page = readMembersPage(listed.body);
+    if (group === null || page === null) {
+      unreadable(screen, "Group");
+      return;
+    }
+    const facts = make(
+      "dl",
+      "facts",
+      make("dt", "", "Group"),
+      make("dd", "", make("code", "", group.id)),
+      make("dt", "", "Description"),
+      make("dd", "", group.description === "" ? make("span", "muted", "None") : group.description),
+      make("dt", "", "Roles"),
+      make("dd", "", rolePills(group.roles))
+    );
+    const redraw = (said) => void groupView(screen, id, after, said);
+    const host = make("div", "");
+    const opener = make("section", "change-form", make("h2", "", "Delete this group"));
+    const remove = button("Delete group", "secondary", () => {
+      void deletePanel(screen, group, { host, opener }, (said) => {
+        pending = said;
+        location.hash = "#/groups";
+      });
+    });
+    opener.append(make("div", "actions", remove));
+    show(
+      screen.view,
+      heading("Group"),
+      facts,
+      rolesForm(screen, group, redraw),
+      membersSection(screen, group, page, after, redraw),
+      opener,
+      host,
+      make("p", "paging", link("#/groups", "Back to groups"))
+    );
+    say(message !== "" ? message : pending);
+    pending = "";
+  }
+  function takePending() {
+    const said = pending;
+    pending = "";
+    return said;
+  }
+
+  // src/groups.ts
+  var WRONG = {
+    id: "Give an id of 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit.",
+    roles: "Give roles as lowercase words separated by spaces, each like a group id."
+  };
+  function table(groups) {
+    const head = make(
+      "tr",
+      "",
+      make("th", "", "Group"),
+      make("th", "", "Description"),
+      make("th", "", "Roles")
+    );
+    for (const cell of head.children) {
+      cell.setAttribute("scope", "col");
+    }
+    const body = make("tbody", "");
+    for (const group of groups) {
+      body.append(
+        make(
+          "tr",
+          "",
+          make("td", "", link(groupHash(group.id), group.id, "mono-link")),
+          make("td", "", group.description === "" ? make("span", "muted", "None") : group.description),
+          make("td", "", rolePills(group.roles))
+        )
+      );
+    }
+    return make("table", "grid", make("thead", "", head), body);
+  }
+  function makeForm(screen) {
+    const keyFor = keys();
+    const id = make("input", "mono");
+    id.type = "text";
+    id.autocomplete = "off";
+    id.spellcheck = false;
+    id.maxLength = 64;
+    const description = make("input", "");
+    description.type = "text";
+    description.autocomplete = "off";
+    description.maxLength = 200;
+    const roles = make("input", "mono");
+    roles.type = "text";
+    roles.autocomplete = "off";
+    roles.spellcheck = false;
+    const reason = reasonField("group-make-reason");
+    const said = notice();
+    const submit = make("button", "primary", "Make group");
+    submit.type = "submit";
+    const form = make(
+      "form",
+      "change-form",
+      make("h2", "", "Make a group"),
+      labelled("group-make-id", "Group id", id),
+      labelled("group-make-description", "Description (optional)", description),
+      labelled("group-make-roles", "Roles it carries (optional, separated by spaces)", roles),
+      reason.row,
+      said,
+      submit
+    );
+    const fields = { id, roles };
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      for (const input of Object.values(fields)) {
+        input.removeAttribute("aria-invalid");
+      }
+      const described = groupFormOf({ id: id.value, description: description.value, roles: roles.value });
+      if ("wrong" in described) {
+        said.textContent = WRONG[described.wrong];
+        said.hidden = false;
+        fields[described.wrong].setAttribute("aria-invalid", "true");
+        fields[described.wrong].focus();
+        return;
+      }
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      submit.disabled = true;
+      void change("api/groups", keyFor, { ...described.body, reason: why }).then((answer) => {
+        submit.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        const group = answer.ok ? readGroup(answer.body) : null;
+        if (group !== null) {
+          openGroup(group.id, "Group made.");
+          return;
+        }
+        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "This group", groupRefusalText);
+        if (text !== null) {
+          said.textContent = text;
+          said.hidden = false;
+        }
+      });
+    });
+    return form;
+  }
+  async function groupsView(screen, after) {
+    say("Loading groups.");
+    const answer = await call("GET", groupsPath(after));
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Groups", answer, "That group");
+      return;
+    }
+    const page = readGroupsPage(answer.body);
+    if (page === null) {
+      unreadable(screen, "Groups");
+      return;
+    }
+    const parts = [
+      heading("Groups"),
+      make(
+        "p",
+        "lead",
+        "A group's roles are released to applications granted the groups scope, for the accounts in it. They grant nothing in this console."
+      )
+    ];
+    parts.push(
+      page.groups.length === 0 ? make("p", "empty", after === null ? "This company has no groups yet." : "No more groups after this one.") : table(page.groups)
+    );
+    const paging = make("p", "paging");
+    if (after !== null) {
+      paging.append(link("#/groups", "First page"));
+    }
+    if (page.next !== null) {
+      paging.append(link(`#/groups?${new URLSearchParams({ after: page.next }).toString()}`, "Next page"));
+    }
+    if (paging.childElementCount > 0) {
+      parts.push(paging);
+    }
+    parts.push(makeForm(screen));
+    show(screen.view, ...parts);
+    say(takePending());
+  }
+
   // src/clients-read.ts
   var ALGORITHMS = ["EdDSA", "ES256"];
   var GRANTS = ["authorization_code", "refresh_token", "client_credentials"];
@@ -967,7 +1496,7 @@
   }
 
   // src/clients.ts
-  var WRONG = {
+  var WRONG2 = {
     id: "Give an id of 1 to 255 visible characters.",
     jwk: "Paste the client's public key as one JSON object (a JWK).",
     algorithm: "Choose the algorithm the client signs with.",
@@ -1072,7 +1601,7 @@
         dpop: dpop.chosen().length > 0
       });
       if ("wrong" in made) {
-        said.textContent = WRONG[made.wrong];
+        said.textContent = WRONG2[made.wrong];
         said.hidden = false;
         fields[made.wrong].setAttribute("aria-invalid", "true");
         fields[made.wrong].focus();
@@ -1666,7 +2195,7 @@
     const said = notice();
     const out = make("div", "");
     const ring = { reveal: keys(), enrol: keys(), move: keys() };
-    const refusedHere = (answer) => {
+    const refusedHere2 = (answer) => {
       const text = refusedText(screen, answer, "This account");
       if (text !== null) {
         said.textContent = text;
@@ -1684,7 +2213,7 @@
           return;
         }
         if (shown2 === null) {
-          refusedHere(answer);
+          refusedHere2(answer);
           return;
         }
         ring.reveal = keys();
@@ -1703,7 +2232,7 @@
         }
         const issued = answer.ok ? readIssued(answer.body) : null;
         if (issued === null) {
-          refusedHere(answer);
+          refusedHere2(answer);
           return;
         }
         ring.enrol = keys();
@@ -1733,7 +2262,7 @@
           return;
         }
         if (!answer.ok) {
-          refusedHere(answer);
+          refusedHere2(answer);
           return;
         }
         if (path === "enable") {
@@ -1785,7 +2314,7 @@
   }
 
   // src/users.ts
-  var pending = "";
+  var pending2 = "";
   function statusBadge2(user) {
     const badge2 = make("span", "badge", user.status === "active" ? "Active" : "Disabled");
     badge2.dataset["state"] = user.status === "active" ? "ok" : "warn";
@@ -1807,7 +2336,7 @@
     });
     return form;
   }
-  function table(users) {
+  function table2(users) {
     const head = make(
       "tr",
       "",
@@ -1860,7 +2389,7 @@
         )
       );
     } else {
-      parts.push(table(page.users));
+      parts.push(table2(page.users));
     }
     const paging = make("p", "paging");
     if (looking || after !== null) {
@@ -1874,7 +2403,7 @@
     }
     parts.push(
       openForm(screen, (user) => {
-        pending = "Account opened.";
+        pending2 = "Account opened.";
         location.hash = `#/users/${encodeURIComponent(user)}`;
       })
     );
@@ -1917,8 +2446,8 @@
       actionsFor(screen, user, address, redraw),
       make("p", "paging", link("#/users", "Back to users"))
     );
-    say(message !== "" ? message : pending);
-    pending = "";
+    say(message !== "" ? message : pending2);
+    pending2 = "";
   }
 
   // src/console.ts
@@ -2001,6 +2530,12 @@
         return;
       case "user":
         void userView(screen, at.id);
+        return;
+      case "groups":
+        void groupsView(screen, at.after);
+        return;
+      case "group":
+        void groupView(screen, at.id, at.after);
         return;
       case "clients":
         void clientsView(screen, at.after);
