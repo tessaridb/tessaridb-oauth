@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
 use super::repository::UserRepository;
-use super::{CredentialEntity, EmailEntity, UserEntity};
+use super::{CredentialEntity, EmailEntity, ProfileEntity, UserEntity};
 use crate::{Result, answers};
 
 pub(crate) struct TessaridbUserRepository {
@@ -177,6 +177,41 @@ impl UserRepository for TessaridbUserRepository {
                     ("id".to_owned(), Value::from(user_id)),
                     ("from".to_owned(), Value::from(from)),
                     ("to".to_owned(), Value::from(to)),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn find_profile(&self, place: &Place, user_id: &str) -> Result<Option<ProfileEntity>> {
+        let answers = self
+            .database
+            .run_at(
+                place,
+                "SELECT name, given_name, family_name FROM users:$id;",
+                vec![("id".to_owned(), Value::from(user_id))],
+            )
+            .await?;
+        answers::single(answers, "profile")
+    }
+
+    async fn set_profile(
+        &self,
+        place: &Place,
+        user_id: &str,
+        profile: &ProfileEntity,
+    ) -> Result<()> {
+        // An absent name is bound as NONE, which removes the field: the profile is replaced whole.
+        let name = |value: &Option<String>| value.as_deref().map_or(Value::None, Value::from);
+        self.database
+            .run_at(
+                place,
+                "UPDATE users:$id SET name = $name, given_name = $given, family_name = $family;",
+                vec![
+                    ("id".to_owned(), Value::from(user_id)),
+                    ("name".to_owned(), name(&profile.name)),
+                    ("given".to_owned(), name(&profile.given_name)),
+                    ("family".to_owned(), name(&profile.family_name)),
                 ],
             )
             .await?;

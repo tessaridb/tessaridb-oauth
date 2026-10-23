@@ -2,11 +2,12 @@
 
 mod entity;
 mod model;
+mod profile;
 mod repository;
 mod service;
 mod tessaridb;
 
-pub use entity::{CredentialEntity, EmailEntity, UserEntity};
-pub use model::{Registered, StoredPassword, UserAccount, UserStatus};
+pub use entity::{CredentialEntity, EmailEntity, ProfileEntity, UserEntity};
+pub use model::{Profile, Registered, StoredPassword, UserAccount, UserStatus};
 pub use service::UserService;
 pub(crate) use tessaridb::TessaridbUserRepository;

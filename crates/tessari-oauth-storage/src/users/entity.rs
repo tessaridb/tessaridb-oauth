@@ -16,6 +16,17 @@ pub struct UserEntity {
     pub created_at: i64,
 }
 
+/// An account's profile names as stored on its `users` row, each absent until set.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProfileEntity {
+    /// The full name.
+    pub name: Option<String>,
+    /// The given name.
+    pub given_name: Option<String>,
+    /// The family name.
+    pub family_name: Option<String>,
+}
+
 /// The email address an account signs in with, under the address in its kept form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmailEntity {
@@ -71,6 +82,16 @@ impl FromRecord for CredentialEntity {
             hash: row.take("hash")?,
             pepper: row.take("pepper")?,
             updated_at: row.take("updated_at")?,
+        })
+    }
+}
+
+impl FromRecord for ProfileEntity {
+    fn from_row(mut row: Row) -> Result<Self, MappingFault> {
+        Ok(Self {
+            name: row.take("name")?,
+            given_name: row.take("given_name")?,
+            family_name: row.take("family_name")?,
         })
     }
 }

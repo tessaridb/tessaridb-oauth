@@ -40,6 +40,26 @@ fn the_group_claims_are_released_at_userinfo_only_under_their_scope() {
 }
 
 #[test]
+fn the_name_claims_are_released_at_userinfo_only_under_profile() {
+    for claim in ["name", "given_name", "family_name"] {
+        assert!(
+            releases(claim, Place::UserInfo, &scopes(&["openid", "profile"])),
+            "{claim}"
+        );
+        assert!(
+            !releases(claim, Place::UserInfo, &scopes(&["openid", "groups"])),
+            "{claim}"
+        );
+    }
+    for unlisted in ["picture", "birthdate", "locale", "nickname"] {
+        assert!(
+            !releases(unlisted, Place::UserInfo, &scopes(&["openid", "profile"])),
+            "{unlisted}: `profile` releases the three names and nothing else"
+        );
+    }
+}
+
+#[test]
 fn group_claims_name_each_group_and_role_once_in_order() {
     let id = |name: &str| GroupId::parse(name).expect("a group id");
     let roles = |names: &[&str]| -> BTreeSet<GroupRole> {

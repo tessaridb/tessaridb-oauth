@@ -22,8 +22,8 @@ use crate::{Error, Result, Tenancy};
 /// Accounts and their credentials.
 #[derive(Clone)]
 pub struct UserService {
-    repository: Arc<dyn UserRepository>,
-    tenancy: Tenancy,
+    pub(super) repository: Arc<dyn UserRepository>,
+    pub(super) tenancy: Tenancy,
 }
 
 fn unreadable(record: &'static str, reason: &str) -> Error {

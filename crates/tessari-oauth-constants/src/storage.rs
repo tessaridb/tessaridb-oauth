@@ -82,6 +82,9 @@ pub const LOGOUT_DELIVERY_INTERVAL_SECS: u64 = 5;
 /// abandoned leaves its claims to lapse rather than racing the next run for them.
 pub const LOGOUT_DELIVERY_RUN_TIMEOUT_SECS: u64 = 25;
 
+/// The longest profile name (`name`, `given_name`, `family_name`), in characters.
+pub const PROFILE_NAME_MAX_CHARS: usize = 100;
+
 /// The longest company name, in characters.
 pub const COMPANY_NAME_MAX_CHARS: usize = 100;
 

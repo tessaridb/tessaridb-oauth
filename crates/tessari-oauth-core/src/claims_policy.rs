@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use tessari_oauth_constants::GROUPS_SCOPE;
+use tessari_oauth_constants::{GROUPS_SCOPE, PROFILE_SCOPE};
 use tessari_oauth_types::{GroupId, GroupRole};
 
 /// Where a released claim may appear.
@@ -30,7 +30,7 @@ pub struct Rule {
 }
 
 /// Every claim released beyond the authentication facts.
-pub const POLICY: [Rule; 2] = [
+pub const POLICY: [Rule; 5] = [
     Rule {
         claim: "groups",
         scope: GROUPS_SCOPE,
@@ -42,6 +42,24 @@ pub const POLICY: [Rule; 2] = [
         scope: GROUPS_SCOPE,
         place: Place::UserInfo,
         source: "the roles those groups carry",
+    },
+    Rule {
+        claim: "name",
+        scope: PROFILE_SCOPE,
+        place: Place::UserInfo,
+        source: "the full name the user set in the account portal",
+    },
+    Rule {
+        claim: "given_name",
+        scope: PROFILE_SCOPE,
+        place: Place::UserInfo,
+        source: "the given name the user set in the account portal",
+    },
+    Rule {
+        claim: "family_name",
+        scope: PROFILE_SCOPE,
+        place: Place::UserInfo,
+        source: "the family name the user set in the account portal",
     },
 ];
 

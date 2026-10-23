@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
 
-use super::{CredentialEntity, EmailEntity, UserEntity};
+use super::{CredentialEntity, EmailEntity, ProfileEntity, UserEntity};
 use crate::Result;
 
 /// The accounts, their addresses and their credentials.
@@ -40,4 +40,15 @@ pub(crate) trait UserRepository: Send + Sync {
 
     /// Move the account `user_id` from status `from` to `to`, refused unless it is in `from`.
     async fn set_status(&self, place: &Place, user_id: &str, from: &str, to: &str) -> Result<()>;
+
+    /// The profile names on `user_id`'s account; `None` when there is no such account.
+    async fn find_profile(&self, place: &Place, user_id: &str) -> Result<Option<ProfileEntity>>;
+
+    /// Replace the profile names on `user_id`'s account; `false` when there is no such account.
+    async fn set_profile(
+        &self,
+        place: &Place,
+        user_id: &str,
+        profile: &ProfileEntity,
+    ) -> Result<()>;
 }

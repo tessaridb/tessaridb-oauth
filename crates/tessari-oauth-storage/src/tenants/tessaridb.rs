@@ -80,6 +80,9 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS secrets (sealed string REQUIRED, created_at int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS users (\
      user_id string REQUIRED, tenant string REQUIRED, status string REQUIRED, created_at int REQUIRED); \
+     DEFINE FIELD IF NOT EXISTS name ON users TYPE string; \
+     DEFINE FIELD IF NOT EXISTS given_name ON users TYPE string; \
+     DEFINE FIELD IF NOT EXISTS family_name ON users TYPE string; \
      DEFINE TABLE IF NOT EXISTS user_emails (\
      address string REQUIRED, user_id string REQUIRED, verified_at int, verified_by string); \
      DEFINE INDEX IF NOT EXISTS by_user ON user_emails FIELDS user_id; \

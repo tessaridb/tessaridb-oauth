@@ -1,7 +1,7 @@
 //! Users: an address belongs to one account in its tenant, found by the address whatever its case; a second
 //! registration of it — even eight at once — writes nothing; a password credential is replaced whole and read back.
 
-use tessari_oauth_storage::users::{Registered, StoredPassword, UserAccount, UserStatus};
+use tessari_oauth_storage::users::{Profile, Registered, StoredPassword, UserAccount, UserStatus};
 use tessari_oauth_types::{EmailAddress, ErrorCategory, TenantId, Timestamp, UserId};
 
 use crate::fresh;
@@ -318,4 +318,89 @@ async fn an_account_is_disabled_and_enabled_only_from_the_status_it_has() {
         Ok(false),
         "no such account: nothing changes"
     );
+}
+
+fn named(name: Option<&str>, given: Option<&str>, family: Option<&str>) -> Profile {
+    Profile {
+        name: name.map(str::to_owned),
+        given_name: given.map(str::to_owned),
+        family_name: family.map(str::to_owned),
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_profile_is_set_replaced_and_cleared_on_its_own_account() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    let acme = tenant("acme");
+    let user = created(
+        storage
+            .users
+            .register(&acme, &email("ada@example.com"), NOW)
+            .await
+            .expect("registered"),
+    );
+    let read = |user: UserId| {
+        let storage = storage.clone();
+        async move { storage.users.profile(&tenant("acme"), &user).await }
+    };
+    assert_eq!(
+        read(user.clone()).await,
+        Ok(Some(Profile::default())),
+        "nothing set yet"
+    );
+
+    let set = named(Some("  Ada Lovelace "), Some("Ada"), Some("Lovelace"));
+    assert_eq!(
+        storage.users.set_profile(&acme, &user, &set).await,
+        Ok(true)
+    );
+    assert_eq!(
+        read(user.clone()).await,
+        Ok(Some(named(
+            Some("Ada Lovelace"),
+            Some("Ada"),
+            Some("Lovelace")
+        ))),
+        "kept trimmed"
+    );
+
+    // The profile is replaced whole: an empty or absent name is cleared.
+    let replaced = named(Some("Ada King"), Some(" "), None);
+    assert_eq!(
+        storage.users.set_profile(&acme, &user, &replaced).await,
+        Ok(true)
+    );
+    assert_eq!(
+        read(user.clone()).await,
+        Ok(Some(named(Some("Ada King"), None, None)))
+    );
+
+    for refused in ["x".repeat(101), "Ada\u{7}King".to_owned()] {
+        assert!(
+            matches!(
+                storage
+                    .users
+                    .set_profile(&acme, &user, &named(Some(&refused), None, None))
+                    .await,
+                Err(tessari_oauth_storage::Error::Invalid {
+                    record: "profile",
+                    ..
+                })
+            ),
+            "{refused:?}"
+        );
+    }
+    assert_eq!(
+        read(user.clone()).await,
+        Ok(Some(named(Some("Ada King"), None, None))),
+        "a refused profile changes nothing"
+    );
+
+    let stranger = UserId::parse("no-such-account").expect("an id");
+    assert_eq!(
+        storage.users.set_profile(&acme, &stranger, &set).await,
+        Ok(false)
+    );
+    assert_eq!(read(stranger).await, Ok(None));
 }

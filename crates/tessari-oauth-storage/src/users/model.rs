@@ -52,3 +52,14 @@ pub struct StoredPassword {
     /// The version of the pepper it was made under.
     pub pepper: u32,
 }
+
+/// The names an account's user gave in the account portal (OpenID Connect Core §5.1), each absent until set.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Profile {
+    /// The full name.
+    pub name: Option<String>,
+    /// The given name.
+    pub given_name: Option<String>,
+    /// The family name.
+    pub family_name: Option<String>,
+}
