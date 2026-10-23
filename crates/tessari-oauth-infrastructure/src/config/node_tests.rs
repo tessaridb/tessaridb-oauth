@@ -340,3 +340,32 @@ fn trusted_proxies_are_read_and_a_list_that_does_not_parse_is_refused_by_name() 
         "a name is not an address"
     );
 }
+
+#[test]
+fn mail_is_off_until_a_relay_is_named_and_then_read_from_the_smtp_variables() {
+    assert_eq!(
+        read(&environment()).expect("a valid environment").mail,
+        None
+    );
+    let mut mailing = environment();
+    mailing.insert(
+        "TESSARIDB_OAUTH_SMTP_URL",
+        "smtps://mail.example.com".to_owned(),
+    );
+    mailing.insert(
+        "TESSARIDB_OAUTH_SMTP_FROM",
+        "no-reply@id.example.com".to_owned(),
+    );
+    let mail = read(&mailing)
+        .expect("a valid environment")
+        .mail
+        .expect("a relay");
+    assert_eq!((mail.host.as_str(), mail.port), ("mail.example.com", 465));
+    mailing.remove("TESSARIDB_OAUTH_SMTP_URL");
+    assert!(matches!(
+        read(&mailing),
+        Err(Error::Unset {
+            key: "TESSARIDB_OAUTH_SMTP_URL"
+        })
+    ));
+}

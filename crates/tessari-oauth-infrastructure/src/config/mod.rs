@@ -1,9 +1,11 @@
 //! The server's configuration, read from the environment once at start-up.
 
+mod mail;
 mod node;
 mod operator;
 mod peers;
 
+pub use mail::{MailCredentials, MailSecurity, MailSettings};
 pub use node::{AdminConfig, NodeConfig, PublicConfig, ReadLimit, StoreSettings, TlsFiles};
 pub use operator::operator_target;
 pub use peers::{PeerRegion, PeerSettings};

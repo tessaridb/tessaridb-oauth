@@ -15,6 +15,7 @@ use tessari_oauth_constants::{
 use tessari_oauth_types::{TenantId, TrustedProxies};
 use url::{Host, Url};
 
+use super::mail::{MailSettings, MailVariables, mail_settings};
 use super::peers::{PeerSettings, PeerVariables, peer_settings};
 use crate::custody::PasswordCost;
 use crate::{Error, Result};
@@ -107,6 +108,8 @@ pub struct NodeConfig {
     pub region: String,
     /// The other regions whose directories this server reads, when it is told of any.
     pub peers: Option<PeerSettings>,
+    /// The mail relay, when mail is configured; without it no mail is sent.
+    pub mail: Option<MailSettings>,
     /// The tenants this server is the issuer for.
     pub tenants: Vec<TenantId>,
     /// The read limit on the public routes: metadata, key set and UserInfo.
@@ -404,6 +407,13 @@ impl NodeConfig {
             kek: variables.required("TESSARIDB_OAUTH_KEK")?.into(),
             region,
             peers,
+            mail: mail_settings(MailVariables {
+                url: variables.optional("TESSARIDB_OAUTH_SMTP_URL"),
+                user: variables.optional("TESSARIDB_OAUTH_SMTP_USER"),
+                password_file: variables.optional("TESSARIDB_OAUTH_SMTP_PASSWORD_FILE"),
+                from: variables.optional("TESSARIDB_OAUTH_SMTP_FROM"),
+                authority: variables.optional("TESSARIDB_OAUTH_SMTP_AUTHORITY"),
+            })?,
             tenants: tenants(variables.required("TESSARIDB_OAUTH_TENANTS")?)?,
             read_limit,
             token_limit,
