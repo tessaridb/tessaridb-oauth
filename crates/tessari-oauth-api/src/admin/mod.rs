@@ -177,6 +177,10 @@ pub fn admin_router(state: AdminState) -> Router {
             get(policy::two_factor).put(policy::set_two_factor),
         )
         .route(
+            "/admin/{company}/api/policy/registration",
+            get(policy::registration).put(policy::set_registration),
+        )
+        .route(
             "/admin/{company}/api/branding",
             get(branding::read).put(branding::set),
         )

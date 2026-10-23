@@ -247,3 +247,64 @@ async fn nobody_else_reaches_the_policy() {
         .count();
     assert_eq!(role_refusals, 2, "each missing role is audited");
 }
+
+const REGISTRATION: &str = "/admin/acme/api/policy/registration";
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn registration_opens_from_the_revision_read_and_refuses_what_is_not_a_domain() {
+    let server = server(2).await;
+    let state = signed_in_as(
+        &server,
+        "operator-r",
+        &[OperatorRole::Policy],
+        "issuer-r",
+        "console-r",
+    )
+    .await;
+    let first = send(state.clone(), read(REGISTRATION, "console-r")).await;
+    assert_eq!(first.status, StatusCode::OK);
+    assert_eq!(
+        first.body,
+        serde_json::json!({"open": false, "domains": [], "revision": 0}),
+        "closed until a company opens it"
+    );
+    let open = r#"{"revision":0,"open":true,"domains":["Example.com"],"reason":"pilot"}"#;
+    let made = send(
+        state.clone(),
+        change(REGISTRATION, "console-r", Some("registration-0001"), open),
+    )
+    .await;
+    assert_eq!(made.status, StatusCode::OK, "{:?}", made.body);
+    assert_eq!(
+        made.body,
+        serde_json::json!({"open": true, "domains": ["example.com"], "revision": 1})
+    );
+    let stale = r#"{"revision":0,"open":false,"domains":[],"reason":"close it"}"#;
+    let moved = send(
+        state.clone(),
+        change(REGISTRATION, "console-r", Some("registration-0002"), stale),
+    )
+    .await;
+    assert_eq!(moved.status, StatusCode::CONFLICT);
+    assert_eq!(moved.body["code"], "changed_meanwhile");
+    let wildcard = r#"{"revision":1,"open":true,"domains":["*.example.com"],"reason":"wider"}"#;
+    let refused = send(
+        state.clone(),
+        change(
+            REGISTRATION,
+            "console-r",
+            Some("registration-0003"),
+            wildcard,
+        ),
+    )
+    .await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+    assert_eq!(refused.body["code"], "domains_rejected");
+    let kept = send(state, read(REGISTRATION, "console-r")).await;
+    assert_eq!(
+        kept.body,
+        serde_json::json!({"open": true, "domains": ["example.com"], "revision": 1}),
+        "neither refusal changed it"
+    );
+}
