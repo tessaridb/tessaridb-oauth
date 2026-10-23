@@ -4,7 +4,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { changeRefusalText } from "../src/console-copy.ts";
-import { keyring, readDisabled, readIssued, readOpened, readRevealed, reasonOf } from "../src/users-change.ts";
+import {
+  keyring,
+  readDisabled,
+  readIssued,
+  readMailed,
+  readOpened,
+  readRevealed,
+  reasonOf,
+} from "../src/users-change.ts";
 
 test("an opened account is read with its address masked as given", () => {
   assert.deepEqual(readOpened({ user: "user-8", email: "n***@example.com", status: "active" }), {
@@ -35,6 +43,16 @@ test("an enrolment code is kept only when the answer says it is the one showing"
   });
   assert.equal(readIssued({ user: "user-3", code: null, shown_once: false, valid_secs: 259200 }), null, "a repeat");
   assert.equal(readIssued({ user: "user-3", code: "abc", shown_once: false, valid_secs: 259200 }), null);
+  const mailed = { user: "user-3", code: null, shown_once: false, mailed: true, valid_secs: 259200 };
+  assert.equal(readIssued(mailed), null, "a mailed code is never shown");
+});
+
+test("a code sent by mail is read as sent, and never with a code in hand", () => {
+  const mailed = { user: "user-3", code: null, shown_once: false, mailed: true, valid_secs: 259200 };
+  assert.deepEqual(readMailed(mailed), { validHours: 72 });
+  assert.equal(readMailed({ ...mailed, code: "abc" }), null, "an answer carrying a code is not a mailed one");
+  assert.equal(readMailed({ ...mailed, mailed: false }), null);
+  assert.equal(readMailed({ ...mailed, valid_secs: "259200" }), null);
 });
 
 test("a reason is 1 to 500 characters after trimming", () => {
@@ -50,6 +68,7 @@ test("each refused change says what happened and what to do next", () => {
     "email_taken",
     "already_enrolled",
     "account_disabled",
+    "mail_unavailable",
     "changed_meanwhile",
     "reason_required",
     "idempotency_key_reused",

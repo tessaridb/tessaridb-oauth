@@ -1,13 +1,13 @@
-//! `GET /{tenant}/login`, `GET /{tenant}/login/reset`, `GET /{tenant}/login/verify`, `GET /{tenant}/login/email`,
-//! `GET /{tenant}/consent`, `GET /{tenant}/account` and `GET /{tenant}/assets/*`: the sign-in, password-reset,
-//! address-verification, address-change, consent and account pages.
+//! `GET /{tenant}/login`, `GET /{tenant}/login/reset`, `GET /{tenant}/login/enrol`, `GET /{tenant}/login/verify`,
+//! `GET /{tenant}/login/email`, `GET /{tenant}/consent`, `GET /{tenant}/account` and `GET /{tenant}/assets/*`: the
+//! sign-in, password-reset, enrolment, address-verification, address-change, consent and account pages.
 //!
 //! They carry no data and need no session: everything a page shows it asks of the sign-in or account API from the
 //! browser that holds the sign-in or the session. Each answer carries a policy that lets the page run only its own
 //! script and style, show only its own image, talk only to this origin, submit no form anywhere, rewrite no base
 //! address and never be framed.
 //! The pages link their assets relatively, so a page served under a tenant loads that tenant's copy; the reset,
-//! verification and address-change pages sit under the sign-in page and link them one level up.
+//! enrolment, verification and address-change pages sit under the sign-in page and link them one level up.
 //!
 //! The bytes are the committed output of `pages/` (`npm run build`), embedded so that building the server never
 //! needs Node; `npm run verify` fails when the committed output no longer matches its source.
@@ -27,7 +27,7 @@ pub(super) const POLICY: &str = "default-src 'none'; script-src 'self'; style-sr
 /// One served file: the path under the tenant, its type, its bytes.
 type Asset = (&'static str, &'static str, &'static str);
 
-pub(super) const ASSETS: [Asset; 14] = [
+pub(super) const ASSETS: [Asset; 16] = [
     (
         "/login",
         "text/html; charset=utf-8",
@@ -37,6 +37,11 @@ pub(super) const ASSETS: [Asset; 14] = [
         "/login/reset",
         "text/html; charset=utf-8",
         include_str!("../../assets/reset.html"),
+    ),
+    (
+        "/login/enrol",
+        "text/html; charset=utf-8",
+        include_str!("../../assets/enrol.html"),
     ),
     (
         "/login/verify",
@@ -67,6 +72,11 @@ pub(super) const ASSETS: [Asset; 14] = [
         "/assets/reset.js",
         "text/javascript; charset=utf-8",
         include_str!("../../assets/reset.js"),
+    ),
+    (
+        "/assets/enrol.js",
+        "text/javascript; charset=utf-8",
+        include_str!("../../assets/enrol.js"),
     ),
     (
         "/assets/verify.js",

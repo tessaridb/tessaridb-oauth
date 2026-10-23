@@ -21,12 +21,17 @@ use crate::routes::{live_storage, state};
 const PAGE_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
                            connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'";
 
-const SERVED: [(&str, &str, &str); 14] = [
+const SERVED: [(&str, &str, &str); 16] = [
     ("/acme/login", "text/html; charset=utf-8", "login.html"),
     (
         "/acme/login/reset",
         "text/html; charset=utf-8",
         "reset.html",
+    ),
+    (
+        "/acme/login/enrol",
+        "text/html; charset=utf-8",
+        "enrol.html",
     ),
     (
         "/acme/login/verify",
@@ -49,6 +54,11 @@ const SERVED: [(&str, &str, &str); 14] = [
         "/acme/assets/reset.js",
         "text/javascript; charset=utf-8",
         "reset.js",
+    ),
+    (
+        "/acme/assets/enrol.js",
+        "text/javascript; charset=utf-8",
+        "enrol.js",
     ),
     (
         "/acme/assets/verify.js",
@@ -162,9 +172,11 @@ async fn the_pages_load_only_their_own_assets() {
             "{path} names the product until a company names itself"
         );
     }
-    // The reset, verification and address-change pages sit one level down, under the sign-in page, and reach the same assets.
+    // The reset, enrolment, verification and address-change pages sit one level down, under the sign-in page, and reach
+    // the same assets.
     for (path, script) in [
         ("/acme/login/reset", "src=\"../assets/reset.js\""),
+        ("/acme/login/enrol", "src=\"../assets/enrol.js\""),
         ("/acme/login/verify", "src=\"../assets/verify.js\""),
         ("/acme/login/email", "src=\"../assets/email.js\""),
     ] {

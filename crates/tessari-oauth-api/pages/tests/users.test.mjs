@@ -42,6 +42,8 @@ test("a refusal says what is left to do", () => {
     kind: "refused",
     code: "changed_meanwhile",
   });
+  assert.deepEqual(readRefusal(503, { code: "mail_unavailable" }, null), { kind: "refused", code: "mail_unavailable" });
+  assert.deepEqual(readRefusal(503, { code: "store_unavailable" }, null), { kind: "failed" }, "only the missing relay");
   assert.deepEqual(readRefusal(0, null, null), { kind: "failed" });
   assert.deepEqual(readRefusal(500, { code: "internal" }, null), { kind: "failed" });
 });

@@ -53,6 +53,15 @@ export function readIssued(body: unknown): { code: string; validHours: number } 
   return { code, validHours: Math.floor(validSecs / 3600) };
 }
 
+/** An enrolment code sent to the account's address, only from an answer carrying no code, and its hours. */
+export function readMailed(body: unknown): { validHours: number } | null {
+  const validSecs = count(body, "valid_secs");
+  if (field(body, "mailed") !== true || field(body, "code") !== null || validSecs === null) {
+    return null;
+  }
+  return { validHours: Math.floor(validSecs / 3600) };
+}
+
 /**
  * A source of Idempotency-Keys for one form: the same key while the same body is sent again (a double press, a retry
  * after a lost answer), a new one from `fresh` as soon as what is sent changes, because the server answers a key with

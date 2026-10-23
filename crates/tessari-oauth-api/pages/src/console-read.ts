@@ -146,6 +146,10 @@ export function readRefusal(status: number, body: unknown, retryAfter: string | 
   if ((status === 400 || status === 403 || status === 409) && typeof code === "string") {
     return { kind: "refused", code };
   }
+  // The server is up and sends no mail: a refusal with something to do, not a failure to try again.
+  if (status === 503 && code === "mail_unavailable") {
+    return { kind: "refused", code };
+  }
   return { kind: "failed" };
 }
 

@@ -101,6 +101,17 @@ export const RESET_TEXT = {
     "your second factor and passkeys are unchanged.",
 } as const;
 
+/** The words of the page an enrolment link opens. */
+export const ENROL_TEXT = {
+  invalidLink: "This link isn't complete. Open the link from the email again.",
+  spentLink: "This link has expired or was already used. Ask your administrator for a new one.",
+  already: "This account already has a password. Sign in with it, or reset it from the sign-in page.",
+  hint: "At least 15 characters. A few unrelated words work well.",
+  passwordRequired: "Choose a password.",
+  saving: "Saving your password.",
+  set: "Your password is set. Sign in with it from the application you were invited to.",
+} as const;
+
 /** The words of the address-verification page and of the account page's request for a link. */
 export const VERIFY_TEXT = {
   confirming: "Confirming your email address.",

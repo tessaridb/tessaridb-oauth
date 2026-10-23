@@ -68,6 +68,7 @@ test("a rule the wording broke is said in the server's words, anything else in n
 test("every kind has a title, and an unknown one is named as it is", () => {
   assert.equal(mailTitle("reset"), "Password reset");
   assert.equal(mailTitle("signin_changed"), "Sign-in change notice");
+  assert.equal(mailTitle("enrolment"), "Enrolment link");
   assert.equal(mailTitle("welcome"), "welcome");
 });
 

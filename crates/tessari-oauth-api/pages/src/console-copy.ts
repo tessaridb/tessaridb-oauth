@@ -31,6 +31,8 @@ export function changeRefusalText(code: string): string {
       return "This account has already set a password, so it needs no enrolment code.";
     case "account_disabled":
       return "This account is disabled. Enable it before issuing an enrolment code.";
+    case "mail_unavailable":
+      return "This server sends no mail, so nothing was sent. Issue a code and give it to the person instead.";
     case "changed_meanwhile":
       return "Someone changed this while you were looking. The view now shows it as it is; check it and try again.";
     case "reason_required":

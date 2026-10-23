@@ -107,6 +107,9 @@
     if ((status === 400 || status === 403 || status === 409) && typeof code === "string") {
       return { kind: "refused", code };
     }
+    if (status === 503 && code === "mail_unavailable") {
+      return { kind: "refused", code };
+    }
     return { kind: "failed" };
   }
   function confirmedBy(typed, company2) {
@@ -227,6 +230,8 @@
         return "This account has already set a password, so it needs no enrolment code.";
       case "account_disabled":
         return "This account is disabled. Enable it before issuing an enrolment code.";
+      case "mail_unavailable":
+        return "This server sends no mail, so nothing was sent. Issue a code and give it to the person instead.";
       case "changed_meanwhile":
         return "Someone changed this while you were looking. The view now shows it as it is; check it and try again.";
       case "reason_required":
@@ -369,6 +374,13 @@
       return null;
     }
     return { code, validHours: Math.floor(validSecs / 3600) };
+  }
+  function readMailed(body) {
+    const validSecs = count(body, "valid_secs");
+    if (field(body, "mailed") !== true || field(body, "code") !== null || validSecs === null) {
+      return null;
+    }
+    return { validHours: Math.floor(validSecs / 3600) };
   }
   function keyring(fresh) {
     let last = null;
@@ -1818,7 +1830,8 @@
     ["email_applied_old", "Address changed: to the old address"],
     ["email_applied_new", "Address changed: to the new address"],
     ["email_refused", "Address change refused"],
-    ["signin_changed", "Sign-in change notice"]
+    ["signin_changed", "Sign-in change notice"],
+    ["enrolment", "Enrolment link"]
   ];
   function one(row2) {
     const kind = field(row2, "kind");
@@ -2889,7 +2902,7 @@
     const reason = reasonField("action-reason");
     const said = notice();
     const out = make("div", "");
-    const ring = { reveal: keys(), enrol: keys(), move: keys() };
+    const ring = { reveal: keys(), enrol: keys(), mail: keys(), move: keys() };
     const refusedHere2 = (answer) => {
       const text2 = refusedText(screen, answer, "This account");
       if (text2 !== null) {
@@ -2945,6 +2958,35 @@
           )
         );
         say("Enrolment code issued.");
+      });
+    });
+    const mail = button("Send the code by mail", "secondary", () => {
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      void change(`${base}/enrolment`, ring.mail, { reason: why, by_mail: true }).then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        const sent = answer.ok ? readMailed(answer.body) : null;
+        if (sent === null) {
+          refusedHere2(answer);
+          return;
+        }
+        ring.mail = keys();
+        out.replaceChildren(
+          make(
+            "div",
+            "panel",
+            make(
+              "p",
+              "",
+              `A link to set a password was sent to the account's address. It works for ${sent.validHours} hours; a new code replaces it. Nobody here sees the code.`
+            )
+          )
+        );
+        say("Enrolment link sent.");
       });
     });
     const move = (path) => {
@@ -3003,7 +3045,7 @@
       stay.focus();
     });
     const enable = button("Enable account", "secondary", () => move("enable"));
-    const buttons = make("div", "actions", reveal, enrol, user.status === "active" ? disable : enable);
+    const buttons = make("div", "actions", reveal, enrol, mail, user.status === "active" ? disable : enable);
     const title = make("h2", "", "Change this account");
     return make("section", "change-form", title, reason.row, said, buttons, confirmPanel, out);
   }

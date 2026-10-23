@@ -1,13 +1,14 @@
 // The changes an operator holding `users` makes to accounts. Every change carries a reason and an Idempotency-Key
 // made once per form, so a double press is one change. Disabling ends what the account holds elsewhere, so it is
 // confirmed with the account named; enabling is undone by disabling and is not. Showing an address whole is
-// recorded with the reason, and an enrolment code is shown once and never kept by the page.
+// recorded with the reason, and an enrolment code is shown once and never kept by the page, or sent to the account's
+// address so that nobody here sees it.
 
 import { change, keys, notice, reasonField, reasonIn, refusedText } from "./console-change.ts";
 import { type Screen, button, labelled, make } from "./console-dom.ts";
 import { type Answer, say } from "./dom.ts";
 import { type User } from "./users-read.ts";
-import { readDisabled, readIssued, readOpened, readRevealed } from "./users-change.ts";
+import { readDisabled, readIssued, readMailed, readOpened, readRevealed } from "./users-change.ts";
 
 /** The form opening an account for an address; the new account's view follows. */
 export function openForm(screen: Screen, opened: (user: string) => void): HTMLFormElement {
@@ -69,7 +70,7 @@ export function actionsFor(
   const reason = reasonField("action-reason");
   const said = notice();
   const out = make("div", "");
-  const ring = { reveal: keys(), enrol: keys(), move: keys() };
+  const ring = { reveal: keys(), enrol: keys(), mail: keys(), move: keys() };
 
   const refusedHere = (answer: Answer): void => {
     const text = refusedText(screen, answer, "This account");
@@ -129,6 +130,37 @@ export function actionsFor(
         ),
       );
       say("Enrolment code issued.");
+    });
+  });
+
+  const mail = button("Send the code by mail", "secondary", () => {
+    const why = reasonIn(reason.input, said);
+    if (why === null) {
+      return;
+    }
+    void change(`${base}/enrolment`, ring.mail, { reason: why, by_mail: true }).then((answer) => {
+      if (!screen.live()) {
+        return;
+      }
+      const sent = answer.ok ? readMailed(answer.body) : null;
+      if (sent === null) {
+        refusedHere(answer);
+        return;
+      }
+      ring.mail = keys();
+      out.replaceChildren(
+        make(
+          "div",
+          "panel",
+          make(
+            "p",
+            "",
+            `A link to set a password was sent to the account's address. It works for ${sent.validHours} hours; ` +
+              "a new code replaces it. Nobody here sees the code.",
+          ),
+        ),
+      );
+      say("Enrolment link sent.");
     });
   });
 
@@ -193,7 +225,7 @@ export function actionsFor(
   });
   const enable = button("Enable account", "secondary", () => move("enable"));
 
-  const buttons = make("div", "actions", reveal, enrol, user.status === "active" ? disable : enable);
+  const buttons = make("div", "actions", reveal, enrol, mail, user.status === "active" ? disable : enable);
   const title = make("h2", "", "Change this account");
   return make("section", "change-form", title, reason.row, said, buttons, confirmPanel, out);
 }
