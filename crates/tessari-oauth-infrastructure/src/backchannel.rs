@@ -137,7 +137,7 @@ impl Poster {
         let port = url
             .port_or_known_default()
             .ok_or(Undelivered::NotHttpsUrl)?;
-        let (address, name) = vetted(&url, port).await?;
+        let (addresses, name) = vetted(&url, port).await?;
         let request = Request::post(&url[Position::BeforePath..Position::AfterQuery])
             .header(HOST, &url[Position::BeforeHost..Position::AfterPort])
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
@@ -147,9 +147,7 @@ impl Poster {
                     .finish(),
             )
             .map_err(|_| Undelivered::NotHttpsUrl)?;
-        let socket = TcpStream::connect(address)
-            .await
-            .map_err(|failure| Undelivered::Unreachable(failure.kind()))?;
+        let socket = connected(&addresses).await?;
         let tls = self
             .connector
             .connect(name, socket)
@@ -177,11 +175,11 @@ impl Poster {
     }
 }
 
-/// The address to connect to for `url` and the name its certificate must carry.
+/// The addresses to connect to for `url`, in the order they resolved, and the name its certificate must carry.
 async fn vetted(
     url: &Url,
     port: u16,
-) -> std::result::Result<(SocketAddr, ServerName<'static>), Undelivered> {
+) -> std::result::Result<(Vec<SocketAddr>, ServerName<'static>), Undelivered> {
     let (candidates, name): (Vec<SocketAddr>, ServerName<'static>) = match url.host() {
         Some(Host::Ipv4(v4)) => (
             vec![SocketAddr::new(IpAddr::V4(v4), port)],
@@ -200,11 +198,27 @@ async fn vetted(
         ),
         None => return Err(Undelivered::NotHttpsUrl),
     };
-    let address = candidates
+    let addresses: Vec<SocketAddr> = candidates
         .into_iter()
-        .find(|candidate| !never_called(candidate.ip()))
-        .ok_or(Undelivered::ForbiddenAddress)?;
-    Ok((address, name))
+        .filter(|candidate| !never_called(candidate.ip()))
+        .collect();
+    if addresses.is_empty() {
+        return Err(Undelivered::ForbiddenAddress);
+    }
+    Ok((addresses, name))
+}
+
+/// A connection to the first of `addresses` that accepts one, tried in order (RFC 8305 §5): a name whose first
+/// address refuses, as an IPv6 address in front of a service listening on IPv4 only does, is still reached.
+async fn connected(addresses: &[SocketAddr]) -> std::result::Result<TcpStream, Undelivered> {
+    let mut refused = Undelivered::ForbiddenAddress;
+    for address in addresses {
+        match TcpStream::connect(address).await {
+            Ok(socket) => return Ok(socket),
+            Err(failure) => refused = Undelivered::Unreachable(failure.kind()),
+        }
+    }
+    Err(refused)
 }
 
 #[cfg(test)]

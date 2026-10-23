@@ -204,3 +204,25 @@ async fn an_endpoint_that_never_answers_is_given_up_on() {
     assert_eq!(refused, Err(Undelivered::TimedOut));
     held.abort();
 }
+
+#[tokio::test]
+async fn an_address_that_refuses_is_passed_over_for_the_next_one_the_name_resolved_to() {
+    let refusing = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("a port")
+        .local_addr()
+        .expect("an address");
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("a port");
+    let listening = listener.local_addr().expect("an address");
+    let socket = super::connected(&[refusing, listening])
+        .await
+        .expect("the second address accepts");
+    assert_eq!(socket.peer_addr().expect("a peer"), listening);
+    assert_eq!(
+        super::connected(&[refusing]).await.err(),
+        Some(Undelivered::Unreachable(
+            std::io::ErrorKind::ConnectionRefused
+        )),
+        "with no address left the last refusal is the reason"
+    );
+}
