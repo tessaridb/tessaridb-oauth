@@ -11,9 +11,9 @@ use std::time::Duration;
 
 use tessari_oauth_constants::KEY_ROTATION_CONCURRENCY;
 use tessari_oauth_core::keys::{self, KeyRecord};
-use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
+use tessari_oauth_infrastructure::custody::Kek;
 use tessari_oauth_storage::companies::Served;
-use tessari_oauth_storage::keys::{KeyService, StoredKey};
+use tessari_oauth_storage::keys::KeyService;
 use tessari_oauth_types::{Algorithm, Clock, ErrorCategory, TenantId, Timestamp};
 use tokio::task::JoinSet;
 
@@ -55,33 +55,6 @@ struct Custody {
     algorithm: Algorithm,
 }
 
-/// A successor for `tenant`, sealed and recorded as made at `now`.
-async fn make_key(
-    custody: &Custody,
-    tenant: &TenantId,
-    now: Timestamp,
-) -> std::result::Result<(), String> {
-    let (key, pkcs8) =
-        SigningKey::generate(custody.algorithm).map_err(|error| error.to_string())?;
-    let sealed = custody
-        .kek
-        .seal(tenant, key.kid().as_str(), &pkcs8)
-        .map_err(|error| error.to_string())?;
-    let stored = StoredKey {
-        kid: key.kid().clone(),
-        algorithm: key.algorithm(),
-        sealed,
-        public_jwk: key.public_jwk().map_err(|error| error.to_string())?,
-        created_at: now,
-        compromised: false,
-    };
-    custody
-        .keys
-        .add(tenant, &stored)
-        .await
-        .map_err(|error| error.to_string())
-}
-
 /// Apply the rule to `tenant` at `now`.
 async fn rotate(
     custody: Custody,
@@ -104,7 +77,11 @@ async fn rotate(
     let plan = keys::plan(&records, now);
     let mut outcome = Outcome::default();
     if plan.generate {
-        make_key(&custody, &tenant, now).await?;
+        custody
+            .keys
+            .generate(&tenant, &custody.kek, custody.algorithm, now)
+            .await
+            .map_err(|error| error.to_string())?;
         outcome.generated = 1;
     }
     for kid in &plan.retire {

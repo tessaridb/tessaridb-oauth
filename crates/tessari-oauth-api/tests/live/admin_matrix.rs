@@ -17,7 +17,7 @@ const WHY: &str = r#"{"reason":"matrix probe"}"#;
 
 /// Every route behind a session: its method, its path under `/admin/{company}`, and whether a role refuses an
 /// operator holding only `audit` there.
-const ROUTES: [(&str, &str, bool); 35] = [
+const ROUTES: [(&str, &str, bool); 38] = [
     ("GET", "api/me", false),
     ("GET", "api/policy/two-factor", true),
     ("PUT", "api/policy/two-factor", true),
@@ -25,6 +25,9 @@ const ROUTES: [(&str, &str, bool); 35] = [
     ("PUT", "api/branding", true),
     ("PUT", "api/branding/logo", true),
     ("POST", "api/branding/logo/remove", true),
+    ("GET", "api/keys", true),
+    ("POST", "api/keys/rotate", true),
+    ("POST", "api/keys/matrix-kid/withdraw", true),
     ("GET", "api/users", true),
     ("POST", "api/users", true),
     ("GET", "api/users/user-nobody", true),
@@ -111,6 +114,7 @@ async fn every_session_route_refuses_no_session_another_company_a_low_privilege_
         OperatorRole::Users,
         OperatorRole::Clients,
         OperatorRole::Policy,
+        OperatorRole::Keys,
         OperatorRole::Audit,
     ];
     let lead = signed_in_as(&server, "operator-l", &all, "issuer-l", "console-l").await;

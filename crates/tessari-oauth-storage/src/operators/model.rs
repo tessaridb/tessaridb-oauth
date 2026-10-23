@@ -13,17 +13,20 @@ pub enum OperatorRole {
     Clients,
     /// Change the company's sign-in policy.
     Policy,
+    /// Read the company's signing keys, make a successor early and withdraw a compromised one.
+    Keys,
     /// Read the company's audit trail.
     Audit,
 }
 
 impl OperatorRole {
     /// Every role.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Companies,
         Self::Users,
         Self::Clients,
         Self::Policy,
+        Self::Keys,
         Self::Audit,
     ];
 
@@ -35,6 +38,7 @@ impl OperatorRole {
             Self::Users => "users",
             Self::Clients => "clients",
             Self::Policy => "policy",
+            Self::Keys => "keys",
             Self::Audit => "audit",
         }
     }

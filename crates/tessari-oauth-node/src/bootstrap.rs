@@ -52,7 +52,7 @@ pub(crate) fn run(arguments: &[String]) -> Result<(), Failure> {
     let roles = if company.as_str() == SYSTEM_COMPANY {
         "companies and users"
     } else {
-        "users, clients, policy and audit"
+        "users, clients, policy, keys and audit"
     };
     if done.code_issued {
         println!(

@@ -109,3 +109,44 @@ async fn a_key_sealed_for_another_tenant_does_not_open() {
         "{refused:?}"
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_generated_key_is_published_at_once_sealed_for_its_tenant_and_signs_when_it_is_the_only_one()
+ {
+    let acme = tenant("acme");
+    let storage = fresh(&acme, 2).await;
+    let kek = fresh_kek().expect("a key-encryption key");
+    let now = Timestamp::from_unix_secs(T0);
+    let kid = storage
+        .keys
+        .generate(&acme, &kek, Algorithm::Es256, now)
+        .await
+        .expect("generated");
+    let live = storage.keys.live(&acme).await.expect("read");
+    assert_eq!(live.len(), 1);
+    assert_eq!(live[0].kid, kid);
+    assert_eq!(live[0].created_at, now);
+    assert!(!live[0].compromised);
+    assert!(
+        !live[0].public_jwk.contains("\"d\""),
+        "only the public half is published"
+    );
+    let signer = storage
+        .keys
+        .signer(&acme, &kek, now)
+        .await
+        .expect("a signer");
+    assert_eq!(signer.kid(), &kid, "the only key signs, unwaited");
+    let another = storage
+        .keys
+        .generate(&acme, &kek, Algorithm::Es256, now)
+        .await
+        .expect("generated");
+    assert_ne!(another, kid, "a new key every time");
+    assert!(
+        kek.unseal(&tenant("globex"), kid.as_str(), &live[0].sealed)
+            .is_err(),
+        "sealed for acme alone"
+    );
+}

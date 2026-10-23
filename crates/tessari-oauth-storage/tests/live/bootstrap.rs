@@ -1,5 +1,5 @@
 //! The emergency path: it makes the `system` company and an operator in it who holds `companies` and `users`, or the
-//! first operator of a company that already exists and is served, who holds that company's four console roles; it
+//! first operator of a company that already exists and is served, who holds that company's five console roles; it
 //! hands the operator a code to set a first password and leaves its use on that company's audit trail every time.
 
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
@@ -208,7 +208,7 @@ async fn an_account_that_has_a_password_is_given_no_code() {
 
 #[tokio::test]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
-async fn a_served_company_gets_its_first_operator_with_its_four_roles() {
+async fn a_served_company_gets_its_first_operator_with_its_five_roles() {
     let storage = storage();
     company(&storage, &acme(), CompanyStatus::Active).await;
     let code = EnrolmentCode::from_secret("code-acme");
@@ -222,6 +222,7 @@ async fn a_served_company_gets_its_first_operator_with_its_four_roles() {
         [
             OperatorRole::Audit,
             OperatorRole::Clients,
+            OperatorRole::Keys,
             OperatorRole::Policy,
             OperatorRole::Users
         ],

@@ -3,7 +3,7 @@
 //! while the server does not.
 //!
 //! For `system` it makes the company when there is none and serves it, and gives `companies` and `users`; for any
-//! other company it acts only on one that exists and is served, and gives that company's four console roles, never
+//! other company it acts only on one that exists and is served, and gives that company's five console roles, never
 //! `companies`. Either way it finds or registers the account signing in with the address given and grants in the
 //! name of `break-glass` rather than of any operator. An account with no password yet is issued the enrolment code
 //! the caller minted, replacing any earlier one; an account that has one keeps it, so the path never takes over a
@@ -28,10 +28,11 @@ const BOOTSTRAP_REASON: &str = "bootstrap-operator";
 const SYSTEM_ROLES: [OperatorRole; 2] = [OperatorRole::Companies, OperatorRole::Users];
 
 /// The roles it gives in any other company: every console role there, `companies` being held only in `system`.
-const COMPANY_ROLES: [OperatorRole; 4] = [
+const COMPANY_ROLES: [OperatorRole; 5] = [
     OperatorRole::Users,
     OperatorRole::Clients,
     OperatorRole::Policy,
+    OperatorRole::Keys,
     OperatorRole::Audit,
 ];
 

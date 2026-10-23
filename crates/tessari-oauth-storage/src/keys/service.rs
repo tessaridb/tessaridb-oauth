@@ -75,6 +75,32 @@ impl KeyService {
         self.repository.create(&place, &row).await
     }
 
+    /// A new key for `tenant` signing with `algorithm`, generated inside custody, sealed under `kek` for this tenant
+    /// and its `kid`, and recorded with its public half as made at `now`; the plaintext never leaves this call.
+    ///
+    /// # Errors
+    ///
+    /// A custody failure generating or sealing the key, and the store's failures.
+    pub async fn generate(
+        &self,
+        tenant: &TenantId,
+        kek: &Kek,
+        algorithm: Algorithm,
+        now: Timestamp,
+    ) -> Result<KeyThumbprint> {
+        let (key, pkcs8) = SigningKey::generate(algorithm)?;
+        let stored = StoredKey {
+            kid: key.kid().clone(),
+            algorithm: key.algorithm(),
+            sealed: kek.seal(tenant, key.kid().as_str(), &pkcs8)?,
+            public_jwk: key.public_jwk()?,
+            created_at: now,
+            compromised: false,
+        };
+        self.add(tenant, &stored).await?;
+        Ok(stored.kid)
+    }
+
     /// Every key of `tenant` not yet retired, oldest first — the input of the rotation rule.
     ///
     /// # Errors

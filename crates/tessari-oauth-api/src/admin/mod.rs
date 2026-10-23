@@ -12,6 +12,7 @@ mod console;
 mod enrolment;
 mod groups;
 mod groups_read;
+mod keys;
 mod operator;
 mod operators;
 mod policy;
@@ -25,6 +26,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::http::HeaderValue;
 use axum::routing::{get, post};
+use tessari_oauth_infrastructure::custody::Kek;
 use tessari_oauth_storage::ClientRemovalService;
 use tessari_oauth_storage::admin::AdminService;
 use tessari_oauth_storage::audit::AuditEvent;
@@ -36,6 +38,7 @@ use tessari_oauth_storage::companies::{CompanyService, Served};
 use tessari_oauth_storage::consents::ConsentService;
 use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::groups::GroupService;
+use tessari_oauth_storage::keys::KeyService;
 use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::refresh::RefreshService;
@@ -43,7 +46,7 @@ use tessari_oauth_storage::sessions::SessionService;
 use tessari_oauth_storage::tenants::TenantService;
 use tessari_oauth_storage::throttle::{Limit, ThrottleService};
 use tessari_oauth_storage::users::UserService;
-use tessari_oauth_types::{Clock, TenantId};
+use tessari_oauth_types::{Algorithm, Clock, TenantId};
 
 use crate::{Error, Result};
 
@@ -75,6 +78,12 @@ pub struct AdminState {
     pub policies: Arc<PolicyService>,
     /// Each company's brand and logo, which the console reads and sets.
     pub brands: Arc<BrandService>,
+    /// Each company's signing keys, which the console reads, adds to and withdraws.
+    pub keys: Arc<KeyService>,
+    /// The key-encryption key a key made from the console is sealed under.
+    pub kek: Arc<Kek>,
+    /// The algorithm a key made from the console signs with, as the rotation daemon's keys do.
+    pub signing_algorithm: Algorithm,
     /// The company's user accounts the console lists and moves between active and disabled.
     pub users: Arc<UserService>,
     /// The company's groups and who is in them.
@@ -169,6 +178,12 @@ pub fn admin_router(state: AdminState) -> Router {
         .route(
             "/admin/{company}/api/branding/logo/remove",
             post(branding::remove_logo),
+        )
+        .route("/admin/{company}/api/keys", get(keys::read))
+        .route("/admin/{company}/api/keys/rotate", post(keys::rotate))
+        .route(
+            "/admin/{company}/api/keys/{kid}/withdraw",
+            post(keys::withdraw),
         )
         .route(
             "/admin/{company}/api/users",
