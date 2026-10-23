@@ -86,8 +86,10 @@ the URL as one of its resources and names it as `resource` — and carrying `ope
 (`{"sub": …}`). A token that also carries `groups` gets `groups`, the ids of the company's groups its user is in, and
 `roles`, the roles those groups carry, each sorted and read from the store at that moment, so a membership removed a
 moment ago is gone from the next answer; these two claims appear nowhere else, not in the ID token and not in the
-access token. Profile and contact claims will be released per scope once the account endpoints serve them. Adding
-`groups` raised the consent policy to version 2, so every earlier grant is asked for once more.
+access token. A token that carries `profile` gets the names the user set in the account portal, `name`,
+`given_name` and `family_name`, each as it stands at that moment and absent while unset, and likewise nowhere else.
+Contact claims are not released yet. Adding `groups` raised the consent policy to version 2 and adding the names
+under `profile` to version 3, so every earlier grant is asked for once more.
 The token is read from the `Authorization` header alone, as `Bearer`, or as `DPoP` with a proof
 over that token (`ath`, RFC 9449 §7.1) that is spent once; a bound token is refused as a bearer token. Every bad
 token gets the same `401` with `error="invalid_token"` in `WWW-Authenticate`, a token without `openid` a `403` with

@@ -21,7 +21,8 @@ use tessari_oauth_core::token::Refusal;
 use tessari_oauth_core::userinfo::{self, Expected, Presented};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::replay::Spent;
-use tessari_oauth_types::{ClientId, ErrorCode, TenantId, Timestamp};
+use tessari_oauth_storage::users::Profile;
+use tessari_oauth_types::{ClientId, ErrorCode, TenantId, Timestamp, UserId};
 
 use crate::Error;
 use crate::headers::no_store;
@@ -35,6 +36,12 @@ struct Answer {
     groups: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     roles: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    given_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    family_name: Option<String>,
 }
 
 /// The two schemes a token may arrive under.
@@ -112,37 +119,57 @@ pub(super) async fn userinfo(
             return refuse(&state, &tenant, scheme, replayed, now).await;
         }
     }
-    let (groups, roles) = released_groups(&state, &tenant, &access).await?;
+    let user = user_of(&state, &tenant, &access).await?;
+    let (groups, roles) = released_groups(&state, &tenant, &access, user.as_ref()).await?;
+    let names = released_names(&state, &tenant, &access, user.as_ref()).await?;
     Ok(no_store(
         Json(Answer {
             sub: access.subject,
             groups,
             roles,
+            name: names.name,
+            given_name: names.given_name,
+            family_name: names.family_name,
         })
         .into_response(),
     ))
 }
 
-/// The `groups` and `roles` claims, when the token's scopes release them: from the store now, for the user the token's
-/// subject stands for at its client. A subject with no record (a token issued before subjects were recorded) is
+/// The user the token's subject stands for at its client, when the token's scopes release any claim read for a user; a
+/// subject with no record (a token issued before subjects were recorded) stands for nobody.
+async fn user_of(
+    state: &PublicState,
+    tenant: &TenantId,
+    access: &userinfo::Access,
+) -> crate::Result<Option<UserId>> {
+    let any = ["groups", "roles", "name", "given_name", "family_name"]
+        .iter()
+        .any(|claim| claims_policy::releases(claim, Place::UserInfo, &access.scopes));
+    if !any {
+        return Ok(None);
+    }
+    let client = ClientId::parse(access.client_id.as_str()).map_err(|_| Error::Internal)?;
+    state
+        .subjects
+        .user_of(tenant, &client, &access.subject)
+        .await
+        .map_err(Error::Store)
+}
+
+/// The `groups` and `roles` claims, when the token's scopes release them: from the store now, for `user`. Nobody is
 /// released as in no group.
 async fn released_groups(
     state: &PublicState,
     tenant: &TenantId,
     access: &userinfo::Access,
+    user: Option<&UserId>,
 ) -> crate::Result<(Option<Vec<String>>, Option<Vec<String>>)> {
     let groups = claims_policy::releases("groups", Place::UserInfo, &access.scopes);
     let roles = claims_policy::releases("roles", Place::UserInfo, &access.scopes);
     if !groups && !roles {
         return Ok((None, None));
     }
-    let client = ClientId::parse(access.client_id.as_str()).map_err(|_| Error::Internal)?;
-    let user = state
-        .subjects
-        .user_of(tenant, &client, &access.subject)
-        .await
-        .map_err(Error::Store)?;
-    let held = match &user {
+    let held = match user {
         Some(user) => state
             .groups
             .groups_of(tenant, user)
@@ -155,6 +182,32 @@ async fn released_groups(
         groups.then_some(claims.groups),
         roles.then_some(claims.roles),
     ))
+}
+
+/// The name claims the token's scopes release: `user`'s profile as it stands now, an unset name absent.
+async fn released_names(
+    state: &PublicState,
+    tenant: &TenantId,
+    access: &userinfo::Access,
+    user: Option<&UserId>,
+) -> crate::Result<Profile> {
+    let Some(user) = user else {
+        return Ok(Profile::default());
+    };
+    let kept = state
+        .users
+        .profile(tenant, user)
+        .await
+        .map_err(Error::Store)?
+        .unwrap_or_default();
+    let released = |claim: &str, value: Option<String>| {
+        value.filter(|_| claims_policy::releases(claim, Place::UserInfo, &access.scopes))
+    };
+    Ok(Profile {
+        name: released("name", kept.name),
+        given_name: released("given_name", kept.given_name),
+        family_name: released("family_name", kept.family_name),
+    })
 }
 
 /// The scheme and token of the one `Authorization` header, when it is `Bearer` or `DPoP` (case-insensitive, RFC 9110

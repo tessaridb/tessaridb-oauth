@@ -18,7 +18,7 @@ use crate::token_fixture::{NOW, Server, passwords, server, tenant};
 const NEW: &str = "a much longer phrase than before";
 
 /// Open a session for `user` under the cookie value `value`, signed in with `methods` `ago` seconds before now.
-async fn session(
+pub(crate) async fn session(
     server: &Server,
     user: &UserId,
     value: &str,

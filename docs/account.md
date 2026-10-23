@@ -39,6 +39,14 @@ its company's policy asks for (a sign-in then always asks for its code), and mus
 local part or the tenant's name; otherwise `400 password_rejected` with the rule it broke. The value is never echoed,
 logged or recorded. Screening against a list of compromised passwords is not done yet.
 
+## Your profile: `<issuer>/account/api/profile`
+
+`POST <issuer>/account/api/profile` with `{"name": "...", "given_name": "...", "family_name": "..."}` replaces the
+user's profile whole: each name is trimmed, at most 100 characters with no control character (otherwise
+`400 profile_rejected` and nothing changes), and a name that is left out or empty is cleared. The answer and
+`GET <issuer>/account/api/me` carry it as `profile`, each name `null` until set. UserInfo releases the names to a
+token carrying `profile`, as they stand at that moment; they appear in no token.
+
 ## Your grants: `<issuer>/account/api/grants`
 
 A signed-in user reads the grants they gave with `GET <issuer>/account/api/grants`: for each client still holding

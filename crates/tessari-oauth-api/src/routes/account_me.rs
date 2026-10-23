@@ -22,6 +22,7 @@ struct Me {
     email_verified: bool,
     factors: Factors,
     two_factor: &'static str,
+    profile: super::account_profile::View,
 }
 
 #[derive(Serialize)]
@@ -82,6 +83,12 @@ pub(super) async fn me(
         .two_factor(&tenant)
         .await
         .map_err(Error::Store)?;
+    let profile = state
+        .users
+        .profile(&tenant, &user)
+        .await
+        .map_err(Error::Store)?
+        .ok_or(Error::Internal)?;
     let me = Me {
         email: account.email.as_str().to_owned(),
         email_verified: account.email_verified,
@@ -92,6 +99,7 @@ pub(super) async fn me(
             passkeys,
         },
         two_factor: policy.name(),
+        profile: profile.into(),
     };
     Ok((StatusCode::OK, Json(me)).into_response())
 }

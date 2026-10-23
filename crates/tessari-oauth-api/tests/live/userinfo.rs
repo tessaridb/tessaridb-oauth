@@ -60,10 +60,22 @@ async fn register_reader(server: &Server) {
 
 /// Issue `code` to `reader` for `scopes` at `resource`.
 async fn issue_for(server: &Server, code: &str, scopes: &str, resource: &str) {
+    issue_to(
+        server,
+        code,
+        &UserId::parse(USER).expect("a user id"),
+        scopes,
+        resource,
+    )
+    .await;
+}
+
+/// Issue `code` to `reader` for `user`, `scopes` at `resource`.
+async fn issue_to(server: &Server, code: &str, user: &UserId, scopes: &str, resource: &str) {
     let issued = IssuedCode {
         tenant: tenant("acme"),
         client_id: ClientId::parse("reader").expect("a client id"),
-        user: UserId::parse(USER).expect("a user id"),
+        user: user.clone(),
         redirect_uri: REDIRECT.to_owned(),
         challenge: Challenge::of(VERIFIER).expect("a challenge"),
         scopes: ScopeSet::parse(scopes).expect("scopes"),
@@ -386,6 +398,62 @@ async fn under_groups_the_answer_names_the_users_groups_and_roles_as_they_stand_
     assert!(
         without.body.get("groups").is_none() && without.body.get("roles").is_none(),
         "no group claim without the scope: {}",
+        without.body
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn under_profile_the_answer_names_the_users_names_as_they_stand_now() {
+    use tessari_oauth_storage::users::Profile;
+
+    let server = server(2).await;
+    register_reader(&server).await;
+    let user = crate::login_password::with_password(&server, "ada@example.com").await;
+    let named = |name: &str| Profile {
+        name: Some(name.to_owned()),
+        given_name: Some("Ada".to_owned()),
+        family_name: None,
+    };
+    assert_eq!(
+        server
+            .storage
+            .users
+            .set_profile(&tenant("acme"), &user, &named("Ada Lovelace"))
+            .await,
+        Ok(true)
+    );
+    issue_to(&server, "code-p1", &user, "openid profile", &userinfo()).await;
+    let token = access_token(&post(&server, "acme", &redemption("reader", "code-p1")).await);
+    let bearer = format!("Bearer {token}");
+    let answered = call(&server, "GET", Some(&bearer), &[]).await;
+    assert_eq!(answered.status, StatusCode::OK, "{}", answered.body);
+    assert_eq!(answered.body["name"], "Ada Lovelace");
+    assert_eq!(answered.body["given_name"], "Ada");
+    assert!(
+        answered.body.get("family_name").is_none(),
+        "an unset name is absent: {}",
+        answered.body
+    );
+
+    assert_eq!(
+        server
+            .storage
+            .users
+            .set_profile(&tenant("acme"), &user, &named("Ada King"))
+            .await,
+        Ok(true)
+    );
+    let after = call(&server, "GET", Some(&bearer), &[]).await;
+    assert_eq!(after.body["name"], "Ada King", "read now, not at issuance");
+
+    issue_to(&server, "code-p2", &user, "openid groups", &userinfo()).await;
+    let plain = access_token(&post(&server, "acme", &redemption("reader", "code-p2")).await);
+    let without = call(&server, "GET", Some(&format!("Bearer {plain}")), &[]).await;
+    assert_eq!(without.status, StatusCode::OK, "{}", without.body);
+    assert!(
+        without.body.get("name").is_none() && without.body.get("given_name").is_none(),
+        "no name without the scope: {}",
         without.body
     );
 }

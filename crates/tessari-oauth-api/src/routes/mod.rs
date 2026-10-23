@@ -8,6 +8,7 @@ mod account_factors;
 mod account_me;
 mod account_passkeys;
 mod account_password;
+mod account_profile;
 mod account_sessions;
 mod account_totp;
 mod authorize;
@@ -175,6 +176,10 @@ pub fn public_router(state: PublicState) -> Router {
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/password"),
             post(account_password::change),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/profile"),
+            post(account_profile::set),
         )
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions"),

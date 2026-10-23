@@ -67,6 +67,9 @@ pub enum Error {
     /// The new password breaks one of the rules for new passwords.
     #[error("the password was not accepted")]
     PasswordRejected(PasswordRefused),
+    /// A profile name is longer than the limit or holds a control character.
+    #[error("the profile was not accepted")]
+    ProfileRejected,
     /// The return to the admin console does not open a session: one answer for every reason, so it says nothing about
     /// which check failed.
     #[error("the console sign-in was refused")]
@@ -110,7 +113,9 @@ impl Error {
                 ErrorCategory::Conflict
             }
             Self::AlreadyEnrolled | Self::NothingPending => ErrorCategory::Conflict,
-            Self::CodeRejected | Self::PasswordRejected(_) => ErrorCategory::Validation,
+            Self::CodeRejected | Self::PasswordRejected(_) | Self::ProfileRejected => {
+                ErrorCategory::Validation
+            }
             Self::ConsoleRefused | Self::CrossOrigin | Self::RoleRequired => {
                 ErrorCategory::Forbidden
             }
@@ -209,6 +214,11 @@ impl IntoResponse for Error {
                     }
                     PasswordRefused::Guessable => "the password is too easily guessed",
                 },
+            ),
+            (Self::ProfileRejected, _) => (
+                StatusCode::BAD_REQUEST,
+                "profile_rejected",
+                "a name must be at most 100 characters with no control character",
             ),
             (Self::ConsoleRefused, _) => (
                 StatusCode::FORBIDDEN,

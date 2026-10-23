@@ -65,6 +65,7 @@ async fn a_user_reads_their_address_and_factors_and_nobody_elses() {
             "email_verified": verified,
             "factors": { "password": true, "totp": false, "recovery_codes": 0, "passkeys": [] },
             "two_factor": "optional",
+            "profile": { "name": null, "given_name": null, "family_name": null },
         })
     );
     let at = Timestamp::from_unix_secs(NOW);
