@@ -112,7 +112,9 @@ has lapsed or whose change already took effect gets `400` `code_rejected`.
 
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listeners stop accepting, the requests in flight
-finish within 25 seconds, and the process exits 0.
+finish within 25 seconds, and the process exits 0. Under `RUST_LOG=debug` the first line, `loaded configuration`, is
+the effective configuration with every default filled in; the store, peer and relay passwords never appear in it
+(the first two print `<redacted>`, the relay's is only a file path), and the KEK and pepper are file paths.
 
 A line about something that happened carries an `event` field; these are the ones worth an alert. At `ERROR`:
 `break_glass` (the emergency operator path ran) and `audit_unrecorded` (an event could not be appended to the audit
