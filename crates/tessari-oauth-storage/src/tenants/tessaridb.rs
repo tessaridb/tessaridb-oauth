@@ -143,7 +143,10 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      group_id string REQUIRED, user_id string REQUIRED, added_at int REQUIRED, added_by string REQUIRED); \
      DEFINE INDEX IF NOT EXISTS by_group ON group_members FIELDS group_id; \
      DEFINE INDEX IF NOT EXISTS by_user ON group_members FIELDS user_id; \
-     DEFINE TABLE IF NOT EXISTS pairwise_subjects (client_id string REQUIRED, user_id string REQUIRED);";
+     DEFINE TABLE IF NOT EXISTS pairwise_subjects (client_id string REQUIRED, user_id string REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS brand (\
+     name string REQUIRED, accent string REQUIRED, support_url string, privacy_url string, updated_at int REQUIRED); \
+     DEFINE TABLE IF NOT EXISTS brand_logo (png string REQUIRED, updated_at int REQUIRED);";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

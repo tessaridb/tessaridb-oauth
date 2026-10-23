@@ -1264,6 +1264,7 @@ name = "tessari-oauth-storage"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "png",
  "tessari-oauth-constants",
  "tessari-oauth-core",
  "tessari-oauth-infrastructure",

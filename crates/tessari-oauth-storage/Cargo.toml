@@ -29,6 +29,7 @@ zeroize.workspace = true
 
 [dev-dependencies]
 tessari-oauth-test-support.workspace = true
+png.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 [lints]

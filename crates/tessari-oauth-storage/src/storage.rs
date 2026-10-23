@@ -7,6 +7,7 @@ use tessari_oauth_infrastructure::tessaridb::Database;
 use crate::Tenancy;
 use crate::admin::{AdminService, TessaridbAdminRepository};
 use crate::audit::{AuditService, TessaridbAuditRepository};
+use crate::brands::{BrandService, TessaridbBrandRepository};
 use crate::client_removal::ClientRemovalService;
 use crate::clients::{ClientService, TessaridbClientRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
@@ -67,6 +68,8 @@ pub struct Storage {
     pub policies: Arc<PolicyService>,
     /// Each company's groups and who is in them.
     pub groups: Arc<GroupService>,
+    /// Each company's brand and logo on its public pages.
+    pub brands: Arc<BrandService>,
     /// Passkeys and their challenges.
     pub passkeys: Arc<PasskeyService>,
     /// Sign-ins in progress.
@@ -106,6 +109,7 @@ impl Storage {
         let policy_repository = Arc::new(TessaridbPolicyRepository::new(database.clone()));
         let passkey_repository = Arc::new(TessaridbPasskeyRepository::new(database.clone()));
         let group_repository = Arc::new(TessaridbGroupRepository::new(database.clone()));
+        let brand_repository = Arc::new(TessaridbBrandRepository::new(database.clone()));
 
         let signin_repository = Arc::new(TessaridbSigninRepository::new(database.clone()));
 
@@ -146,6 +150,7 @@ impl Storage {
             factors: Arc::new(FactorService::new(factor_repository, tenancy.clone())),
             policies: Arc::new(PolicyService::new(policy_repository, tenancy.clone())),
             groups: Arc::new(GroupService::new(group_repository, tenancy.clone())),
+            brands: Arc::new(BrandService::new(brand_repository, tenancy.clone())),
             passkeys: Arc::new(PasskeyService::new(passkey_repository, tenancy.clone())),
             signins: Arc::new(SigninService::new(signin_repository, tenancy.clone())),
             sessions: Arc::new(SessionService::new(session_repository, tenancy.clone())),

@@ -12,6 +12,7 @@
 mod admin;
 mod audit;
 mod bootstrap;
+mod brands;
 mod clients;
 mod codes;
 mod companies;

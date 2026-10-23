@@ -4,6 +4,7 @@ pub mod admin;
 mod answers;
 pub mod audit;
 mod bootstrap;
+pub mod brands;
 mod client_removal;
 pub mod clients;
 pub mod codes;

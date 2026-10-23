@@ -68,12 +68,13 @@ fn a_png_comes_back_as_a_new_png_with_the_same_pixels_and_none_of_its_text() {
     let sent = png_of(8, 4, Some("<script>alert(1)</script>"));
     assert!(contains(&sent, b"tEXt"));
     let kept = reencode(&sent).expect("re-encoded");
+    let kept = kept.as_bytes();
     assert!(
-        !contains(&kept, b"tEXt"),
+        !contains(kept, b"tEXt"),
         "ancillary text is not carried over"
     );
-    assert!(!contains(&kept, b"<script>"));
-    assert_eq!(pixels(&kept), pixels(&sent));
+    assert!(!contains(kept, b"<script>"));
+    assert_eq!(pixels(kept), pixels(&sent));
 }
 
 #[test]

@@ -14,6 +14,18 @@ use crate::branding::BrandRefusal;
 /// The eight bytes every PNG starts with (PNG specification, section 5.2).
 const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
 
+/// A PNG this server wrote: made only by [`reencode`], so storage that takes one never holds an upload as sent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Png(Vec<u8>);
+
+impl Png {
+    /// The PNG's bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 /// `upload` re-encoded as a new PNG of the same pixels.
 ///
 /// # Errors
@@ -21,7 +33,7 @@ const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
 /// [`BrandRefusal::LogoTooLarge`] past the byte ceiling, [`BrandRefusal::LogoNotPng`] without the PNG signature,
 /// [`BrandRefusal::LogoTooWide`] past the side ceiling, and [`BrandRefusal::LogoUnreadable`] for anything the
 /// decoder refuses.
-pub fn reencode(upload: &[u8]) -> Result<Vec<u8>, BrandRefusal> {
+pub fn reencode(upload: &[u8]) -> Result<Png, BrandRefusal> {
     if upload.len() > LOGO_MAX_BYTES {
         return Err(BrandRefusal::LogoTooLarge);
     }
@@ -70,7 +82,7 @@ pub fn reencode(upload: &[u8]) -> Result<Vec<u8>, BrandRefusal> {
             .map_err(|_| BrandRefusal::LogoUnreadable)?;
         writer.finish().map_err(|_| BrandRefusal::LogoUnreadable)?;
     }
-    Ok(written)
+    Ok(Png(written))
 }
 
 #[cfg(test)]
