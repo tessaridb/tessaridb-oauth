@@ -1,6 +1,7 @@
 # Platform operators
 
-The emergency path for the first operator, operator roles, and what to do when a signing key may be exposed.
+The emergency path for the first operator, operator roles, and what to do in an incident: an exposed signing key,
+a leaked client credential, a taken account.
 
 
 ```sh
@@ -49,3 +50,21 @@ departing operator who could reach the key-encryption key), withdraw it at once;
 Every key of every company is sealed with the server's key-encryption key (`TESSARIDB_OAUTH_KEK`). If that file
 itself may be exposed, withdrawing keys is not enough, because a replacement is sealed with the same file; this
 version has no command that re-seals the keys under a new key-encryption key.
+
+## A leaked client credential
+
+When a client's private key (or the host that holds it) may be in someone else's hands, remove the client with an
+operator holding `clients`: `POST <ADMIN_URL>/admin/<company>/api/clients/<id>/remove` with a `reason`. The key stops
+authenticating at once, every user's grant to the client and every refresh family it held are revoked, and the answer
+gives `access_tokens_end_by`, at most five minutes on, after which the access tokens it already holds stop working.
+Then register the client again with a new key; it may keep its `client_id`, and it starts with nothing: no grant and
+no refresh token from before comes back, so every user is asked again.
+
+## A taken account
+
+When an account may be used by someone other than its owner, disable it with an operator holding `users`:
+`POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` with a `reason`. Every session of the account ends at once
+(its clients are told through the back channel), every refresh family is revoked, nobody can sign in to it, and its
+access tokens stop working by the `access_tokens_end_by` the answer gives. Once the owner is reached, enable it again
+(`POST .../users/<user>/enable`, which gives back none of what was ended) and have the owner ask for a password reset
+from the sign-in page; the reset keeps the account's second factor.
