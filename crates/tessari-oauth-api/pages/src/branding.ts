@@ -48,7 +48,7 @@ function facts(brand: Branding): HTMLDListElement {
   return make(
     "dl",
     "facts",
-    ...fact("Name", brand.name ?? "Not set: the pages say TessariDB"),
+    ...fact("Name", brand.name ?? "Not set: the pages say TessariDB OAuth"),
     ...fact(
       "Colour",
       ...(brand.accent === null

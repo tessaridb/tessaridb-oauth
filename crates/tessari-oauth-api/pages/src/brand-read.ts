@@ -35,7 +35,8 @@ export function readBrand(body: unknown): Brand {
   };
 }
 
-/** The logo's address, carrying its upload time so a new logo is fetched rather than a cached one. */
-export function logoAddress(uploaded: number): string {
-  return `assets/logo.png?v=${uploaded}`;
+/** The logo's address under the page's `assets` path, carrying its upload time so a new logo is fetched rather than
+ * a cached one. */
+export function logoAddress(uploaded: number, assets = "assets/"): string {
+  return `${assets}logo.png?v=${uploaded}`;
 }

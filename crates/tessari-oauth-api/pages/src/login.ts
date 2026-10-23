@@ -4,7 +4,7 @@
 // Everything the user typed stays in place when a step is refused.
 
 import { showBrand } from "./brand.ts";
-import { TEXT, refusalText } from "./copy.ts";
+import { RESET_TEXT, TEXT, refusalText } from "./copy.ts";
 import { type Answer, call, element, fieldError, say } from "./dom.ts";
 import {
   type Step,
@@ -16,6 +16,7 @@ import {
   refusal,
   toBase64url,
 } from "./flow.ts";
+import { requestOutcome } from "./reset-read.ts";
 
 const STEP_FORMS: readonly Step[] = ["identify", "first_factor", "second_factor"];
 
@@ -152,6 +153,25 @@ async function passkey(base: string): Promise<void> {
   );
 }
 
+/** Ask for a reset link for `address`; the answer reads the same whether or not an account uses it. */
+async function forgot(base: string, address: string): Promise<void> {
+  busy(true);
+  say(RESET_TEXT.sending);
+  const answer = await call("POST", `${base}/reset`, { email: address });
+  busy(false);
+  const outcome = requestOutcome(answer.status, answer.body, answer.retryAfter);
+  switch (outcome.kind) {
+    case "sent":
+      say(RESET_TEXT.sent);
+      return;
+    case "unavailable":
+      say(RESET_TEXT.unavailable);
+      return;
+    default:
+      say(refusalText(outcome));
+  }
+}
+
 async function main(): Promise<void> {
   const base = apiBase(location.pathname, "login");
   const asked = beginBody(location.search);
@@ -188,6 +208,12 @@ async function main(): Promise<void> {
     password.type = shown ? "password" : "text";
     reveal.setAttribute("aria-pressed", String(!shown));
     reveal.textContent = shown ? "Show" : "Hide";
+  });
+  element("forgot", HTMLButtonElement).addEventListener("click", () => {
+    const address = element("who", HTMLElement).textContent ?? "";
+    if (address !== "") {
+      void forgot(base, address);
+    }
   });
   const switcher = element("use-recovery", HTMLButtonElement);
   switcher.addEventListener("click", () => {

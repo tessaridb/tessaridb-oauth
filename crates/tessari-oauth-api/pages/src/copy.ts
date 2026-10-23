@@ -86,6 +86,21 @@ export function codesLeft(count: number): string {
   return codes.select(count) === "one" ? "1 code left" : `${count} codes left`;
 }
 
+/** The words for a forgotten password, on the sign-in page and on the page its link opens. */
+export const RESET_TEXT = {
+  sending: "Sending a reset link.",
+  sent: "If an account uses that address, we sent it a link to choose a new password. It works for 30 minutes.",
+  unavailable: "Password reset by email isn't set up here. Ask your administrator to reset it.",
+  invalidLink: "This reset link isn't complete. Open the link from the email again, or ask for a new one.",
+  spentLink: "This reset link has expired or was already used. Ask for a new one from the sign-in page.",
+  hint: "At least 15 characters, or 8 if you also use an authenticator app. A few unrelated words work well.",
+  passwordRequired: "Enter a new password.",
+  saving: "Saving your new password.",
+  changed:
+    "Password changed. You were signed out everywhere. Sign in with your new password; " +
+    "your second factor and passkeys are unchanged.",
+} as const;
+
 /** The words the account page shows, by place. */
 export const ACCOUNT_TEXT = {
   loading: "Loading your account.",

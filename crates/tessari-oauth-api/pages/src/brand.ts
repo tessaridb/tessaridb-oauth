@@ -14,9 +14,9 @@ function offer(id: string, address: string | null): boolean {
   return address !== null;
 }
 
-/** Show the brand of the company this page belongs to. */
-export async function showBrand(): Promise<void> {
-  const answer = await call("GET", "assets/brand.json");
+/** Show the brand of the company this page belongs to, whose assets are at `assets` relative to the page. */
+export async function showBrand(assets = "assets/"): Promise<void> {
+  const answer = await call("GET", `${assets}brand.json`);
   if (!answer.ok) {
     return;
   }
@@ -25,7 +25,7 @@ export async function showBrand(): Promise<void> {
     element("brand-name", HTMLSpanElement).textContent = brand.name;
   }
   if (brand.logo !== null) {
-    element("brand-logo", HTMLImageElement).src = logoAddress(brand.logo);
+    element("brand-logo", HTMLImageElement).src = logoAddress(brand.logo, assets);
   }
   const support = offer("brand-support", brand.support);
   const privacy = offer("brand-privacy", brand.privacy);

@@ -164,7 +164,7 @@ async function addPasskey(base: string, followups: Followups): Promise<void> {
     created = await navigator.credentials.create({
       publicKey: {
         challenge: options.challenge,
-        rp: { id: options.rpId, name: "TessariDB" },
+        rp: { id: options.rpId, name: "TessariDB OAuth" },
         user: { id: options.userId, name: options.userName, displayName: options.userName },
         pubKeyCredParams: options.algorithms.map((alg) => ({ type: "public-key" as const, alg })),
         excludeCredentials: options.exclude.map((id) => ({ type: "public-key" as const, id })),

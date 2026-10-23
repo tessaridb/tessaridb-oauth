@@ -78,8 +78,8 @@
       logo: seconds(field(body, "logo"))
     };
   }
-  function logoAddress(uploaded) {
-    return `assets/logo.png?v=${uploaded}`;
+  function logoAddress(uploaded, assets = "assets/") {
+    return `${assets}logo.png?v=${uploaded}`;
   }
 
   // src/dom.ts
@@ -127,8 +127,8 @@
     anchor.hidden = address === null;
     return address !== null;
   }
-  async function showBrand() {
-    const answer = await call("GET", "assets/brand.json");
+  async function showBrand(assets = "assets/") {
+    const answer = await call("GET", `${assets}brand.json`);
     if (!answer.ok) {
       return;
     }
@@ -137,7 +137,7 @@
       element("brand-name", HTMLSpanElement).textContent = brand.name;
     }
     if (brand.logo !== null) {
-      element("brand-logo", HTMLImageElement).src = logoAddress(brand.logo);
+      element("brand-logo", HTMLImageElement).src = logoAddress(brand.logo, assets);
     }
     const support = offer("brand-support", brand.support);
     const privacy = offer("brand-privacy", brand.privacy);

@@ -19,6 +19,11 @@ test("a brand the server set is read as it was set", () => {
     logo: 1800000000,
   });
   assert.equal(logoAddress(1800000000), "assets/logo.png?v=1800000000");
+  assert.equal(
+    logoAddress(1800000000, "../assets/"),
+    "../assets/logo.png?v=1800000000",
+    "a page one level down reaches the same logo",
+  );
 });
 
 test("no brand leaves every field empty, so the pages keep their own", () => {

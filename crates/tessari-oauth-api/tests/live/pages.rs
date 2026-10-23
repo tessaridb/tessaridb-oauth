@@ -21,14 +21,24 @@ use crate::routes::{live_storage, state};
 const PAGE_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
                            connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'";
 
-const SERVED: [(&str, &str, &str); 8] = [
+const SERVED: [(&str, &str, &str); 10] = [
     ("/acme/login", "text/html; charset=utf-8", "login.html"),
+    (
+        "/acme/login/reset",
+        "text/html; charset=utf-8",
+        "reset.html",
+    ),
     ("/acme/consent", "text/html; charset=utf-8", "consent.html"),
     ("/acme/account", "text/html; charset=utf-8", "account.html"),
     (
         "/acme/assets/login.js",
         "text/javascript; charset=utf-8",
         "login.js",
+    ),
+    (
+        "/acme/assets/reset.js",
+        "text/javascript; charset=utf-8",
+        "reset.js",
     ),
     (
         "/acme/assets/consent.js",
@@ -127,7 +137,25 @@ async fn the_pages_load_only_their_own_assets() {
         assert!(body.contains("href=\"assets/pages.css\""), "{path}");
         assert!(body.contains("href=\"assets/brand.css\""), "{path}");
         assert!(!body.contains("//"), "{path} names nothing off this origin");
+        assert!(
+            body.contains("<span id=\"brand-name\">TessariDB OAuth</span>"),
+            "{path} names the product until a company names itself"
+        );
     }
+    // The reset page sits one level down, under the sign-in page, and reaches the same assets.
+    let (_, _, body) = fetch("/acme/login/reset").await;
+    for asset in [
+        "src=\"../assets/reset.js\"",
+        "href=\"../assets/pages.css\"",
+        "href=\"../assets/brand.css\"",
+    ] {
+        assert!(body.contains(asset), "the reset page loads {asset}");
+    }
+    assert!(
+        !body.contains("//"),
+        "the reset page names nothing off this origin"
+    );
+    assert!(body.contains("<span id=\"brand-name\">TessariDB OAuth</span>"));
 }
 
 #[tokio::test]

@@ -35,7 +35,7 @@ function refusedText(why: ChangeRefusal, answer: Answer): string | null {
   }
 }
 
-function passwordRuleText(why: ChangeRefusal): string {
+export function passwordRuleText(why: ChangeRefusal): string {
   switch (why) {
     case "too-short":
       return ACCOUNT_TEXT.passwordTooShort;

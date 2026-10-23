@@ -121,8 +121,8 @@
       logo: seconds(field(body, "logo"))
     };
   }
-  function logoAddress(uploaded) {
-    return `assets/logo.png?v=${uploaded}`;
+  function logoAddress(uploaded, assets = "assets/") {
+    return `${assets}logo.png?v=${uploaded}`;
   }
 
   // src/dom.ts
@@ -181,8 +181,8 @@
     anchor.hidden = address === null;
     return address !== null;
   }
-  async function showBrand() {
-    const answer = await call("GET", "assets/brand.json");
+  async function showBrand(assets = "assets/") {
+    const answer = await call("GET", `${assets}brand.json`);
     if (!answer.ok) {
       return;
     }
@@ -191,7 +191,7 @@
       element("brand-name", HTMLSpanElement).textContent = brand.name;
     }
     if (brand.logo !== null) {
-      element("brand-logo", HTMLImageElement).src = logoAddress(brand.logo);
+      element("brand-logo", HTMLImageElement).src = logoAddress(brand.logo, assets);
     }
     const support = offer("brand-support", brand.support);
     const privacy = offer("brand-privacy", brand.privacy);
@@ -229,6 +229,28 @@
     allowed: "Access allowed. Taking you back to the application.",
     denied: "Access denied. Taking you back to the application."
   };
+  var RESET_TEXT = {
+    sending: "Sending a reset link.",
+    sent: "If an account uses that address, we sent it a link to choose a new password. It works for 30 minutes.",
+    unavailable: "Password reset by email isn't set up here. Ask your administrator to reset it.",
+    invalidLink: "This reset link isn't complete. Open the link from the email again, or ask for a new one.",
+    spentLink: "This reset link has expired or was already used. Ask for a new one from the sign-in page.",
+    hint: "At least 15 characters, or 8 if you also use an authenticator app. A few unrelated words work well.",
+    passwordRequired: "Enter a new password.",
+    saving: "Saving your new password.",
+    changed: "Password changed. You were signed out everywhere. Sign in with your new password; your second factor and passkeys are unchanged."
+  };
+
+  // src/reset-read.ts
+  function requestOutcome(status, body, retryAfter) {
+    if (status === 202) {
+      return { kind: "sent" };
+    }
+    if (status === 503 && field(body, "code") === "mail_unavailable") {
+      return { kind: "unavailable" };
+    }
+    return status === 429 ? refusal(status, body, retryAfter) : { kind: "retry" };
+  }
 
   // src/login.ts
   var STEP_FORMS = ["identify", "first_factor", "second_factor"];
@@ -351,6 +373,23 @@
       null
     );
   }
+  async function forgot(base, address) {
+    busy(true);
+    say(RESET_TEXT.sending);
+    const answer = await call("POST", `${base}/reset`, { email: address });
+    busy(false);
+    const outcome = requestOutcome(answer.status, answer.body, answer.retryAfter);
+    switch (outcome.kind) {
+      case "sent":
+        say(RESET_TEXT.sent);
+        return;
+      case "unavailable":
+        say(RESET_TEXT.unavailable);
+        return;
+      default:
+        say(refusalText(outcome));
+    }
+  }
   async function main() {
     const base = apiBase(location.pathname, "login");
     const asked = beginBody(location.search);
@@ -387,6 +426,12 @@
       password.type = shown ? "password" : "text";
       reveal.setAttribute("aria-pressed", String(!shown));
       reveal.textContent = shown ? "Show" : "Hide";
+    });
+    element("forgot", HTMLButtonElement).addEventListener("click", () => {
+      const address = element("who", HTMLElement).textContent ?? "";
+      if (address !== "") {
+        void forgot(base, address);
+      }
     });
     const switcher = element("use-recovery", HTMLButtonElement);
     switcher.addEventListener("click", () => {
