@@ -3,6 +3,7 @@
 // continues.
 // Everything the user typed stays in place when a step is refused.
 
+import { showBrand } from "./brand.ts";
 import { TEXT, refusalText } from "./copy.ts";
 import { type Answer, call, element, fieldError, say } from "./dom.ts";
 import {
@@ -207,4 +208,5 @@ async function main(): Promise<void> {
   settle(begun, null);
 }
 
+void showBrand();
 void main();

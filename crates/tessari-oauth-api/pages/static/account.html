@@ -7,6 +7,7 @@
   <title>Your account</title>
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/pages.css">
+  <link rel="stylesheet" href="assets/brand.css">
   <script src="assets/account.js" defer></script>
 </head>
 <body>
@@ -14,8 +15,8 @@
   <main id="main" class="page" tabindex="-1">
     <section class="card wide" aria-labelledby="title">
       <header class="brand">
-        <img src="assets/mark.svg" alt="" width="32" height="32">
-        <span>TessariDB</span>
+        <img id="brand-logo" src="assets/mark.svg" alt="" width="32" height="32">
+        <span id="brand-name">TessariDB</span>
       </header>
       <h1 id="title" tabindex="-1">Your account</h1>
       <p id="status" class="status" role="status" aria-live="polite">Loading your account.</p>
@@ -125,6 +126,10 @@
           <ul id="grants" class="rows" aria-labelledby="grants-title"></ul>
         </section>
       </div>
+      <p id="brand-links" class="brand-links" hidden>
+        <a id="brand-support" class="quiet-link" rel="noreferrer" hidden>Help</a>
+        <a id="brand-privacy" class="quiet-link" rel="noreferrer" hidden>Privacy</a>
+      </p>
     </section>
   </main>
 </body>

@@ -1,83 +1,5 @@
 "use strict";
 (() => {
-  // src/copy.ts
-  var seconds = new Intl.PluralRules("en");
-  function inSeconds(count) {
-    return seconds.select(count) === "one" ? `${count} second` : `${count} seconds`;
-  }
-  function refusalText(refused) {
-    switch (refused.kind) {
-      case "rejected":
-        return "That didn't match. Check it and try again.";
-      case "expired":
-        return "This sign-in has expired. Go back to the application and start again.";
-      case "throttled":
-        return refused.seconds === null ? "Too many attempts. Wait a moment, then try again." : `Too many attempts. Try again in ${inSeconds(refused.seconds)}.`;
-      case "retry":
-        return "Something went wrong on our side. Try again in a moment.";
-    }
-  }
-  var SCOPES = {
-    openid: "Confirmation that you signed in, and who you are to this application",
-    profile: "Your name and basic profile details",
-    email: "Your email address and whether it is verified",
-    offline_access: "Access while you are signed out or not using it",
-    groups: "The groups you are in at this company, and the roles they give you"
-  };
-  function describeScope(scope) {
-    return Object.hasOwn(SCOPES, scope) ? SCOPES[scope] ?? scope : scope;
-  }
-  var TEXT = {
-    starting: "Preparing your sign-in.",
-    missing: "This page needs a sign-in to continue. Go back to the application and start again.",
-    passkeyCancelled: "The passkey wasn't used. Try again, or sign in another way.",
-    emailRequired: "Enter the email address you signed up with.",
-    passwordRequired: "Enter your password.",
-    codeRequired: "Enter the 6-digit code from your authenticator app.",
-    recoveryRequired: "Enter one of your recovery codes.",
-    continuing: "Signed in. Taking you back to the application.",
-    consentLoading: "Checking what the application asks for.",
-    consentNothing: "This application asks for nothing new.",
-    allowed: "Access allowed. Taking you back to the application.",
-    denied: "Access denied. Taking you back to the application."
-  };
-
-  // src/dom.ts
-  function element(id, kind) {
-    const found = document.getElementById(id);
-    if (!(found instanceof kind)) {
-      throw new Error(`the page has no ${kind.name} #${id}`);
-    }
-    return found;
-  }
-  async function call(method, path, body, extra) {
-    const init = {
-      method,
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: { accept: "application/json", "content-type": "application/json", ...extra }
-    };
-    if (body !== void 0) {
-      init.body = JSON.stringify(body);
-    }
-    try {
-      const response = await fetch(path, init);
-      const text = await response.text();
-      let parsed = null;
-      try {
-        parsed = text === "" ? null : JSON.parse(text);
-      } catch {
-        parsed = null;
-      }
-      return { ok: response.ok, status: response.status, body: parsed, retryAfter: response.headers.get("retry-after") };
-    } catch {
-      return { ok: false, status: 0, body: null, retryAfter: null };
-    }
-  }
-  function say(text) {
-    element("status", HTMLParagraphElement).textContent = text;
-  }
-
   // src/flow.ts
   function field(value, key) {
     if (typeof value !== "object" || value === null) {
@@ -89,12 +11,12 @@
   function strings(value) {
     return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : null;
   }
-  function url(text) {
-    if (typeof text !== "string") {
+  function url(text2) {
+    if (typeof text2 !== "string") {
       return null;
     }
     try {
-      return new URL(text);
+      return new URL(text2);
     } catch {
       return null;
     }
@@ -132,11 +54,137 @@
       return { kind: "expired" };
     }
     if (status === 429) {
-      const seconds2 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
-      return { kind: "throttled", seconds: seconds2 };
+      const seconds3 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
+      return { kind: "throttled", seconds: seconds3 };
     }
     return { kind: "retry" };
   }
+
+  // src/brand-read.ts
+  function text(value) {
+    return typeof value === "string" && value !== "" ? value : null;
+  }
+  function link(value) {
+    return typeof value === "string" && value.startsWith("https://") ? value : null;
+  }
+  function seconds(value) {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  function readBrand(body) {
+    return {
+      name: text(field(body, "name")),
+      support: link(field(body, "support")),
+      privacy: link(field(body, "privacy")),
+      logo: seconds(field(body, "logo"))
+    };
+  }
+  function logoAddress(uploaded) {
+    return `assets/logo.png?v=${uploaded}`;
+  }
+
+  // src/dom.ts
+  function element(id, kind) {
+    const found = document.getElementById(id);
+    if (!(found instanceof kind)) {
+      throw new Error(`the page has no ${kind.name} #${id}`);
+    }
+    return found;
+  }
+  async function call(method, path, body, extra) {
+    const init = {
+      method,
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { accept: "application/json", "content-type": "application/json", ...extra }
+    };
+    if (body !== void 0) {
+      init.body = JSON.stringify(body);
+    }
+    try {
+      const response = await fetch(path, init);
+      const text2 = await response.text();
+      let parsed = null;
+      try {
+        parsed = text2 === "" ? null : JSON.parse(text2);
+      } catch {
+        parsed = null;
+      }
+      return { ok: response.ok, status: response.status, body: parsed, retryAfter: response.headers.get("retry-after") };
+    } catch {
+      return { ok: false, status: 0, body: null, retryAfter: null };
+    }
+  }
+  function say(text2) {
+    element("status", HTMLParagraphElement).textContent = text2;
+  }
+
+  // src/brand.ts
+  function offer(id, address) {
+    const anchor = element(id, HTMLAnchorElement);
+    if (address !== null) {
+      anchor.href = address;
+    }
+    anchor.hidden = address === null;
+    return address !== null;
+  }
+  async function showBrand() {
+    const answer = await call("GET", "assets/brand.json");
+    if (!answer.ok) {
+      return;
+    }
+    const brand = readBrand(answer.body);
+    if (brand.name !== null) {
+      element("brand-name", HTMLSpanElement).textContent = brand.name;
+    }
+    if (brand.logo !== null) {
+      element("brand-logo", HTMLImageElement).src = logoAddress(brand.logo);
+    }
+    const support = offer("brand-support", brand.support);
+    const privacy = offer("brand-privacy", brand.privacy);
+    element("brand-links", HTMLParagraphElement).hidden = !support && !privacy;
+  }
+
+  // src/copy.ts
+  var seconds2 = new Intl.PluralRules("en");
+  function inSeconds(count) {
+    return seconds2.select(count) === "one" ? `${count} second` : `${count} seconds`;
+  }
+  function refusalText(refused) {
+    switch (refused.kind) {
+      case "rejected":
+        return "That didn't match. Check it and try again.";
+      case "expired":
+        return "This sign-in has expired. Go back to the application and start again.";
+      case "throttled":
+        return refused.seconds === null ? "Too many attempts. Wait a moment, then try again." : `Too many attempts. Try again in ${inSeconds(refused.seconds)}.`;
+      case "retry":
+        return "Something went wrong on our side. Try again in a moment.";
+    }
+  }
+  var SCOPES = {
+    openid: "Confirmation that you signed in, and who you are to this application",
+    profile: "Your name and basic profile details",
+    email: "Your email address and whether it is verified",
+    offline_access: "Access while you are signed out or not using it",
+    groups: "The groups you are in at this company, and the roles they give you"
+  };
+  function describeScope(scope) {
+    return Object.hasOwn(SCOPES, scope) ? SCOPES[scope] ?? scope : scope;
+  }
+  var TEXT = {
+    starting: "Preparing your sign-in.",
+    missing: "This page needs a sign-in to continue. Go back to the application and start again.",
+    passkeyCancelled: "The passkey wasn't used. Try again, or sign in another way.",
+    emailRequired: "Enter the email address you signed up with.",
+    passwordRequired: "Enter your password.",
+    codeRequired: "Enter the 6-digit code from your authenticator app.",
+    recoveryRequired: "Enter one of your recovery codes.",
+    continuing: "Signed in. Taking you back to the application.",
+    consentLoading: "Checking what the application asks for.",
+    consentNothing: "This application asks for nothing new.",
+    allowed: "Access allowed. Taking you back to the application.",
+    denied: "Access denied. Taking you back to the application."
+  };
 
   // src/consent.ts
   var request = element("request", HTMLDivElement);
@@ -194,5 +242,6 @@
     say("");
     allow.focus();
   }
+  void showBrand();
   void main();
 })();

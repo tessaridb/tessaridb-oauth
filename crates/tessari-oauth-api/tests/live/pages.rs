@@ -125,6 +125,7 @@ async fn the_pages_load_only_their_own_assets() {
         let (_, _, body) = fetch(path).await;
         assert!(body.contains(&format!("src=\"{script}\"")), "{path}");
         assert!(body.contains("href=\"assets/pages.css\""), "{path}");
+        assert!(body.contains("href=\"assets/brand.css\""), "{path}");
         assert!(!body.contains("//"), "{path} names nothing off this origin");
     }
 }

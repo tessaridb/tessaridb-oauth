@@ -90,10 +90,10 @@
   --border-strong: var(--n-450);
   --text: var(--n-1000);
   --text-muted: var(--n-500);
-  --accent: var(--violet-600);
-  --accent-hover: var(--violet-500);
-  --accent-text: var(--violet-600);
-  --accent-wash: var(--violet-a12);
+  --accent: var(--brand-accent, var(--violet-600));
+  --accent-hover: var(--brand-accent, var(--violet-500));
+  --accent-text: var(--brand-accent, var(--violet-600));
+  --accent-wash: var(--brand-wash, var(--violet-a12));
   --on-accent: var(--n-0);
   --ok: var(--green-600);
   --warn: var(--amber-600);
@@ -245,6 +245,22 @@ body {
   margin-block-end: var(--s-5);
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.brand img {
+  object-fit: contain;
+}
+
+.brand-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin: var(--s-5) 0 0;
+  font-size: var(--t-data);
+}
+
+.brand-links a {
+  padding-block: var(--s-1);
 }
 
 h1 {

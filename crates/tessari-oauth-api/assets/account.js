@@ -20,30 +20,30 @@
       return { kind: "expired" };
     }
     if (status === 429) {
-      const seconds2 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
-      return { kind: "throttled", seconds: seconds2 };
+      const seconds3 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
+      return { kind: "throttled", seconds: seconds3 };
     }
     return { kind: "retry" };
   }
   var ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   function toBase64url(bytes2) {
-    let text2 = "";
+    let text3 = "";
     for (let at = 0; at < bytes2.length; at += 3) {
       const chunk = bytes2.subarray(at, at + 3);
       const bits = (chunk[0] ?? 0) << 16 | (chunk[1] ?? 0) << 8 | (chunk[2] ?? 0);
       const sextets = [bits >> 18, bits >> 12, bits >> 6, bits].map((value) => ALPHABET[value & 63] ?? "");
-      text2 += sextets.slice(0, chunk.length + 1).join("");
+      text3 += sextets.slice(0, chunk.length + 1).join("");
     }
-    return text2;
+    return text3;
   }
-  function fromBase64url(text2) {
-    if (!/^[A-Za-z0-9_-]*$/.test(text2) || text2.length % 4 === 1) {
+  function fromBase64url(text3) {
+    if (!/^[A-Za-z0-9_-]*$/.test(text3) || text3.length % 4 === 1) {
       return null;
     }
     const bytes2 = [];
     let bits = 0;
     let held = 0;
-    for (const char of text2) {
+    for (const char of text3) {
       bits = bits << 6 | ALPHABET.indexOf(char);
       held += 6;
       if (held >= 8) {
@@ -285,10 +285,10 @@
     }
     try {
       const response = await fetch(path, init);
-      const text2 = await response.text();
+      const text3 = await response.text();
       let parsed = null;
       try {
-        parsed = text2 === "" ? null : JSON.parse(text2);
+        parsed = text3 === "" ? null : JSON.parse(text3);
       } catch {
         parsed = null;
       }
@@ -297,19 +297,19 @@
       return { ok: false, status: 0, body: null, retryAfter: null };
     }
   }
-  function fieldError(input, text2) {
+  function fieldError(input, text3) {
     const error = element(`${input.id}-error`, HTMLParagraphElement);
-    error.textContent = text2 ?? "";
-    error.hidden = text2 === null;
-    if (text2 === null) {
+    error.textContent = text3 ?? "";
+    error.hidden = text3 === null;
+    if (text3 === null) {
       input.removeAttribute("aria-invalid");
     } else {
       input.setAttribute("aria-invalid", "true");
       input.focus();
     }
   }
-  function say(text2) {
-    element("status", HTMLParagraphElement).textContent = text2;
+  function say(text3) {
+    element("status", HTMLParagraphElement).textContent = text3;
   }
 
   // src/account-factors.ts
@@ -392,11 +392,11 @@
           followups.signedOut();
           return;
         }
-        const text2 = refusedText(why, answer);
-        if (text2 === null) {
+        const text3 = refusedText(why, answer);
+        if (text3 === null) {
           fieldError(input, passwordRuleText(why));
         } else {
-          say(text2);
+          say(text3);
         }
       })();
     });
@@ -437,9 +437,9 @@
         list.replaceChildren(
           ...codes2.map((code) => {
             const item = document.createElement("li");
-            const text2 = document.createElement("code");
-            text2.textContent = code;
-            item.append(text2);
+            const text3 = document.createElement("code");
+            text3.textContent = code;
+            item.append(text3);
             return item;
           })
         );
@@ -566,11 +566,11 @@
     const form = element("app-form", HTMLFormElement);
     const input = element("app-code", HTMLInputElement);
     const secret = element("app-secret", HTMLElement);
-    const link = element("app-link", HTMLAnchorElement);
+    const link2 = element("app-link", HTMLAnchorElement);
     const close = () => {
       input.value = "";
       secret.textContent = "";
-      link.removeAttribute("href");
+      link2.removeAttribute("href");
       fieldError(input, null);
       form.hidden = true;
     };
@@ -585,7 +585,7 @@
           return;
         }
         secret.textContent = begun.secret;
-        link.href = begun.uri;
+        link2.href = begun.uri;
         form.hidden = false;
         open.hidden = true;
         input.focus();
@@ -713,6 +713,54 @@
     await followups.changed();
   }
 
+  // src/brand-read.ts
+  function text2(value) {
+    return typeof value === "string" && value !== "" ? value : null;
+  }
+  function link(value) {
+    return typeof value === "string" && value.startsWith("https://") ? value : null;
+  }
+  function seconds2(value) {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  function readBrand(body) {
+    return {
+      name: text2(field(body, "name")),
+      support: link(field(body, "support")),
+      privacy: link(field(body, "privacy")),
+      logo: seconds2(field(body, "logo"))
+    };
+  }
+  function logoAddress(uploaded) {
+    return `assets/logo.png?v=${uploaded}`;
+  }
+
+  // src/brand.ts
+  function offer(id, address) {
+    const anchor = element(id, HTMLAnchorElement);
+    if (address !== null) {
+      anchor.href = address;
+    }
+    anchor.hidden = address === null;
+    return address !== null;
+  }
+  async function showBrand() {
+    const answer = await call("GET", "assets/brand.json");
+    if (!answer.ok) {
+      return;
+    }
+    const brand = readBrand(answer.body);
+    if (brand.name !== null) {
+      element("brand-name", HTMLSpanElement).textContent = brand.name;
+    }
+    if (brand.logo !== null) {
+      element("brand-logo", HTMLImageElement).src = logoAddress(brand.logo);
+    }
+    const support = offer("brand-support", brand.support);
+    const privacy = offer("brand-privacy", brand.privacy);
+    element("brand-links", HTMLParagraphElement).hidden = !support && !privacy;
+  }
+
   // src/account.ts
   var account = element("account", HTMLDivElement);
   var everywhere = element("everywhere", HTMLButtonElement);
@@ -722,10 +770,10 @@
   function signedOutBy(answer) {
     return answer.status === 401 && field(answer.body, "code") === "session_required";
   }
-  function signedOut(text2) {
+  function signedOut(text3) {
     account.hidden = true;
     element("sign-in", HTMLParagraphElement).hidden = false;
-    say(text2);
+    say(text3);
     element("title", HTMLHeadingElement).focus();
   }
   function refused2(answer) {
@@ -936,5 +984,6 @@
     account.hidden = false;
     say("");
   }
+  void showBrand();
   void main();
 })();

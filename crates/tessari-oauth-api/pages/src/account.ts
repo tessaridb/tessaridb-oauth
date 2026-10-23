@@ -16,6 +16,7 @@ import {
 } from "./account-read.ts";
 import { removePasskey, wireApp, wireAppOff, wirePasskeyAdd } from "./account-enrol.ts";
 import { type Followups, wirePassword, wireRecoveryCodes } from "./account-factors.ts";
+import { showBrand } from "./brand.ts";
 import { ACCOUNT_TEXT, codesLeft, describeMethods, describeScope, refusalText, when } from "./copy.ts";
 import { type Answer, call, element, say } from "./dom.ts";
 import { field, refusal } from "./flow.ts";
@@ -266,4 +267,5 @@ async function main(): Promise<void> {
   say("");
 }
 
+void showBrand();
 void main();

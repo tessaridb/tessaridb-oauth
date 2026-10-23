@@ -1,6 +1,7 @@
 // The consent page. It asks what the pending authorization wants that the signed-in user has not yet granted,
 // shows it, and sends the user's decision; the answer to the decision is where the browser goes next.
 
+import { showBrand } from "./brand.ts";
 import { TEXT, describeScope, refusalText } from "./copy.ts";
 import { call, element, say } from "./dom.ts";
 import { apiBase, readDelta, readRedirect, refusal } from "./flow.ts";
@@ -65,4 +66,5 @@ async function main(): Promise<void> {
   allow.focus();
 }
 
+void showBrand();
 void main();

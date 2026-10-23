@@ -7,6 +7,7 @@
   <title>Allow access</title>
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/pages.css">
+  <link rel="stylesheet" href="assets/brand.css">
   <script src="assets/consent.js" defer></script>
 </head>
 <body>
@@ -14,8 +15,8 @@
   <main id="main" class="page" tabindex="-1">
     <section class="card" aria-labelledby="title">
       <header class="brand">
-        <img src="assets/mark.svg" alt="" width="32" height="32">
-        <span>TessariDB</span>
+        <img id="brand-logo" src="assets/mark.svg" alt="" width="32" height="32">
+        <span id="brand-name">TessariDB</span>
       </header>
       <h1 id="title">Allow access?</h1>
       <p id="status" class="status" role="status" aria-live="polite">Checking what the application asks for.</p>
@@ -32,6 +33,10 @@
           <button type="button" id="deny" class="secondary">Deny</button>
         </div>
       </div>
+      <p id="brand-links" class="brand-links" hidden>
+        <a id="brand-support" class="quiet-link" rel="noreferrer" hidden>Help</a>
+        <a id="brand-privacy" class="quiet-link" rel="noreferrer" hidden>Privacy</a>
+      </p>
     </section>
   </main>
 </body>
