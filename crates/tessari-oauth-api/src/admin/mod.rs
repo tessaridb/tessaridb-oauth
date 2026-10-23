@@ -9,6 +9,8 @@ mod clients_read;
 mod companies;
 mod console;
 mod enrolment;
+mod groups;
+mod groups_read;
 mod operator;
 mod operators;
 mod policy;
@@ -31,6 +33,7 @@ use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::{CompanyService, Served};
 use tessari_oauth_storage::consents::ConsentService;
 use tessari_oauth_storage::enrolments::EnrolmentService;
+use tessari_oauth_storage::groups::GroupService;
 use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::refresh::RefreshService;
@@ -70,6 +73,8 @@ pub struct AdminState {
     pub policies: Arc<PolicyService>,
     /// The company's user accounts the console lists and moves between active and disabled.
     pub users: Arc<UserService>,
+    /// The company's groups and who is in them.
+    pub groups: Arc<GroupService>,
     /// Refresh families, revoked when their user is disabled.
     pub refresh: Arc<RefreshService>,
     /// Enrolment codes, issued to accounts that have never set a password.
@@ -178,6 +183,27 @@ pub fn admin_router(state: AdminState) -> Router {
         .route(
             "/admin/{company}/api/clients/{client}/remove",
             post(clients::remove),
+        )
+        .route(
+            "/admin/{company}/api/groups",
+            get(groups_read::list).post(groups::create),
+        )
+        .route("/admin/{company}/api/groups/{group}", get(groups_read::one))
+        .route(
+            "/admin/{company}/api/groups/{group}/roles",
+            post(groups::set_roles),
+        )
+        .route(
+            "/admin/{company}/api/groups/{group}/members",
+            get(groups_read::members).post(groups::add_member),
+        )
+        .route(
+            "/admin/{company}/api/groups/{group}/members/{user}/remove",
+            post(groups::remove_member),
+        )
+        .route(
+            "/admin/{company}/api/groups/{group}/remove",
+            post(groups::remove),
         )
         .route("/admin/{company}/api/operators", get(operators::list))
         .route(

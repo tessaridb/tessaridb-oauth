@@ -15,6 +15,7 @@ mod admin_audit;
 mod admin_callback;
 mod admin_clients;
 mod admin_companies;
+mod admin_groups;
 mod admin_matrix;
 mod admin_operators;
 mod admin_pages;

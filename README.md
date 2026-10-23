@@ -64,7 +64,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, operators, audit trail, companies) and its pages |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, groups, operators, audit trail, companies) and its pages |
 | Built, not served yet | enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
 | Planned | the account portal page, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
@@ -333,6 +333,16 @@ grant to it is revoked as `client_removed` (it drops out of their grants list) a
 revoked. The answer counts both and gives the time by which the access tokens it already holds stop working, at
 most five minutes on. Sending it again finishes a removal that stopped part way; one that finds nothing to end is
 `404 client_not_found`, and `admin-console` is `409 client_reserved`. Changing a client is not in the console yet.
+
+Groups (role `users`): `GET <ADMIN_URL>/admin/<company>/api/groups?limit=&after=` lists the company's groups in id
+order and `GET .../api/groups/<group>` reads one with the roles it carries; `GET .../api/groups/<group>/members`
+lists its members (cursor = the last user id). `POST .../api/groups` with `{"group", "description", "roles",
+"reason"}` makes one (`409 group_taken` for an id in use); a group id and a role are 1 to 64 lowercase letters,
+digits, `-` and `_`. `POST .../groups/<group>/roles` with `{"roles", "reason"}` replaces its roles,
+`POST .../groups/<group>/members` with `{"user", "reason"}` adds an account of the company (`404 user_not_found`,
+`409 too_many_groups` past 100 groups for one account), `POST .../groups/<group>/members/<user>/remove` takes one out
+and `POST .../groups/<group>/remove` deletes the group with every membership. A group holds accounts, never another
+group; what its members are released as is described under UserInfo.
 
 Operators: holding a role is what lets an operator give it. `GET <ADMIN_URL>/admin/<company>/api/operators` lists the
 current grants of the roles the viewer holds (cursor `<user>.<role>`, at most 100 a page).
