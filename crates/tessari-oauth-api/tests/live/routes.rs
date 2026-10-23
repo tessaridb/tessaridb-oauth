@@ -37,6 +37,7 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         refresh: Arc::clone(&storage.refresh),
         replay: Arc::clone(&storage.replay),
         subjects: Arc::clone(&storage.subjects),
+        groups: Arc::clone(&storage.groups),
         kek: Arc::new(kek()),
         throttle: Arc::clone(&storage.throttle),
         audit: Arc::clone(&storage.audit),

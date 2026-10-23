@@ -3,7 +3,8 @@
 //! The salt is key material: it is made once per tenant from the system's random source, sealed under the
 //! key-encryption key for this tenant and purpose, and never made again — a second salt would give every user a new
 //! identifier at every client, orphaning every account a client has linked. Two first requests can both find no salt;
-//! the store accepts one of their writes, and the other reads back the salt that won.
+//! the store accepts one of their writes, and the other reads back the salt that won. Each subject derived is recorded
+//! once with the client and user it was derived from, which is the only way back from a subject to its user.
 
 use std::ops::Deref;
 use std::sync::Arc;
@@ -13,8 +14,8 @@ use tessari_oauth_core::subject;
 use tessari_oauth_infrastructure::custody::{Kek, random_secret};
 use tessari_oauth_types::{ClientId, ErrorCategory, TenantId, Timestamp, UserId, base64url};
 
-use super::SecretEntity;
 use super::repository::SecretRepository;
+use super::{SecretEntity, SubjectEntity};
 use crate::{Error, Result, Tenancy, retry};
 
 /// The record id and sealing binding of the pairwise salt.
@@ -56,7 +57,64 @@ impl SubjectService {
         now: Timestamp,
     ) -> Result<String> {
         let salt = self.salt(tenant, kek, now).await?;
-        Ok(subject::pairwise(&salt, client, user))
+        let subject = subject::pairwise(&salt, client, user);
+        self.record(tenant, &subject, client, user).await?;
+        Ok(subject)
+    }
+
+    /// The user `subject` stands for at `client` in `tenant`, when the subject was derived for that client.
+    ///
+    /// # Errors
+    ///
+    /// The store's failures, and [`Error::Unreadable`] for a record of another shape.
+    pub async fn user_of(
+        &self,
+        tenant: &TenantId,
+        client: &ClientId,
+        subject: &str,
+    ) -> Result<Option<UserId>> {
+        let place = self.tenancy.place(tenant)?;
+        let Some(found) = self.repository.find_subject(&place, subject).await? else {
+            return Ok(None);
+        };
+        if found.client_id != client.as_str() {
+            return Ok(None);
+        }
+        UserId::parse(found.user_id)
+            .map(Some)
+            .map_err(|_| unreadable("a pairwise subject's user_id"))
+    }
+
+    /// Record once whom `subject` stands for; a record another request made first is the same record.
+    async fn record(
+        &self,
+        tenant: &TenantId,
+        subject: &str,
+        client: &ClientId,
+        user: &UserId,
+    ) -> Result<()> {
+        let place = self.tenancy.place(tenant)?;
+        if self
+            .repository
+            .find_subject(&place, subject)
+            .await?
+            .is_some()
+        {
+            return Ok(());
+        }
+        let entity = SubjectEntity {
+            client_id: client.as_str().to_owned(),
+            user_id: user.as_str().to_owned(),
+        };
+        match self
+            .repository
+            .create_subject(&place, subject, &entity)
+            .await
+        {
+            Ok(()) => Ok(()),
+            Err(Error::Store(store)) if store.category() == ErrorCategory::Conflict => Ok(()),
+            Err(failure) => Err(failure),
+        }
     }
 
     /// The tenant's salt, cleared from memory when the caller drops it.

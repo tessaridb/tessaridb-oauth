@@ -10,6 +10,8 @@ test("a standard scope is described, any other shown as it is", () => {
   assert.match(describeScope("email"), /email/i);
   assert.match(describeScope("profile"), /name/i);
   assert.match(describeScope("offline_access"), /signed out|not using/i);
+  assert.match(describeScope("groups"), /groups/i);
+  assert.match(describeScope("groups"), /roles/i);
   assert.equal(describeScope("api:read"), "api:read");
 });
 

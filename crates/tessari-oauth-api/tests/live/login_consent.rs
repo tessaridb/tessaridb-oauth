@@ -135,7 +135,7 @@ async fn coverage(server: &Server, user: &UserId, scopes: &str) -> Coverage {
             user,
             &ClientId::parse("portal").expect("a client id"),
             &asking(scopes),
-            1,
+            tessari_oauth_constants::CONSENT_POLICY_VERSION,
         )
         .await
         .expect("the store answers")
@@ -193,8 +193,8 @@ async fn the_page_is_told_only_what_is_not_yet_granted() {
             user: user.clone(),
             client_id: ClientId::parse("portal").expect("a client id"),
             request: asking("api:read"),
-            policy_version: 1,
-            shown_version: "1".to_owned(),
+            policy_version: tessari_oauth_constants::CONSENT_POLICY_VERSION,
+            shown_version: tessari_oauth_constants::CONSENT_SHOWN_VERSION.to_owned(),
             at: Timestamp::from_unix_secs(NOW),
         })
         .await
@@ -213,8 +213,8 @@ async fn the_page_is_told_only_what_is_not_yet_granted() {
             user,
             client_id: ClientId::parse("portal").expect("a client id"),
             request: asking("api:write"),
-            policy_version: 1,
-            shown_version: "1".to_owned(),
+            policy_version: tessari_oauth_constants::CONSENT_POLICY_VERSION,
+            shown_version: tessari_oauth_constants::CONSENT_SHOWN_VERSION.to_owned(),
             at: Timestamp::from_unix_secs(NOW),
         })
         .await

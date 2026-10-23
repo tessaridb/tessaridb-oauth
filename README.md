@@ -64,7 +64,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject only), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, operators, audit trail, companies) and its pages |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, operators, audit trail, companies) and its pages |
 | Built, not served yet | enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
 | Planned | the account portal page, more regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
@@ -151,8 +151,12 @@ minutes. Discovery advertises the endpoint and its authentication methods.
 
 UserInfo (OpenID Connect Core §5.3) answers an access token addressed to that URL — a client that calls it registers
 the URL as one of its resources and names it as `resource` — and carrying `openid`, with the token's subject
-(`{"sub": …}`) and nothing more yet: profile and contact claims will be released per scope once the account
-endpoints serve them. The token is read from the `Authorization` header alone, as `Bearer`, or as `DPoP` with a proof
+(`{"sub": …}`). A token that also carries `groups` gets `groups`, the ids of the company's groups its user is in, and
+`roles`, the roles those groups carry, each sorted and read from the store at that moment, so a membership removed a
+moment ago is gone from the next answer; these two claims appear nowhere else, not in the ID token and not in the
+access token. Profile and contact claims will be released per scope once the account endpoints serve them. Adding
+`groups` raised the consent policy to version 2, so every earlier grant is asked for once more.
+The token is read from the `Authorization` header alone, as `Bearer`, or as `DPoP` with a proof
 over that token (`ath`, RFC 9449 §7.1) that is spent once; a bound token is refused as a bearer token. Every bad
 token gets the same `401` with `error="invalid_token"` in `WWW-Authenticate`, a token without `openid` a `403` with
 `error="insufficient_scope"`, and none of the answers is cached. A token from the client credentials grant never

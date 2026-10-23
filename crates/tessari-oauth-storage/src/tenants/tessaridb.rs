@@ -40,7 +40,8 @@ use crate::Result;
 /// eight hours (`ADMIN_SESSION_ABSOLUTE_SECS`) it lasts; `admin_actions` holds an operator's change under its operator
 /// and idempotency key for the day a repeat of it is answered from. `groups` holds each group under its id with the
 /// roles it carries; `group_members` holds each membership under `<group id>.<user id>`, found for a group's member
-/// list by `by_group` and for a user's claims by `by_user`.
+/// list by `by_group` and for a user's claims by `by_user`. `pairwise_subjects` holds each pairwise subject the server
+/// has derived under the subject itself, with the client and user it was derived from.
 const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      tenant string REQUIRED, client_id string REQUIRED, user_id string REQUIRED, redirect_uri string REQUIRED, \
      challenge string REQUIRED, scopes array REQUIRED, resources array REQUIRED, expires_at int REQUIRED, \
@@ -141,7 +142,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS group_members (\
      group_id string REQUIRED, user_id string REQUIRED, added_at int REQUIRED, added_by string REQUIRED); \
      DEFINE INDEX IF NOT EXISTS by_group ON group_members FIELDS group_id; \
-     DEFINE INDEX IF NOT EXISTS by_user ON group_members FIELDS user_id;";
+     DEFINE INDEX IF NOT EXISTS by_user ON group_members FIELDS user_id; \
+     DEFINE TABLE IF NOT EXISTS pairwise_subjects (client_id string REQUIRED, user_id string REQUIRED);";
 
 pub(crate) struct TessaridbTenantRepository {
     database: Database,

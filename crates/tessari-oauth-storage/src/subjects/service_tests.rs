@@ -9,8 +9,8 @@ use tessari_oauth_test_support::fresh_kek;
 use tessari_oauth_types::{ClientId, TenantId, Timestamp, UserId, base64url};
 
 use super::{PAIRWISE_SALT, SubjectService};
-use crate::subjects::SecretEntity;
 use crate::subjects::repository::SecretRepository;
+use crate::subjects::{SecretEntity, SubjectEntity};
 use crate::{Error, Result, Tenancy};
 
 /// The salt another request made first.
@@ -36,6 +36,19 @@ impl SecretRepository for LostTheRace {
     async fn find(&self, _place: &Place, _purpose: &str) -> Result<Option<SecretEntity>> {
         let earlier = self.finds.fetch_add(1, Ordering::Relaxed);
         Ok((earlier > 0).then(|| self.sealed.clone()))
+    }
+
+    async fn create_subject(
+        &self,
+        _place: &Place,
+        _subject: &str,
+        _entity: &SubjectEntity,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn find_subject(&self, _place: &Place, _subject: &str) -> Result<Option<SubjectEntity>> {
+        Ok(None)
     }
 }
 

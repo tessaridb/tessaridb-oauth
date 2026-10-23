@@ -31,6 +31,7 @@ const SCOPES: Readonly<Record<string, string>> = {
   profile: "Your name and basic profile details",
   email: "Your email address and whether it is verified",
   offline_access: "Access while you are signed out or not using it",
+  groups: "The groups you are in at this company, and the roles they give you",
 };
 
 /** A scope in the user's terms where this server knows it, the scope itself where it does not. */

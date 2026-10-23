@@ -13,6 +13,7 @@ use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::consents::ConsentService;
 use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::factors::FactorService;
+use tessari_oauth_storage::groups::GroupService;
 use tessari_oauth_storage::interactions::InteractionService;
 use tessari_oauth_storage::keys::KeyService;
 use tessari_oauth_storage::passkeys::PasskeyService;
@@ -43,6 +44,8 @@ pub struct PublicState {
     pub replay: Arc<ReplayService>,
     /// Pairwise subjects.
     pub subjects: Arc<SubjectService>,
+    /// Each company's groups, released at UserInfo under the `groups` scope.
+    pub groups: Arc<GroupService>,
     /// The key-encryption key signing keys and salts are sealed under.
     pub kek: Arc<Kek>,
     /// The request counters.

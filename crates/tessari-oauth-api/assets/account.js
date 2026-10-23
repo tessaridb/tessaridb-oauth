@@ -191,7 +191,8 @@
     openid: "Confirmation that you signed in, and who you are to this application",
     profile: "Your name and basic profile details",
     email: "Your email address and whether it is verified",
-    offline_access: "Access while you are signed out or not using it"
+    offline_access: "Access while you are signed out or not using it",
+    groups: "The groups you are in at this company, and the roles they give you"
   };
   function describeScope(scope) {
     return Object.hasOwn(SCOPES, scope) ? SCOPES[scope] ?? scope : scope;

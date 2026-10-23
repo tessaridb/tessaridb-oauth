@@ -6,6 +6,7 @@ pub mod assertion;
 pub mod authentication;
 pub mod authorize;
 pub mod ceremony;
+pub mod claims_policy;
 pub mod client_credentials;
 pub mod clients;
 pub mod codes;

@@ -1,5 +1,6 @@
 //! UserInfo (OpenID Connect Core §5.3): a token addressed to it and carrying `openid` is answered with its subject
-//! and nothing more; any other token is refused with one `invalid_token` shape, a token without `openid` with
+//! and nothing more, or under `groups` also with the groups its user is in and their roles, read at the moment of the
+//! request; any other token is refused with one `invalid_token` shape, a token without `openid` with
 //! `insufficient_scope`, a bound token only under DPoP with a proof over it spent once — and every refusal is recorded.
 
 use std::collections::BTreeSet;
@@ -33,7 +34,7 @@ async fn register_reader(server: &Server) {
     let reader = NewClient {
         client_id: ClientId::parse("reader").expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
-        scope_ceiling: ScopeSet::parse("openid profile api:read").expect("scopes"),
+        scope_ceiling: ScopeSet::parse("openid profile api:read groups").expect("scopes"),
         resources: BTreeSet::from([
             Resource::parse(userinfo()).expect("a resource"),
             Resource::parse(API).expect("a resource"),
@@ -309,5 +310,82 @@ async fn a_token_whose_key_was_withdrawn_is_refused() {
         StatusCode::UNAUTHORIZED,
         r#"Bearer error="invalid_token""#,
         "signed by a withdrawn key",
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn under_groups_the_answer_names_the_users_groups_and_roles_as_they_stand_now() {
+    use tessari_oauth_storage::groups::NewGroup;
+    use tessari_oauth_types::{GroupId, GroupRole};
+
+    let server = server(2).await;
+    register_reader(&server).await;
+    let at = Timestamp::from_unix_secs(NOW);
+    let user = UserId::parse(USER).expect("a user id");
+    for (name, roles) in [
+        ("staff", vec!["reader"]),
+        ("admins", vec!["reader", "writer"]),
+    ] {
+        let group = NewGroup {
+            id: GroupId::parse(name).expect("a group id"),
+            description: String::new(),
+            roles: roles
+                .into_iter()
+                .map(|role| GroupRole::parse(role).expect("a role"))
+                .collect(),
+        };
+        server
+            .storage
+            .groups
+            .create(&tenant("acme"), &group, at)
+            .await
+            .expect("made");
+        server
+            .storage
+            .groups
+            .join(&tenant("acme"), &group.id, &user, "operator-1", at)
+            .await
+            .expect("joined");
+    }
+    let token = token_for(&server, "code-g1", "openid groups", &userinfo()).await;
+    let bearer = format!("Bearer {token}");
+    let answered = call(&server, "GET", Some(&bearer), &[]).await;
+    assert_eq!(answered.status, StatusCode::OK, "{}", answered.body);
+    assert_eq!(
+        answered.body["groups"],
+        serde_json::json!(["admins", "staff"])
+    );
+    assert_eq!(
+        answered.body["roles"],
+        serde_json::json!(["reader", "writer"])
+    );
+    assert!(answered.body["sub"].is_string());
+
+    server
+        .storage
+        .groups
+        .leave(
+            &tenant("acme"),
+            &GroupId::parse("admins").expect("a group id"),
+            &user,
+        )
+        .await
+        .expect("left");
+    let after = call(&server, "GET", Some(&bearer), &[]).await;
+    assert_eq!(
+        after.body["groups"],
+        serde_json::json!(["staff"]),
+        "read now, not at issuance"
+    );
+    assert_eq!(after.body["roles"], serde_json::json!(["reader"]));
+
+    let plain = token_for(&server, "code-g2", "openid profile", &userinfo()).await;
+    let without = call(&server, "GET", Some(&format!("Bearer {plain}")), &[]).await;
+    assert_eq!(without.status, StatusCode::OK, "{}", without.body);
+    assert!(
+        without.body.get("groups").is_none() && without.body.get("roles").is_none(),
+        "no group claim without the scope: {}",
+        without.body
     );
 }

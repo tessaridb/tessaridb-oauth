@@ -46,11 +46,16 @@ pub struct Expected<'a> {
     pub target: &'a str,
 }
 
-/// A token UserInfo may answer: whom it speaks for, and the proof to spend when it was DPoP-bound.
+/// A token UserInfo may answer: whom it speaks for, for which client, under which scopes, and the proof to spend
+/// when it was DPoP-bound.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Access {
     /// The token's subject, as the client knows the user.
     pub subject: String,
+    /// The client the token was issued to.
+    pub client_id: String,
+    /// The scopes it carries, which decide what the claims policy releases.
+    pub scopes: Vec<String>,
     /// The DPoP proof that accompanied a bound token, whose `jti` the caller records as spent.
     pub proof: Option<ProofUse>,
 }
@@ -61,6 +66,7 @@ struct Claims {
     iss: String,
     aud: String,
     sub: String,
+    client_id: String,
     exp: u64,
     iat: u64,
     scope: String,
@@ -127,6 +133,8 @@ pub fn verify(
     }
     Ok(Access {
         subject: claims.sub,
+        client_id: claims.client_id,
+        scopes: claims.scope.split(' ').map(str::to_owned).collect(),
         proof,
     })
 }

@@ -123,6 +123,8 @@ fn a_bearer_token_for_userinfo_with_openid_speaks_for_its_subject() {
         check(Presented::Bearer(&token(&[]))),
         Ok(Access {
             subject: "pw-1".to_owned(),
+            client_id: "portal".to_owned(),
+            scopes: vec!["openid".to_owned(), "profile".to_owned()],
             proof: None,
         })
     );

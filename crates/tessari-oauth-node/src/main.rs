@@ -232,6 +232,7 @@ async fn run(
         refresh: Arc::clone(&storage.refresh),
         replay: Arc::clone(&storage.replay),
         subjects: Arc::clone(&storage.subjects),
+        groups: Arc::clone(&storage.groups),
         kek,
         throttle: Arc::clone(&storage.throttle),
         audit: Arc::clone(&storage.audit),

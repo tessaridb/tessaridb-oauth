@@ -1,7 +1,8 @@
 //! `GET|POST /{tenant}/oauth2/userinfo` (OpenID Connect Core §5.3): the subject an access token speaks for.
 //!
 //! The token is read from the `Authorization` header alone and judged by the core as a resource server judges one;
-//! the answer is the token's subject and nothing more until the user directory and the claims policy exist. A refusal
+//! the answer is the token's subject and whatever the claims policy releases under the token's scopes, read from the
+//! store now: under `groups`, the company's groups the user is in and the roles they carry. A refusal
 //! is a challenge in `WWW-Authenticate` (RFC 6750 §3, RFC 9449 §7.1) whose `error` is the one code the caller needs,
 //! the same for every kind of bad token, while the precise reason goes to the audit trail. A bound token's proof is
 //! spent only once everything else held. No answer may be stored by a cache.
@@ -13,22 +14,27 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use tessari_oauth_constants::{OPENID_SCOPE, USERINFO_PATH};
 use tessari_oauth_core::Reason;
+use tessari_oauth_core::claims_policy::{self, Place};
 use tessari_oauth_core::jose::VerifyingKey;
 use tessari_oauth_core::keys::{self, KeyRecord};
 use tessari_oauth_core::token::Refusal;
 use tessari_oauth_core::userinfo::{self, Expected, Presented};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::replay::Spent;
-use tessari_oauth_types::{ErrorCode, TenantId, Timestamp};
+use tessari_oauth_types::{ClientId, ErrorCode, TenantId, Timestamp};
 
 use crate::Error;
 use crate::headers::no_store;
 use crate::state::PublicState;
 
-/// The answer: whom the token speaks for.
+/// The answer: whom the token speaks for, and the claims the policy releases to it.
 #[derive(Serialize)]
 struct Answer {
     sub: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    groups: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    roles: Option<Vec<String>>,
 }
 
 /// The two schemes a token may arrive under.
@@ -106,11 +112,48 @@ pub(super) async fn userinfo(
             return refuse(&state, &tenant, scheme, replayed, now).await;
         }
     }
+    let (groups, roles) = released_groups(&state, &tenant, &access).await?;
     Ok(no_store(
         Json(Answer {
             sub: access.subject,
+            groups,
+            roles,
         })
         .into_response(),
+    ))
+}
+
+/// The `groups` and `roles` claims, when the token's scopes release them: from the store now, for the user the token's
+/// subject stands for at its client. A subject with no record (a token issued before subjects were recorded) is
+/// released as in no group.
+async fn released_groups(
+    state: &PublicState,
+    tenant: &TenantId,
+    access: &userinfo::Access,
+) -> crate::Result<(Option<Vec<String>>, Option<Vec<String>>)> {
+    let groups = claims_policy::releases("groups", Place::UserInfo, &access.scopes);
+    let roles = claims_policy::releases("roles", Place::UserInfo, &access.scopes);
+    if !groups && !roles {
+        return Ok((None, None));
+    }
+    let client = ClientId::parse(access.client_id.as_str()).map_err(|_| Error::Internal)?;
+    let user = state
+        .subjects
+        .user_of(tenant, &client, &access.subject)
+        .await
+        .map_err(Error::Store)?;
+    let held = match &user {
+        Some(user) => state
+            .groups
+            .groups_of(tenant, user)
+            .await
+            .map_err(Error::Store)?,
+        None => Vec::new(),
+    };
+    let claims = claims_policy::group_claims(held.iter().map(|group| (&group.id, &group.roles)));
+    Ok((
+        groups.then_some(claims.groups),
+        roles.then_some(claims.roles),
     ))
 }
 

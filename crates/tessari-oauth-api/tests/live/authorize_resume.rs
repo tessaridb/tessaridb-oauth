@@ -87,8 +87,8 @@ pub(crate) async fn consented(server: &Server, user: &UserId) {
                 scopes: ScopeSet::parse("api:read").expect("scopes"),
                 resources: BTreeSet::from([Resource::parse(API).expect("a resource")]),
             },
-            policy_version: 1,
-            shown_version: "1".to_owned(),
+            policy_version: tessari_oauth_constants::CONSENT_POLICY_VERSION,
+            shown_version: tessari_oauth_constants::CONSENT_SHOWN_VERSION.to_owned(),
             at: Timestamp::from_unix_secs(NOW),
         })
         .await

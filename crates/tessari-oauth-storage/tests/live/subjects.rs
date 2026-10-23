@@ -124,3 +124,60 @@ async fn a_salt_made_under_another_key_does_not_open() {
         "{refused:?}"
     );
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_derived_subject_leads_back_to_its_user_at_its_own_client_only() {
+    let storage = fresh(&tenant("acme"), 2).await;
+    storage
+        .tenants
+        .provision(&tenant("globex"))
+        .await
+        .expect("provisioned");
+    let kek = fresh_kek().expect("a key-encryption key");
+    let subject = storage
+        .subjects
+        .pairwise(&tenant("acme"), &kek, &client("svc-1"), &user(), NOW)
+        .await
+        .expect("a subject");
+    let again = storage
+        .subjects
+        .pairwise(&tenant("acme"), &kek, &client("svc-1"), &user(), NOW)
+        .await
+        .expect("the same subject, recorded once");
+    assert_eq!(again, subject);
+    assert_eq!(
+        storage
+            .subjects
+            .user_of(&tenant("acme"), &client("svc-1"), &subject)
+            .await
+            .expect("answered"),
+        Some(user())
+    );
+    assert_eq!(
+        storage
+            .subjects
+            .user_of(&tenant("acme"), &client("svc-2"), &subject)
+            .await
+            .expect("answered"),
+        None,
+        "a subject presented by another client leads nowhere"
+    );
+    assert_eq!(
+        storage
+            .subjects
+            .user_of(&tenant("globex"), &client("svc-1"), &subject)
+            .await
+            .expect("answered"),
+        None,
+        "nor in another company"
+    );
+    assert_eq!(
+        storage
+            .subjects
+            .user_of(&tenant("acme"), &client("svc-1"), "never-derived")
+            .await
+            .expect("answered"),
+        None
+    );
+}

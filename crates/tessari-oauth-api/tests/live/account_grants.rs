@@ -159,7 +159,7 @@ async fn a_user_sees_their_own_standing_grants_only() {
                 scopes: ScopeSet::parse("api:read").expect("scopes"),
                 resources: [Resource::parse(API).expect("a resource")].into(),
             },
-            1,
+            tessari_oauth_constants::CONSENT_POLICY_VERSION,
         )
         .await
         .expect("the store answers");
