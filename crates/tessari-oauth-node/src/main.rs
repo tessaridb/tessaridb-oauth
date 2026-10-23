@@ -13,16 +13,17 @@ use tessari_oauth_api::{AdminState, PublicState, admin_router, public_router, se
 use tessari_oauth_constants::{
     DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS,
     KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS,
-    LOGOUT_SEND_TIMEOUT_SECS, SHUTDOWN_DRAIN_SECS,
+    LOGOUT_SEND_TIMEOUT_SECS, PEER_DIRECTORIES_SECS, PEER_DIRECTORIES_TIMEOUT_SECS,
+    SHUTDOWN_DRAIN_SECS,
 };
 use tessari_oauth_core::discovery;
-use tessari_oauth_daemons::{DirectoryRefresh, KeyRotation, LogoutDelivery};
+use tessari_oauth_daemons::{DirectoryRefresh, KeyRotation, LogoutDelivery, Peer, PeerDirectories};
 use tessari_oauth_infrastructure::backchannel::Poster;
 use tessari_oauth_infrastructure::config::NodeConfig;
 use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_infrastructure::tessaridb::{Database, StoreConfig};
 use tessari_oauth_infrastructure::{ListenerTls, listener_config};
-use tessari_oauth_storage::companies::{CompanyStatus, Served};
+use tessari_oauth_storage::companies::{CompanyStatus, Elsewhere, Served};
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_storage::{Storage, Tenancy};
 use tessari_oauth_types::{Algorithm, Clock, Timestamp};
@@ -30,6 +31,7 @@ use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::watch;
 
 mod bootstrap;
+mod peers;
 
 pub(crate) type Failure = Box<dyn Error + Send + Sync>;
 
@@ -104,14 +106,14 @@ fn start() -> Result<(), Failure> {
         discovery::metadata(&issuer, SIGNING_ALGORITHM)
             .map_err(|_| format!("{issuer} is not a valid issuer"))?;
     }
-    let served = Arc::new(Served::new(&config.public.url));
     let poster = Poster::with_native_roots(Duration::from_secs(LOGOUT_SEND_TIMEOUT_SECS))?;
     let database = Database::new(store, config.store.connections.get())?;
     let storage = Storage::new(&database, &Tenancy::for_region(&config.region)?);
+    let peers = peers::peers(&config)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    runtime.block_on(run(config, storage, served, kek, passwords, tls, poster))
+    runtime.block_on(run(config, storage, peers, kek, passwords, tls, poster))
 }
 
 /// How to reach the store the configuration names, its authority read from disk.
@@ -144,16 +146,19 @@ pub(crate) fn system_clock() -> Clock {
 async fn run(
     config: NodeConfig,
     storage: Storage,
-    served: Arc<Served>,
+    peers: Vec<Peer>,
     kek: Arc<Kek>,
     passwords: Arc<Passwords>,
     tls: Listeners,
     poster: Poster,
 ) -> Result<(), Failure> {
     let clock = system_clock();
+    let served = Arc::new(Served::new(&config.public.url));
     // The companies the configuration names are served from the start: created when new, provisioned with their admin
     // console, and made active unless an operator suspended one, which the configuration does not override.
     storage.companies.prepare().await?;
+    // Other regions send this region's companies here, to the public URL recorded beside them.
+    storage.companies.record_base(&config.public.url).await?;
     for tenant in &config.tenants {
         storage
             .companies
@@ -200,6 +205,16 @@ async fn run(
         timeout: Duration::from_secs(DIRECTORY_REFRESH_TIMEOUT_SECS),
     });
     let refreshing = tokio::spawn(tessari_oauth_daemons::run(refresh, stopped.clone()));
+    let elsewhere = Arc::new(Elsewhere::new());
+    let reading_peers = (!peers.is_empty()).then(|| {
+        let directories = Arc::new(PeerDirectories::new(
+            peers,
+            Arc::clone(&elsewhere),
+            Duration::from_secs(PEER_DIRECTORIES_SECS),
+            Duration::from_secs(PEER_DIRECTORIES_TIMEOUT_SECS),
+        ));
+        tokio::spawn(tessari_oauth_daemons::run(directories, stopped.clone()))
+    });
     let console = AdminState {
         admin: Arc::clone(&storage.admin),
         codes: Arc::clone(&storage.codes),
@@ -270,6 +285,7 @@ async fn run(
             window_secs: config.login_limit.window_secs,
         },
         served,
+        elsewhere,
         clock,
     };
     // Signals are taken before the listener opens, so no signal can arrive while the default action still applies.
@@ -307,19 +323,31 @@ async fn run(
         _ = terminate.recv() => tracing::info!(signal = "SIGTERM", "shutting down"),
     }
     stop.send(true)?;
-    let (answered, answered_admin, rotated, delivered, refreshed) =
+    let (answered, answered_admin, rotated, delivered, refreshed, peered) =
         tokio::time::timeout(Duration::from_secs(SHUTDOWN_DRAIN_SECS), async {
             let rotated = rotating.await;
             let delivered = delivering.await;
             let refreshed = refreshing.await;
+            let peered = match reading_peers {
+                Some(reading) => Some(reading.await),
+                None => None,
+            };
             let answered_admin = serving_admin.await;
-            (serving.await, answered_admin, rotated, delivered, refreshed)
+            (
+                serving.await,
+                answered_admin,
+                rotated,
+                delivered,
+                refreshed,
+                peered,
+            )
         })
         .await
         .map_err(|_| format!("requests still in flight after {SHUTDOWN_DRAIN_SECS} s"))?;
     rotated?;
     delivered?;
     refreshed?;
+    peered.transpose()?;
     answered_admin??;
     Ok(answered??)
 }

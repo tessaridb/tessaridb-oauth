@@ -46,6 +46,7 @@ mod login_password;
 mod logout;
 mod pages;
 mod par;
+mod regions;
 mod routes;
 mod throttle;
 mod token;

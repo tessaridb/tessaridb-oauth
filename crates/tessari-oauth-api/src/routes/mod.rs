@@ -1,7 +1,7 @@
 //! The public router: per tenant, the server metadata, the key set, UserInfo and the sign-in and consent pages under
 //! the read limit, the authorization and logout endpoints under the authorization limit, the token, revocation and
 //! pushed-request endpoints under theirs, the sign-in steps under theirs, and the account portal's requests under
-//! theirs, every body capped.
+//! theirs, every body capped. A request for a company another region serves is sent there before any of them.
 
 mod account;
 mod account_factors;
@@ -35,6 +35,7 @@ use tessari_oauth_types::{ClientId, TenantId};
 pub(crate) use login::cookie;
 
 use crate::headers::{no_store, protect};
+use crate::home::{Homes, send_home};
 use crate::state::PublicState;
 
 /// The routes of the public listener over `state`. Unknown paths answer 404 with the same headers as every route.
@@ -202,7 +203,15 @@ pub fn public_router(state: PublicState) -> Router {
         .merge(logins)
         .merge(accounts)
         .fallback(|| async { crate::Error::NotFound })
-        .with_state(state)
+        .with_state(state.clone())
+        // Before any route or limit: a company another region serves costs this node no store work.
+        .layer(axum::middleware::from_fn_with_state(
+            Homes {
+                served: state.served,
+                elsewhere: state.elsewhere,
+            },
+            send_home,
+        ))
         .layer(axum::middleware::map_response(|response| async {
             protect(response)
         }))

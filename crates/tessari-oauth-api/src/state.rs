@@ -10,7 +10,7 @@ use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::brands::BrandService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
-use tessari_oauth_storage::companies::Served;
+use tessari_oauth_storage::companies::{Elsewhere, Served};
 use tessari_oauth_storage::consents::ConsentService;
 use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::factors::FactorService;
@@ -87,6 +87,8 @@ pub struct PublicState {
     pub signing_algorithm: Algorithm,
     /// The companies this node serves and their issuers, refreshed from the directory.
     pub served: Arc<Served>,
+    /// The companies other regions serve, read from their directories; a request for one is sent there.
+    pub elsewhere: Arc<Elsewhere>,
     /// The clock the key rule is judged at.
     pub clock: Clock,
 }

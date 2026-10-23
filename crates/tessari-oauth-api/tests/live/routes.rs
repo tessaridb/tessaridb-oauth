@@ -12,7 +12,7 @@ use tessari_oauth_api::{PublicState, public_router};
 use tessari_oauth_infrastructure::custody::{Kek, SigningKey};
 use tessari_oauth_infrastructure::tessaridb::StoreConfig;
 use tessari_oauth_storage::Storage;
-use tessari_oauth_storage::companies::Served;
+use tessari_oauth_storage::companies::{Elsewhere, Served};
 use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_test_support::{fresh_storage, plain_node, unique};
@@ -62,6 +62,7 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
             served.replace([acme()]);
             Arc::new(served)
         },
+        elsewhere: Arc::new(Elsewhere::new()),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
     }
 }

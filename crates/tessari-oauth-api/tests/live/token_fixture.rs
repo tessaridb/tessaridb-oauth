@@ -13,7 +13,7 @@ use tessari_oauth_core::codes::IssuedCode;
 use tessari_oauth_infrastructure::custody::{Kek, PasswordCost, Passwords, SigningKey};
 use tessari_oauth_storage::Storage;
 use tessari_oauth_storage::clients::NewClient;
-use tessari_oauth_storage::companies::Served;
+use tessari_oauth_storage::companies::{Elsewhere, Served};
 use tessari_oauth_storage::keys::StoredKey;
 use tessari_oauth_storage::throttle::Limit;
 use tessari_oauth_test_support::{fresh_kek, fresh_passwords, fresh_storage, plain_node};
@@ -158,6 +158,7 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
             served.replace(["acme", "initech"].map(tenant));
             Arc::new(served)
         },
+        elsewhere: Arc::new(Elsewhere::new()),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
     }
 }

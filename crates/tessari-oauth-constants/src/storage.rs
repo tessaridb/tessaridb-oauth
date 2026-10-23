@@ -95,6 +95,16 @@ pub const DIRECTORY_REFRESH_SECS: u64 = 5;
 /// The most one directory refresh may take, in seconds.
 pub const DIRECTORY_REFRESH_TIMEOUT_SECS: u64 = 4;
 
+/// How often a node re-reads the other regions' directories, in seconds: a company another region starts or stops
+/// serving is sent there, or no longer, within this long.
+pub const PEER_DIRECTORIES_SECS: u64 = 5;
+
+/// The most one read of every other region's directory may take, in seconds.
+pub const PEER_DIRECTORIES_TIMEOUT_SECS: u64 = 4;
+
+/// The connections a node holds at most to each other region's store: the directory is read once an interval.
+pub const PEER_CONNECTIONS: usize = 2;
+
 /// The company platform operators belong to: the only one whose users may hold the `companies` role.
 pub const SYSTEM_COMPANY: &str = "system";
 

@@ -1155,6 +1155,7 @@ dependencies = [
  "serde_json",
  "tessari-oauth-constants",
  "tessari-oauth-core",
+ "tessari-oauth-daemons",
  "tessari-oauth-infrastructure",
  "tessari-oauth-storage",
  "tessari-oauth-test-support",

@@ -65,9 +65,9 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page, each showing the company's brand; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, groups, operators, branding, signing keys, audit trail, companies) and its pages |
+| Served | metadata and key set per tenant; `/oauth2/authorize` (with `prompt` and `max_age`), `/oauth2/par`, `/oauth2/token` (authorization code, refresh token, client credentials; an ID token for `openid`), `/oauth2/revoke`, `/oauth2/userinfo` (subject, and groups and roles under `groups`), `/oauth2/logout` (RP-initiated) and back-channel logout to registered clients; the sign-in page with password, TOTP, recovery-code and passkey steps, the account page, password hashing (Argon2id over a peppered HMAC, at a measured cost) and sign-in holds per account, address and credential pair that back off and never lock out, and the consent page, each showing the company's brand; the session at this issuer; the account API (`/account/api`: the user's account and factors, sessions, grants); signing-key rotation; per-address limits; the audit trail; the admin console's API (`<ADMIN_URL>/admin/<company>`: sign-in, two-factor policy, users, clients, groups, operators, branding, signing keys, audit trail, companies) and its pages; requests for a company another region serves sent to that region |
 | Built, not served yet | enrolling or changing factors (TOTP, recovery codes, passkey registration); new-password rules |
-| Planned | the account portal page, more regions |
+| Planned | the account portal page |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
 ## How it behaves
@@ -432,6 +432,9 @@ first, for development only.
 | `STORE_CONNECTIONS` | connections to the store at most | `16` |
 | `REGION` | the region whose tenants this server holds (namespace `oauth_<REGION>`) | required |
 | `TENANTS` | the companies (tenants) created and activated at start, comma-separated; a company an operator suspended stays suspended | required |
+| `PEERS` | the other regions, `region=host:port` comma-separated, each its own TessariDB store; a company one of them serves is sent there | none |
+| `PEER_USER`, `PEER_PASSWORD` | the account each other region's store holds for reading its directory; required with `PEERS` | none |
+| `PEER_AUTHORITY` | the PEM the other regions' certificates must lead to; without it only loopback stores are reached | none |
 | `READ_LIMIT`, `READ_WINDOW_SECS` | metadata, key-set and UserInfo requests one client address may make per window | `300`, `60` |
 | `TOKEN_LIMIT`, `TOKEN_WINDOW_SECS` | token requests one client address may make per window | `60`, `60` |
 | `AUTHORIZE_LIMIT`, `AUTHORIZE_WINDOW_SECS` | authorization requests one client address may make per window | `120`, `60` |
@@ -490,6 +493,21 @@ Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listeners stop accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.
 
+### Regions
+
+Each region is its own TessariDB deployment, and a company's identity data stays in its home region's store. At start
+a server records its `PUBLIC_URL` in its region's directory, beside the region's companies. A server given `PEERS`
+reads every other region's directory every five seconds and answers a request for a company another region serves
+with `307 Temporary Redirect` to the same path and query at that region's `PUBLIC_URL`, so the method and body are
+sent again there. A region that does not answer keeps the companies it last named; a company no region serves is
+`404`. The admin console is not redirected.
+
+The account a server reads another region with is declared in that region's store, reaching its directory only:
+
+```text
+DEFINE USER oauth_peer ON oauth_us.directory ROLE viewer PASSWORD '<password>';
+```
+
 ### The first platform operator
 
 ```sh
@@ -541,6 +559,8 @@ starts, so the node holds at most one run's. The suite can run repeatedly agains
 tests also need a node serving TLS (`TESSARIDB_OAUTH_TEST_TLS_STORE`), the PEM of the authority that signed its
 certificate (`TESSARIDB_OAUTH_TEST_TLS_AUTHORITY`) and the PEM of an unrelated one
 (`TESSARIDB_OAUTH_TEST_TLS_OTHER_AUTHORITY`).
+The regions test also needs a second node, standing for another region, with its owner
+(`TESSARIDB_OAUTH_TEST_PEER_STORE`, `_PEER_USER`, `_PEER_PASSWORD`).
 Without an authority the server reaches its store only at `127.0.0.1` or `[::1]`.
 
 ## Branches

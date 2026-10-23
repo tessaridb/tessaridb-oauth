@@ -37,6 +37,7 @@ url.workspace = true
 
 [dev-dependencies]
 tessari-oauth-test-support.workspace = true
+tessari-oauth-daemons.workspace = true
 rcgen.workspace = true
 ring.workspace = true
 png.workspace = true

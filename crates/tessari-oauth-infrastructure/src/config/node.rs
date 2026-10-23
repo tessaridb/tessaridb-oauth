@@ -15,6 +15,7 @@ use tessari_oauth_constants::{
 use tessari_oauth_types::TenantId;
 use url::{Host, Url};
 
+use super::peers::{PeerSettings, PeerVariables, peer_settings};
 use crate::custody::PasswordCost;
 use crate::{Error, Result};
 
@@ -103,6 +104,8 @@ pub struct NodeConfig {
     pub kek: PathBuf,
     /// The region whose records this server holds.
     pub region: String,
+    /// The other regions whose directories this server reads, when it is told of any.
+    pub peers: Option<PeerSettings>,
     /// The tenants this server is the issuer for.
     pub tenants: Vec<TenantId>,
     /// The read limit on the public routes: metadata, key set and UserInfo.
@@ -360,12 +363,23 @@ impl NodeConfig {
                 "a whole number of lanes",
             )?,
         )?;
+        let region = variables.required("TESSARIDB_OAUTH_REGION")?;
+        let peers = peer_settings(
+            PeerVariables {
+                list: variables.optional("TESSARIDB_OAUTH_PEERS"),
+                user: variables.optional("TESSARIDB_OAUTH_PEER_USER"),
+                password: variables.optional("TESSARIDB_OAUTH_PEER_PASSWORD"),
+                authority: variables.optional("TESSARIDB_OAUTH_PEER_AUTHORITY"),
+            },
+            &region,
+        )?;
         Ok(Self {
             public,
             admin,
             store,
             kek: variables.required("TESSARIDB_OAUTH_KEK")?.into(),
-            region: variables.required("TESSARIDB_OAUTH_REGION")?,
+            region,
+            peers,
             tenants: tenants(variables.required("TESSARIDB_OAUTH_TENANTS")?)?,
             read_limit,
             token_limit,

@@ -4,6 +4,7 @@
 mod admin;
 mod error;
 mod headers;
+mod home;
 mod idle_body;
 mod routes;
 mod serve;
