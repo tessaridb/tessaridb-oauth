@@ -14,6 +14,7 @@
 
 mod begin;
 mod consent;
+mod email;
 mod enroll;
 mod factors;
 mod identify;
@@ -24,6 +25,7 @@ mod verify;
 
 pub(super) use begin::begin;
 pub(super) use consent::{consent, decide, signed_in};
+pub(super) use email::{cancel_email_change, confirm_email_change};
 pub(super) use enroll::enroll;
 pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;

@@ -163,6 +163,7 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         outbox: Arc::clone(&storage.outbox),
         resets: Arc::clone(&storage.resets),
         verifications: Arc::clone(&storage.verifications),
+        email_changes: Arc::clone(&storage.email_changes),
         mail: true,
     }
 }

@@ -12,6 +12,7 @@ use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::{Elsewhere, Served};
 use tessari_oauth_storage::consents::ConsentService;
+use tessari_oauth_storage::email_changes::EmailChangeService;
 use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::factors::FactorService;
 use tessari_oauth_storage::groups::GroupService;
@@ -100,6 +101,8 @@ pub struct PublicState {
     pub resets: Arc<ResetService>,
     /// The address-verification tokens mail carries.
     pub verifications: Arc<VerificationService>,
+    /// Requested changes of a sign-in address.
+    pub email_changes: Arc<EmailChangeService>,
     /// Whether a mail relay is configured, so the flows that send mail are offered.
     pub mail: bool,
 }

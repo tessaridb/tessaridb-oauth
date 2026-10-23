@@ -73,6 +73,9 @@ pub enum Error {
     /// A profile name is longer than the limit or holds a control character.
     #[error("the profile was not accepted")]
     ProfileRejected,
+    /// The address asked for is not one an account can sign in with.
+    #[error("the address was not accepted")]
+    EmailRejected,
     /// The return to the admin console does not open a session: one answer for every reason, so it says nothing about
     /// which check failed.
     #[error("the console sign-in was refused")]
@@ -116,9 +119,10 @@ impl Error {
                 ErrorCategory::Conflict
             }
             Self::AlreadyEnrolled | Self::NothingPending => ErrorCategory::Conflict,
-            Self::CodeRejected | Self::PasswordRejected(_) | Self::ProfileRejected => {
-                ErrorCategory::Validation
-            }
+            Self::CodeRejected
+            | Self::PasswordRejected(_)
+            | Self::ProfileRejected
+            | Self::EmailRejected => ErrorCategory::Validation,
             Self::ConsoleRefused | Self::CrossOrigin | Self::RoleRequired => {
                 ErrorCategory::Forbidden
             }
@@ -228,6 +232,11 @@ impl IntoResponse for Error {
                 StatusCode::BAD_REQUEST,
                 "profile_rejected",
                 "a name must be at most 100 characters with no control character",
+            ),
+            (Self::EmailRejected, _) => (
+                StatusCode::BAD_REQUEST,
+                "email_rejected",
+                "the address is not one an account can sign in with",
             ),
             (Self::ConsoleRefused, _) => (
                 StatusCode::FORBIDDEN,

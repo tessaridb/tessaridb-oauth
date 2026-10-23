@@ -321,6 +321,7 @@ async fn run(
         outbox: Arc::clone(&storage.outbox),
         resets: Arc::clone(&storage.resets),
         verifications: Arc::clone(&storage.verifications),
+        email_changes: Arc::clone(&storage.email_changes),
         mail: mailing.is_some(),
     };
     // Signals are taken before the listener opens, so no signal can arrive while the default action still applies.

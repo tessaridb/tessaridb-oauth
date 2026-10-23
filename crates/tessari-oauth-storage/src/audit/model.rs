@@ -37,6 +37,9 @@ pub enum AuditKind {
     FactorChanged,
     /// A user showed they read the address their account signs in with, by a link mailed to it.
     AddressVerified,
+    /// A change of the address an account signs in with moved; `reason` says how: requested, confirmed, cancelled,
+    /// applied or refused.
+    AddressChanged,
     /// `actor` gave `user` an operator `role`; `reason` says why.
     OperatorGranted,
     /// `actor` took an operator `role` from `user`; `reason` says why.
@@ -52,7 +55,7 @@ pub enum AuditKind {
 
 impl AuditKind {
     /// Every kind.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 21] = [
         Self::IssuedCode,
         Self::IssuedRefresh,
         Self::IssuedClient,
@@ -68,6 +71,7 @@ impl AuditKind {
         Self::SessionsEnded,
         Self::FactorChanged,
         Self::AddressVerified,
+        Self::AddressChanged,
         Self::OperatorGranted,
         Self::OperatorRevoked,
         Self::BreakGlass,
@@ -94,6 +98,7 @@ impl AuditKind {
             Self::SessionsEnded => "sessions_ended",
             Self::FactorChanged => "factor_changed",
             Self::AddressVerified => "address_verified",
+            Self::AddressChanged => "address_changed",
             Self::OperatorGranted => "operator_granted",
             Self::OperatorRevoked => "operator_revoked",
             Self::BreakGlass => "break_glass",

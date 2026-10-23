@@ -4,6 +4,7 @@
 //! theirs, every body capped. A request for a company another region serves is sent there before any of them.
 
 mod account;
+mod account_email;
 mod account_factors;
 mod account_me;
 mod account_passkeys;
@@ -137,6 +138,14 @@ pub fn public_router(state: PublicState) -> Router {
             post(login::complete_verification),
         )
         .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/email/confirm"),
+            post(login::confirm_email_change),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/email/cancel"),
+            post(login::cancel_email_change),
+        )
+        .route(
             &format!("/{{tenant}}{LOGIN_API_PATH}/consent"),
             get(login::consent).post(login::decide),
         )
@@ -162,6 +171,10 @@ pub fn public_router(state: PublicState) -> Router {
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/me/verify"),
             post(account_verify::request),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/me/email"),
+            post(account_email::request),
         )
         .route(
             &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/options"),
