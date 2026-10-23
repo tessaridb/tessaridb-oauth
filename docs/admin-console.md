@@ -57,7 +57,11 @@ has is refused as `email_taken`. The account has no password until its user enro
 `POST .../api/users/<user>/enrolment` (role `users`, with a `reason`) answers `201` with an enrolment code valid for 72
 hours, shown in that answer only and kept only as its digest; the same request sent again is answered without it, and
 a new code replaces the earlier one. A code is refused for an account that already has a password
-(`already_enrolled`: an enrolment never replaces a password) or is disabled (`account_disabled`).
+(`already_enrolled`: an enrolment never replaces a password) or is disabled (`account_disabled`). With
+`"by_mail": true` in the same request the code is never shown: it goes to the account's address as a link to
+`<issuer>/login/enrol#code=<code>`, and the answer carries `"mailed": true` and no code, so nobody at the console
+learns it. On a server with no relay that request answers `503` `mail_unavailable` and issues nothing. The Users view
+offers both, a code to hand over and a code sent by mail.
 
 Companies are made in the `system` console, by an operator holding `companies` (a role only `system` users can hold).
 `GET <ADMIN_URL>/admin/system/api/companies` lists them, at most 100 a page; `POST` there with `{"id", "name",

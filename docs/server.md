@@ -34,11 +34,11 @@ authorization belongs to the browser that brought it to `/oauth2/authorize`, by 
 (kept when the browser has one, drawn otherwise): another browser holding the request's id cannot sign in for it,
 answer its consent or receive its code.
 
-The sign-in, password-reset, address-verification, address-change, consent and account pages are served by the binary
-itself at `<issuer>/login`, `<issuer>/login/reset`, `<issuer>/login/verify`, `<issuer>/login/email`,
-`<issuer>/consent` and `<issuer>/account`, with their script, style and mark under `<issuer>/assets/`. The account
-page shows the signed-in user's address, offers a link that verifies it and a change to another one, how the account
-signs in, where it is signed in and which applications hold access; it
+The sign-in, password-reset, enrolment, address-verification, address-change, consent and account pages are served by
+the binary itself at `<issuer>/login`, `<issuer>/login/reset`, `<issuer>/login/enrol`, `<issuer>/login/verify`,
+`<issuer>/login/email`, `<issuer>/consent` and `<issuer>/account`, with their script, style and mark under
+`<issuer>/assets/`. The account page shows the signed-in user's address, offers a link that verifies it and a change
+to another one, how the account signs in, where it is signed in and which applications hold access; it
 signs out one session or every session after a confirmation, takes an application's access back, saying when the
 tokens it already holds stop working, changes the password, issues new recovery codes shown once, turns on an
 authenticator app from a key shown once, and adds or removes passkeys. Without a session it offers a sign-in
@@ -50,8 +50,9 @@ one. Their TypeScript source is in `crates/tessari-oauth-api/pages/`, and its bu
 once and `npm run build` there; `npm run verify` type-checks, runs the page tests and fails when the committed
 assets differ from a rebuild.
 
-With `SMTP_URL` set the server sends mail through that relay: a password-reset link, and a notice to the account's
-address when its sign-in changes (password changed or reset, a passkey or authenticator app added or removed, new
+With `SMTP_URL` set the server sends mail through that relay: a password-reset link, an enrolment link an operator
+sends, and a notice to the account's address when its sign-in changes (password changed or reset, a passkey or
+authenticator app added or removed, new
 recovery codes, a recovery code used, every session signed out). A notice carries no link. A request only writes the
 mail, sealed under the KEK, to a queue in the company's database; a background task sends what is due every five
 seconds, each send bounded to 20 seconds, tries a mail the relay did not take again after 30 seconds and then twice
@@ -69,6 +70,12 @@ the new password (`POST <issuer>/login/api/reset/complete`) changes the password
 passkeys stay, so the next sign-in still asks for them. Every session ends, every refresh token is revoked, the
 change is recorded and a notice goes to the address. A link that was never issued, was used, was replaced or has
 lapsed gets `400` `code_rejected`.
+
+An operator can send a new account its enrolment code by mail instead of handing it over. The link opens
+`<issuer>/login/enrol#code=<code>`, a page that takes the code out of the address the same way and sets the account's
+first password (`POST <issuer>/login/api/enroll`), at least 15 characters. The code is spent only when a password is
+accepted, so a refused one can be tried again; an unknown, used or replaced code gets `400` `code_rejected` before the
+password is looked at, and an account that already has a password gets `409` `already_enrolled` and keeps it.
 
 An account's address stays unverified (`email_verified` is false) until a link sent to it is opened. With a relay
 set, a link to `<issuer>/login/verify#token=<token>` is mailed when an account sets its first password and whenever

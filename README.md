@@ -58,7 +58,7 @@ claimed until a test backs them.
 | | |
 |---|---|
 | Stage | in development, no release |
-| Served | per-tenant discovery and key set; authorization (with PAR), token (code, refresh, client credentials), revocation, UserInfo, RP-initiated and back-channel logout; sign-in with password, TOTP, recovery codes and passkeys; password reset, address verification, changes of sign-in address and sign-in notices by mail, worded per company; consent; the account API; the admin console; signing-key rotation; per-address limits; the audit trail; regions |
+| Served | per-tenant discovery and key set; authorization (with PAR), token (code, refresh, client credentials), revocation, UserInfo, RP-initiated and back-channel logout; sign-in with password, TOTP, recovery codes and passkeys; password reset, enrolment links, address verification, changes of sign-in address and sign-in notices by mail, worded per company; consent; the account API; the admin console; signing-key rotation; per-address limits; the audit trail; regions |
 | Next | the account portal page; a container image |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
