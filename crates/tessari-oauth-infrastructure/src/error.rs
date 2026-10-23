@@ -54,6 +54,12 @@ pub enum Error {
         /// What it must be.
         reason: &'static str,
     },
+    /// A mail could not be built or the relay did not take it; the reason never carries the mail's text.
+    #[error("mail: {reason}")]
+    Mail {
+        /// What failed.
+        reason: String,
+    },
     /// A namespace or database name that is not a plain name.
     #[error("not a plain name: {name:?}")]
     InvalidName {
@@ -80,7 +86,7 @@ impl Error {
     #[must_use]
     pub const fn category(&self) -> ErrorCategory {
         match self {
-            Self::Unavailable { .. } => ErrorCategory::Unavailable,
+            Self::Unavailable { .. } | Self::Mail { .. } => ErrorCategory::Unavailable,
             Self::Refused {
                 class: Some(RefusalClass::Retry | RefusalClass::Conflict),
                 ..

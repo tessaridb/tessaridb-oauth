@@ -6,6 +6,7 @@ pub mod config;
 pub mod custody;
 mod error;
 mod listener_tls;
+pub mod mail;
 pub mod tessaridb;
 
 pub use error::{Error, Result};

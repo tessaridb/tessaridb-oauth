@@ -29,6 +29,9 @@ allow = [
   "Zlib",
 ]
 private = { ignore = true }
+# `quoted_printable` (the mail body encoding lettre uses) is 0BSD: permission to use for any purpose with no
+# condition at all, so it imposes nothing the Apache 2.0 conversion could not honour.
+exceptions = [{ crate = "quoted_printable", allow = ["0BSD"] }]
 
 [sources]
 unknown-registry = "deny"
