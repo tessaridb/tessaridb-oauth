@@ -250,6 +250,15 @@
   font-family: var(--mono);
 }
 
+.swatch {
+  display: inline-block;
+  inline-size: var(--s-5);
+  block-size: var(--s-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+}
+
 .segmented {
   display: flex;
   flex-wrap: wrap;

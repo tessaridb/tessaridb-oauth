@@ -11,6 +11,17 @@
   function strings(value) {
     return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : null;
   }
+  var ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  function toBase64url(bytes) {
+    let text2 = "";
+    for (let at = 0; at < bytes.length; at += 3) {
+      const chunk = bytes.subarray(at, at + 3);
+      const bits = (chunk[0] ?? 0) << 16 | (chunk[1] ?? 0) << 8 | (chunk[2] ?? 0);
+      const sextets = [bits >> 18, bits >> 12, bits >> 6, bits].map((value) => ALPHABET[value & 63] ?? "");
+      text2 += sextets.slice(0, chunk.length + 1).join("");
+    }
+    return text2;
+  }
 
   // src/console-read.ts
   var ROLES = ["users", "clients", "policy", "audit", "companies"];
@@ -20,6 +31,7 @@
     ["clients", "clients"],
     ["operators", null],
     ["policy", "policy"],
+    ["branding", "policy"],
     ["audit", "audit"],
     ["companies", "companies"]
   ];
@@ -59,6 +71,8 @@
         return { kind: "operators", after: query.get("after") };
       case "policy":
         return { kind: "policy" };
+      case "branding":
+        return { kind: "branding" };
       case "audit": {
         const after = query.get("after");
         return { kind: "audit", after: after !== null && /^\d+$/.test(after) ? Number(after) : null };
@@ -81,8 +95,8 @@
       return { kind: "not_found" };
     }
     if (status === 429) {
-      const seconds2 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
-      return { kind: "throttled", seconds: seconds2 };
+      const seconds3 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
+      return { kind: "throttled", seconds: seconds3 };
     }
     if ((status === 400 || status === 403 || status === 409) && typeof code === "string") {
       return { kind: "refused", code };
@@ -102,19 +116,19 @@
     made.append(...children);
     return made;
   }
-  function link(href, text, className = "") {
-    const made = make("a", className, text);
+  function link(href, text2, className = "") {
+    const made = make("a", className, text2);
     made.href = href;
     return made;
   }
-  function button(text, className, then) {
-    const made = make("button", className, text);
+  function button(text2, className, then) {
+    const made = make("button", className, text2);
     made.type = "button";
     made.addEventListener("click", then);
     return made;
   }
-  function heading(text) {
-    const made = make("h1", "view-title", text);
+  function heading(text2) {
+    const made = make("h1", "view-title", text2);
     made.tabIndex = -1;
     return made;
   }
@@ -122,28 +136,28 @@
     view2.replaceChildren(...children);
     view2.querySelector(".view-title")?.focus();
   }
-  function labelled(id, text, input) {
-    const label2 = make("label", "", text);
+  function labelled(id, text2, input2) {
+    const label2 = make("label", "", text2);
     label2.htmlFor = id;
-    input.id = id;
-    return make("div", "field", label2, input);
+    input2.id = id;
+    return make("div", "field", label2, input2);
   }
   function segmented(legend, name, options, checked) {
     const group = make("fieldset", "segmented", make("legend", "", legend));
     const inputs = [];
     for (const option of options) {
-      const input = make("input", "");
-      input.type = "radio";
-      input.name = name;
-      input.id = `${name}-${option}`;
-      input.value = option;
-      input.checked = option === checked;
+      const input2 = make("input", "");
+      input2.type = "radio";
+      input2.name = name;
+      input2.id = `${name}-${option}`;
+      input2.value = option;
+      input2.checked = option === checked;
       const label2 = make("label", "", option);
-      label2.htmlFor = input.id;
-      group.append(input, label2);
-      inputs.push([input, option]);
+      label2.htmlFor = input2.id;
+      group.append(input2, label2);
+      inputs.push([input2, option]);
     }
-    return { group, chosen: () => inputs.find(([input]) => input.checked)?.[1] ?? null };
+    return { group, chosen: () => inputs.find(([input2]) => input2.checked)?.[1] ?? null };
   }
 
   // src/dom.ts
@@ -166,10 +180,10 @@
     }
     try {
       const response = await fetch(path, init);
-      const text = await response.text();
+      const text2 = await response.text();
       let parsed = null;
       try {
-        parsed = text === "" ? null : JSON.parse(text);
+        parsed = text2 === "" ? null : JSON.parse(text2);
       } catch {
         parsed = null;
       }
@@ -178,8 +192,8 @@
       return { ok: false, status: 0, body: null, retryAfter: null };
     }
   }
-  function say(text) {
-    element("status", HTMLParagraphElement).textContent = text;
+  function say(text2) {
+    element("status", HTMLParagraphElement).textContent = text2;
   }
 
   // src/console-copy.ts
@@ -276,6 +290,30 @@
         return changeRefusalText(code);
     }
   }
+  function brandRefusalText(code) {
+    switch (code) {
+      case "brand_name_invalid":
+        return "The name must be 1 to 64 characters, with no control or text-direction characters.";
+      case "accent_invalid":
+        return "Write the colour as # and six hex digits, for example #1f4fd8.";
+      case "accent_low_contrast":
+        return "White text cannot be read on this colour. Choose a darker one.";
+      case "link_invalid":
+        return "Each link must be an https address, with no user name or password in it.";
+      case "logo_too_large":
+        return "The logo is larger than 256 KiB. Save it smaller and upload it again.";
+      case "logo_not_png":
+        return "The logo must be a PNG image. Export it as PNG and upload it again.";
+      case "logo_unreadable":
+        return "The file could not be read as a PNG image. Export it again and upload the new file.";
+      case "logo_too_wide":
+        return "The logo must be at most 512 by 512 pixels. Resize it and upload it again.";
+      case "no_logo":
+        return "This company has no logo to remove. Reload the view to see the brand as it is.";
+      default:
+        return changeRefusalText(code);
+    }
+  }
 
   // src/users-change.ts
   var REASON_MAX_CHARS = 500;
@@ -341,23 +379,23 @@
     return refusal.kind === "refused" ? words(refusal.code) : refusalText(refusal, what);
   }
   function reasonField(id) {
-    const input = make("input", "");
-    input.type = "text";
-    input.required = true;
-    input.maxLength = 500;
-    input.autocomplete = "off";
-    return { input, row: labelled(id, "Reason (recorded with the change)", input) };
+    const input2 = make("input", "");
+    input2.type = "text";
+    input2.required = true;
+    input2.maxLength = 500;
+    input2.autocomplete = "off";
+    return { input: input2, row: labelled(id, "Reason (recorded with the change)", input2) };
   }
-  function reasonIn(input, notice2) {
-    const reason = reasonOf(input.value);
+  function reasonIn(input2, notice2) {
+    const reason = reasonOf(input2.value);
     if (reason === null) {
       notice2.textContent = changeRefusalText("reason_required");
       notice2.hidden = false;
-      input.setAttribute("aria-invalid", "true");
-      input.focus();
+      input2.setAttribute("aria-invalid", "true");
+      input2.focus();
       return null;
     }
-    input.removeAttribute("aria-invalid");
+    input2.removeAttribute("aria-invalid");
     return reason;
   }
   function notice() {
@@ -415,11 +453,11 @@
       if (raw === void 0) {
         continue;
       }
-      const text = shown(raw, shape);
-      if (text === null) {
+      const text2 = shown(raw, shape);
+      if (text2 === null) {
         return null;
       }
-      details.push([label2, text]);
+      details.push([label2, text2]);
     }
     return { position, at, kind, details };
   }
@@ -453,9 +491,9 @@
   }
 
   // src/audit.ts
-  function moment(seconds2) {
+  function moment(seconds3) {
     return new Intl.DateTimeFormat(void 0, { dateStyle: "medium", timeStyle: "medium" }).format(
-      new Date(seconds2 * 1e3)
+      new Date(seconds3 * 1e3)
     );
   }
   function row(event) {
@@ -521,6 +559,224 @@
     say("");
   }
 
+  // src/branding-read.ts
+  function text(value) {
+    return value === null || typeof value === "string" ? value : void 0;
+  }
+  function whole(value) {
+    return value === null || typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : void 0;
+  }
+  function readBranding(body) {
+    const name = text(field(body, "name"));
+    const accent = text(field(body, "accent"));
+    const supportUrl = text(field(body, "support_url"));
+    const privacyUrl = text(field(body, "privacy_url"));
+    const logo = whole(field(body, "logo"));
+    const revision = whole(field(body, "revision"));
+    if (name === void 0 || accent === void 0 || supportUrl === void 0 || privacyUrl === void 0 || logo === void 0 || revision === void 0 || revision === null) {
+      return null;
+    }
+    return { name, accent, supportUrl, privacyUrl, logo, revision };
+  }
+  function brandingBody(revision, name, accent, supportUrl, privacyUrl, reason) {
+    return {
+      revision,
+      name,
+      accent,
+      ...supportUrl === "" ? {} : { support_url: supportUrl },
+      ...privacyUrl === "" ? {} : { privacy_url: privacyUrl },
+      reason
+    };
+  }
+
+  // src/copy.ts
+  var seconds = new Intl.PluralRules("en");
+  var moment2 = /* @__PURE__ */ new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
+  function when(unixSeconds) {
+    return moment2.format(new Date(unixSeconds * 1e3));
+  }
+
+  // src/branding.ts
+  var PATH = "api/branding";
+  var LOGO_MAX_BYTES = 256 * 1024;
+  var COLOUR = /^#[0-9a-fA-F]{6}$/;
+  function input(type, value, className = "") {
+    const made = make("input", className);
+    made.type = type;
+    made.value = value ?? "";
+    made.autocomplete = "off";
+    made.spellcheck = false;
+    return made;
+  }
+  function swatch(colour) {
+    const made = make("span", "swatch");
+    made.setAttribute("aria-hidden", "true");
+    made.style.backgroundColor = colour ?? "";
+    made.hidden = colour === null;
+    return made;
+  }
+  function sayIn(said, text2) {
+    if (text2 !== null) {
+      said.textContent = text2;
+      said.hidden = false;
+    }
+  }
+  function facts(brand) {
+    const fact = (term, ...value) => [make("dt", "", term), make("dd", "", ...value)];
+    return make(
+      "dl",
+      "facts",
+      ...fact("Name", brand.name ?? "Not set: the pages say TessariDB"),
+      ...fact(
+        "Colour",
+        ...brand.accent === null ? ["Not set: the house colour"] : [swatch(brand.accent), " ", make("code", "", brand.accent)]
+      ),
+      ...fact("Help link", brand.supportUrl ?? "None"),
+      ...fact("Privacy link", brand.privacyUrl ?? "None"),
+      ...fact("Logo", brand.logo === null ? "None: the pages show the product mark" : `Uploaded ${when(brand.logo)}`)
+    );
+  }
+  function brandForm(screen, brand, redraw) {
+    const keyFor = keys();
+    const name = input("text", brand.name);
+    name.maxLength = 64;
+    const accent = input("text", brand.accent, "mono");
+    accent.maxLength = 7;
+    accent.placeholder = "#1f4fd8";
+    const preview = swatch(brand.accent);
+    accent.addEventListener("input", () => {
+      const valid = COLOUR.test(accent.value);
+      preview.style.backgroundColor = valid ? accent.value : "";
+      preview.hidden = !valid;
+    });
+    const support = input("url", brand.supportUrl);
+    const privacy = input("url", brand.privacyUrl);
+    const reason = reasonField("brand-reason");
+    const said = notice();
+    const colourRow = labelled("brand-accent", "Colour of buttons and links (white text must be readable on it)", accent);
+    colourRow.append(preview);
+    const save = button("Save the brand", "primary", () => {
+      said.hidden = true;
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      const links = [support.value.trim(), privacy.value.trim()];
+      const body = brandingBody(brand.revision, name.value, accent.value, ...links, why);
+      void change(PATH, keyFor, body, "PUT").then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        if (answer.ok && readBranding(answer.body) !== null) {
+          redraw("The brand is saved. The sign-in, consent and account pages show it now.");
+          return;
+        }
+        if (answer.status === 409) {
+          redraw(brandRefusalText("changed_meanwhile"));
+          return;
+        }
+        const unread = "The server answered in a shape the console cannot read.";
+        sayIn(said, answer.ok ? unread : refusedText(screen, answer, "The brand", brandRefusalText));
+      });
+    });
+    return make(
+      "section",
+      "change-form",
+      make("h2", "", "Change it"),
+      labelled("brand-name", "Name", name),
+      colourRow,
+      labelled("brand-support", "Help link (https, optional)", support),
+      labelled("brand-privacy", "Privacy link (https, optional)", privacy),
+      reason.row,
+      said,
+      make("div", "actions", save)
+    );
+  }
+  function logoForm(screen, brand, redraw) {
+    const keyFor = keys();
+    const file = make("input", "");
+    file.type = "file";
+    file.accept = "image/png";
+    const reason = reasonField("logo-reason");
+    const said = notice();
+    const answered = (text2) => (answer) => {
+      if (!screen.live()) {
+        return;
+      }
+      if (answer.ok) {
+        redraw(text2);
+        return;
+      }
+      sayIn(said, refusedText(screen, answer, "The logo", brandRefusalText));
+    };
+    const upload = button("Upload the logo", "primary", () => {
+      said.hidden = true;
+      const chosen = file.files?.[0];
+      if (chosen === void 0) {
+        sayIn(said, "Choose a PNG file first.");
+        file.focus();
+        return;
+      }
+      if (chosen.size > LOGO_MAX_BYTES) {
+        sayIn(said, brandRefusalText("logo_too_large"));
+        return;
+      }
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      void chosen.arrayBuffer().then((bytes) => {
+        const body = { png: toBase64url(new Uint8Array(bytes)), reason: why };
+        void change(`${PATH}/logo`, keyFor, body, "PUT").then(answered("The logo is uploaded. The pages show it now."));
+      });
+    });
+    const actions = make("div", "actions", upload);
+    if (brand.logo !== null) {
+      actions.append(
+        button("Remove the logo", "secondary", () => {
+          said.hidden = true;
+          const why = reasonIn(reason.input, said);
+          if (why !== null) {
+            void change(`${PATH}/logo/remove`, keyFor, { reason: why }).then(
+              answered("The logo is removed. The pages show the product mark again.")
+            );
+          }
+        })
+      );
+    }
+    const fileLabel = make("label", "", "PNG file, at most 256 KiB and 512 by 512 pixels");
+    file.id = "logo-file";
+    fileLabel.htmlFor = file.id;
+    const fileRow = make("div", "field", fileLabel, file);
+    return make("section", "change-form", make("h2", "", "Logo"), fileRow, reason.row, said, actions);
+  }
+  async function brandingView(screen, message = "") {
+    say("Loading the brand.");
+    const answer = await call("GET", PATH);
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Branding", answer, "The brand");
+      return;
+    }
+    const brand = readBranding(answer.body);
+    if (brand === null) {
+      unreadable(screen, "Branding");
+      return;
+    }
+    const redraw = (said) => void brandingView(screen, said);
+    show(
+      screen.view,
+      heading("Branding"),
+      make("p", "lead", "How the company's sign-in, consent and account pages look. Nothing here changes what they do."),
+      facts(brand),
+      brandForm(screen, brand, redraw),
+      logoForm(screen, brand, redraw)
+    );
+    say(message);
+  }
+
   // src/companies-read.ts
   var ID_MAX_BYTES = 63;
   var NAME_MAX_CHARS = 100;
@@ -574,8 +830,8 @@
     badge2.dataset["state"] = company2.status === "active" ? "ok" : "warn";
     return badge2;
   }
-  function day(seconds2) {
-    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds2 * 1e3));
+  function day(seconds3) {
+    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds3 * 1e3));
   }
   function createForm(screen, created) {
     const keyFor = keys();
@@ -631,9 +887,9 @@
           created(`Company ${made.id} created; its issuer is served now (${made.status}).`);
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That company", companyRefusalText);
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That company", companyRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -726,9 +982,9 @@
           moved(`Company ${made.id} is now ${made.status}.`);
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That company", companyRefusalText);
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That company", companyRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -845,8 +1101,8 @@
     }
     return { body: { group: id, description: form.description.trim(), roles } };
   }
-  function rolesOf(text) {
-    const roles = text.split(/\s+/).filter((role) => role !== "");
+  function rolesOf(text2) {
+    const roles = text2.split(/\s+/).filter((role) => role !== "");
     return roles.every((role) => NAME.test(role)) ? roles : null;
   }
   function membersCountText(count3, more) {
@@ -873,9 +1129,9 @@
     }
     const page = read.ok ? readMembersPage(read.body) : null;
     if (page === null) {
-      const text = read.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, read, "That group", groupRefusalText);
-      if (text !== null) {
-        say(text);
+      const text2 = read.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, read, "That group", groupRefusalText);
+      if (text2 !== null) {
+        say(text2);
       }
       return;
     }
@@ -905,9 +1161,9 @@
           return;
         }
         const missing = groupRefusalCode(answer.status, answer.body);
-        const text = missing !== null ? groupRefusalText(missing) : refusedText(screen, answer, "That group", groupRefusalText);
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = missing !== null ? groupRefusalText(missing) : refusedText(screen, answer, "That group", groupRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -963,9 +1219,9 @@
   }
   function refusedHere(screen, answer, said) {
     const missing = groupRefusalCode(answer.status, answer.body);
-    const text = answer.ok ? "The server answered in a shape the console cannot read." : missing !== null ? groupRefusalText(missing) : refusedText(screen, answer, "This group", groupRefusalText);
-    if (text !== null) {
-      said.textContent = text;
+    const text2 = answer.ok ? "The server answered in a shape the console cannot read." : missing !== null ? groupRefusalText(missing) : refusedText(screen, answer, "This group", groupRefusalText);
+    if (text2 !== null) {
+      said.textContent = text2;
       said.hidden = false;
     }
   }
@@ -1115,7 +1371,7 @@
       unreadable(screen, "Group");
       return;
     }
-    const facts = make(
+    const facts2 = make(
       "dl",
       "facts",
       make("dt", "", "Group"),
@@ -1138,7 +1394,7 @@
     show(
       screen.view,
       heading("Group"),
-      facts,
+      facts2,
       rolesForm(screen, group, redraw),
       membersSection(screen, group, page, after, redraw),
       opener,
@@ -1217,8 +1473,8 @@
     const fields = { id, roles };
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      for (const input of Object.values(fields)) {
-        input.removeAttribute("aria-invalid");
+      for (const input2 of Object.values(fields)) {
+        input2.removeAttribute("aria-invalid");
       }
       const described = groupFormOf({ id: id.value, description: description.value, roles: roles.value });
       if ("wrong" in described) {
@@ -1243,9 +1499,9 @@
           openGroup(group.id, "Group made.");
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "This group", groupRefusalText);
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "This group", groupRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -1358,15 +1614,15 @@
     }
     return { clientId, consents, families, accessTokensEndBy };
   }
-  function listOf(text) {
-    return text.split(/\s+/).filter((value) => value !== "");
+  function listOf(text2) {
+    return text2.split(/\s+/).filter((value) => value !== "");
   }
   function clientIdOf(id) {
     return id.length >= 1 && id.length <= 255 && /^[\x20-\x7e]+$/.test(id);
   }
-  function jwkOf(text) {
+  function jwkOf(text2) {
     try {
-      const parsed = JSON.parse(text);
+      const parsed = JSON.parse(text2);
       return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
     } catch {
       return null;
@@ -1424,9 +1680,9 @@
     }
     const holders = read.ok ? readHolders(read.body) : null;
     if (holders === null) {
-      const text = read.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, read, "That client", clientRemovalRefusalText);
-      if (text !== null) {
-        say(text);
+      const text2 = read.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, read, "That client", clientRemovalRefusalText);
+      if (text2 !== null) {
+        say(text2);
       }
       return;
     }
@@ -1459,9 +1715,9 @@
           );
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That client", clientRemovalRefusalText);
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That client", clientRemovalRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -1504,30 +1760,30 @@
     scopes: "Give the scopes as words separated by spaces.",
     grants: "Choose at least one grant; only a confidential client may act as itself."
   };
-  function area(id, text) {
-    const input = make("textarea", "mono");
-    input.id = id;
-    input.rows = 2;
-    input.spellcheck = false;
-    const label2 = make("label", "", text);
+  function area(id, text2) {
+    const input2 = make("textarea", "mono");
+    input2.id = id;
+    input2.rows = 2;
+    input2.spellcheck = false;
+    const label2 = make("label", "", text2);
     label2.htmlFor = id;
-    return { input, row: make("div", "field", label2, input) };
+    return { input: input2, row: make("div", "field", label2, input2) };
   }
   function toggles(legend, name, options, on) {
     const group = make("fieldset", "segmented", make("legend", "", legend));
     const inputs = [];
     for (const option of options) {
-      const input = make("input", "");
-      input.type = "checkbox";
-      input.id = `${name}-${option}`;
-      input.value = option;
-      input.checked = on.includes(option);
+      const input2 = make("input", "");
+      input2.type = "checkbox";
+      input2.id = `${name}-${option}`;
+      input2.value = option;
+      input2.checked = on.includes(option);
       const label2 = make("label", "", option);
-      label2.htmlFor = input.id;
-      group.append(input, label2);
-      inputs.push(input);
+      label2.htmlFor = input2.id;
+      group.append(input2, label2);
+      inputs.push(input2);
     }
-    return { group, chosen: () => inputs.filter((input) => input.checked).map((input) => input.value) };
+    return { group, chosen: () => inputs.filter((input2) => input2.checked).map((input2) => input2.value) };
   }
   function registerForm(screen, registered) {
     const keyFor = keys();
@@ -1622,9 +1878,9 @@
           registered(`Client ${client.id} registered as a ${client.kind} client.`);
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That client", clientRefusalText);
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That client", clientRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -1730,16 +1986,16 @@
   function operatorsPath(after) {
     return after === null ? "api/operators" : `api/operators?${new URLSearchParams({ after }).toString()}`;
   }
-  function seconds(value) {
+  function seconds2(value) {
     return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
   }
   function readGrant(value) {
     const user = field(value, "user");
     const role = field(value, "role");
     const grantedBy = field(value, "granted_by");
-    const grantedAt = seconds(field(value, "granted_at"));
+    const grantedAt = seconds2(field(value, "granted_at"));
     const expires = field(value, "expires_at");
-    const expiresAt = expires === null ? null : seconds(expires);
+    const expiresAt = expires === null ? null : seconds2(expires);
     const reason = field(value, "reason");
     if (typeof user !== "string" || user === "" || typeof role !== "string" || !isRole(role) || typeof grantedBy !== "string" || grantedAt === null || expires !== null && expiresAt === null || typeof reason !== "string") {
       return null;
@@ -1768,21 +2024,21 @@
     return field(body, "revoked") === true && typeof user === "string" && typeof role === "string" ? { user, role } : null;
   }
   function daysOf(typed) {
-    const text = typed.trim();
-    if (text === "") {
+    const text2 = typed.trim();
+    if (text2 === "") {
       return DEFAULT_DAYS;
     }
-    if (!/^\d{1,3}$/.test(text)) {
+    if (!/^\d{1,3}$/.test(text2)) {
       return null;
     }
-    const days = Number(text);
+    const days = Number(text2);
     return days >= 1 && days <= MAX_DAYS ? days : null;
   }
 
   // src/operators.ts
   var DAYS_WRONG = "Give a whole number of days from 1 to 365, or leave it empty for 90.";
-  function day2(seconds2) {
-    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds2 * 1e3));
+  function day2(seconds3) {
+    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds3 * 1e3));
   }
   function grantForm(screen, roles, granted) {
     const keyFor = keys();
@@ -1842,9 +2098,9 @@
           granted(`Granted ${role} to ${user} for ${valid} days.`);
           return;
         }
-        const text = refusedText(screen, answer, "That account", operatorRefusalText);
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = refusedText(screen, answer, "That account", operatorRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -1920,9 +2176,9 @@
           revoked(`Revoked ${made.role} from ${made.user}.`);
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That grant", operatorRefusalText);
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That grant", operatorRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -1996,7 +2252,7 @@
   }
 
   // src/policy.ts
-  var PATH = "api/policy/two-factor";
+  var PATH2 = "api/policy/two-factor";
   function badge(policy) {
     const made = make("span", "badge", policy);
     made.dataset["state"] = policy === "off" ? "warn" : "ok";
@@ -2052,7 +2308,7 @@
         return;
       }
       typed.removeAttribute("aria-invalid");
-      void change(PATH, keyFor, { expected: current, policy: chosen, reason: why }, "PUT").then((answer) => {
+      void change(PATH2, keyFor, { expected: current, policy: chosen, reason: why }, "PUT").then((answer) => {
         if (!screen.live()) {
           return;
         }
@@ -2065,9 +2321,9 @@
           redraw(changeRefusalText("changed_meanwhile"));
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "The policy");
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "The policy");
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -2081,7 +2337,7 @@
   }
   async function policyView(screen, company2, message = "") {
     say("Loading the policy.");
-    const answer = await call("GET", PATH);
+    const answer = await call("GET", PATH2);
     if (!screen.live()) {
       return;
     }
@@ -2180,9 +2436,9 @@
           opened(made.user);
           return;
         }
-        const text = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "This account");
-        if (text !== null) {
-          said.textContent = text;
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "This account");
+        if (text2 !== null) {
+          said.textContent = text2;
           said.hidden = false;
         }
       });
@@ -2196,9 +2452,9 @@
     const out = make("div", "");
     const ring = { reveal: keys(), enrol: keys(), move: keys() };
     const refusedHere2 = (answer) => {
-      const text = refusedText(screen, answer, "This account");
-      if (text !== null) {
-        said.textContent = text;
+      const text2 = refusedText(screen, answer, "This account");
+      if (text2 !== null) {
+        said.textContent = text2;
         said.hidden = false;
       }
     };
@@ -2321,17 +2577,17 @@
     return badge2;
   }
   function lookup(email) {
-    const input = make("input", "");
-    input.type = "email";
-    input.name = "email";
-    input.autocomplete = "off";
-    input.value = email ?? "";
+    const input2 = make("input", "");
+    input2.type = "email";
+    input2.name = "email";
+    input2.autocomplete = "off";
+    input2.value = email ?? "";
     const find = make("button", "secondary", "Find");
     find.type = "submit";
-    const form = make("form", "inline-form", labelled("users-email", "Find by exact address", input), find);
+    const form = make("form", "inline-form", labelled("users-email", "Find by exact address", input2), find);
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const typed = input.value.trim();
+      const typed = input2.value.trim();
       location.hash = typed === "" ? "#/users" : `#/users?${new URLSearchParams({ email: typed }).toString()}`;
     });
     return form;
@@ -2426,7 +2682,7 @@
       return;
     }
     const address = make("code", "", user.email);
-    const facts = make(
+    const facts2 = make(
       "dl",
       "facts",
       make("dt", "", "Account"),
@@ -2442,7 +2698,7 @@
     show(
       screen.view,
       heading("Account"),
-      facts,
+      facts2,
       actionsFor(screen, user, address, redraw),
       make("p", "paging", link("#/users", "Back to users"))
     );
@@ -2485,7 +2741,7 @@
     sections.hidden = false;
     signOut.hidden = false;
   }
-  function signedOut(text) {
+  function signedOut(text2) {
     generation += 1;
     me = null;
     sections.hidden = true;
@@ -2496,7 +2752,7 @@
       make("p", "lead", `Operators of ${company} sign in through the company's own sign-in, with a second factor.`),
       make("p", "", link("signin", "Sign in", "button-link"))
     );
-    say(text);
+    say(text2);
   }
   function overview(who) {
     const roles = make("ul", "pills");
@@ -2545,6 +2801,9 @@
         return;
       case "policy":
         void policyView(screen, company);
+        return;
+      case "branding":
+        void brandingView(screen);
         return;
       case "audit":
         void auditView(screen, at.after);

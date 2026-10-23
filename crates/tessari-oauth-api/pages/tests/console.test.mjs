@@ -17,7 +17,7 @@ test("the signed-in operator is read with the roles the console knows", () => {
 
 test("a section is offered only to the roles that can use it", () => {
   assert.deepEqual(offered(["audit"]), ["operators", "audit"]);
-  assert.deepEqual(offered(["users", "policy"]), ["users", "groups", "operators", "policy"]);
+  assert.deepEqual(offered(["users", "policy"]), ["users", "groups", "operators", "policy", "branding"]);
   assert.deepEqual(offered(["companies"]), ["operators", "companies"]);
   assert.deepEqual(offered([]), ["operators"]);
 });

@@ -6,6 +6,7 @@ import { type Me, type Route, type Section, offered, readMe, route } from "./con
 import { type Screen, heading, link, make, show } from "./console-dom.ts";
 import { call, element, say } from "./dom.ts";
 import { auditView } from "./audit.ts";
+import { brandingView } from "./branding.ts";
 import { companiesView } from "./companies.ts";
 import { groupView } from "./group.ts";
 import { groupsView } from "./groups.ts";
@@ -124,6 +125,9 @@ function draw(who: Me): void {
       return;
     case "policy":
       void policyView(screen, company);
+      return;
+    case "branding":
+      void brandingView(screen);
       return;
     case "audit":
       void auditView(screen, at.after);

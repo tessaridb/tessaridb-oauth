@@ -16,7 +16,7 @@ export interface Me {
 }
 
 /** A section of the console, named for the job it serves. */
-export type Section = "users" | "groups" | "clients" | "operators" | "policy" | "audit" | "companies";
+export type Section = "users" | "groups" | "clients" | "operators" | "policy" | "branding" | "audit" | "companies";
 
 /** The role a section needs; operators lists the grants of whatever roles the viewer holds, so it needs none. */
 const NEEDS: readonly [Section, Role | null][] = [
@@ -25,6 +25,7 @@ const NEEDS: readonly [Section, Role | null][] = [
   ["clients", "clients"],
   ["operators", null],
   ["policy", "policy"],
+  ["branding", "policy"],
   ["audit", "audit"],
   ["companies", "companies"],
 ];
@@ -39,6 +40,7 @@ export type Route =
   | { kind: "clients"; after: string | null }
   | { kind: "operators"; after: string | null }
   | { kind: "policy" }
+  | { kind: "branding" }
   | { kind: "audit"; after: number | null }
   | { kind: "companies"; after: string | null };
 
@@ -85,6 +87,8 @@ export function route(hash: string): Route {
       return { kind: "operators", after: query.get("after") };
     case "policy":
       return { kind: "policy" };
+    case "branding":
+      return { kind: "branding" };
     case "audit": {
       const after = query.get("after");
       return { kind: "audit", after: after !== null && /^\d+$/.test(after) ? Number(after) : null };

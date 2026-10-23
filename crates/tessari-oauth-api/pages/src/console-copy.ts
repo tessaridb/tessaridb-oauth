@@ -112,3 +112,29 @@ export function groupRefusalText(code: string): string {
       return changeRefusalText(code);
   }
 }
+
+/** The words for a brand or logo change the server refused with `code`. */
+export function brandRefusalText(code: string): string {
+  switch (code) {
+    case "brand_name_invalid":
+      return "The name must be 1 to 64 characters, with no control or text-direction characters.";
+    case "accent_invalid":
+      return "Write the colour as # and six hex digits, for example #1f4fd8.";
+    case "accent_low_contrast":
+      return "White text cannot be read on this colour. Choose a darker one.";
+    case "link_invalid":
+      return "Each link must be an https address, with no user name or password in it.";
+    case "logo_too_large":
+      return "The logo is larger than 256 KiB. Save it smaller and upload it again.";
+    case "logo_not_png":
+      return "The logo must be a PNG image. Export it as PNG and upload it again.";
+    case "logo_unreadable":
+      return "The file could not be read as a PNG image. Export it again and upload the new file.";
+    case "logo_too_wide":
+      return "The logo must be at most 512 by 512 pixels. Resize it and upload it again.";
+    case "no_logo":
+      return "This company has no logo to remove. Reload the view to see the brand as it is.";
+    default:
+      return changeRefusalText(code);
+  }
+}
