@@ -1365,6 +1365,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "png",
+ "serde",
+ "serde_json",
  "tessari-oauth-constants",
  "tessari-oauth-core",
  "tessari-oauth-infrastructure",

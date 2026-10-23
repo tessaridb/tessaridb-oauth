@@ -9,6 +9,7 @@ mod jose;
 mod kdf;
 mod keys;
 mod listeners;
+mod mail;
 mod pkce;
 mod scopes;
 mod storage;
@@ -48,6 +49,10 @@ pub use keys::{
 pub use listeners::{
     SERVE_BODY_IDLE_SECS, SERVE_HEADER_READ_SECS, SERVE_MAX_CONNECTIONS, SHUTDOWN_DRAIN_SECS,
     TLS_HANDSHAKE_SECS,
+};
+pub use mail::{
+    MAIL_ATTEMPTS, MAIL_CLAIM_BATCH, MAIL_DELIVERY_INTERVAL_SECS, MAIL_DELIVERY_RUN_TIMEOUT_SECS,
+    MAIL_RETRY_FIRST_SECS, MAIL_SEND_TIMEOUT_SECS,
 };
 pub use pkce::{
     ADMIN_SESSION_ABSOLUTE_SECS, ADMIN_SESSION_IDLE_SECS, ADMIN_SIGNIN_TTL_SECS,

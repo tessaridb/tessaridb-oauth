@@ -20,6 +20,7 @@ pub mod interactions;
 pub mod keys;
 pub mod logouts;
 pub mod operators;
+pub mod outbox;
 pub mod passkeys;
 pub mod policies;
 pub mod refresh;

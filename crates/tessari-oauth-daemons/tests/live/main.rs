@@ -10,6 +10,7 @@
 mod directory_refresh;
 mod key_rotation;
 mod logout_delivery;
+mod mail_delivery;
 
 use std::sync::Arc;
 

@@ -120,6 +120,9 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      THEN CREATE logout_deliveries:$id = { user_id: $before.user_id, sid: $before.sid, clients: $before.clients, \
      due: time::now() }; \
      DEFINE INDEX IF NOT EXISTS by_user ON sessions FIELDS user_id; \
+     DEFINE QUEUE IF NOT EXISTS mail_outbox TIMEOUT 60s ATTEMPTS 6 SCHEMAFULL NOT BEFORE due; \
+     DEFINE FIELD IF NOT EXISTS sealed ON mail_outbox TYPE string REQUIRED; \
+     DEFINE FIELD IF NOT EXISTS due ON mail_outbox TYPE datetime REQUIRED; \
      DEFINE TABLE IF NOT EXISTS enrolments (\
      user_id string REQUIRED, created_at int REQUIRED, created_by string REQUIRED) EXPIRE AFTER 72h; \
      DEFINE INDEX IF NOT EXISTS by_user ON enrolments FIELDS user_id; \

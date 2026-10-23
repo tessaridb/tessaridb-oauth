@@ -26,6 +26,8 @@ thiserror.workspace = true
 async-trait.workspace = true
 tokio.workspace = true
 zeroize.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 tessari-oauth-test-support.workspace = true

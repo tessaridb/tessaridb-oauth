@@ -13,14 +13,18 @@ use tessari_oauth_api::{AdminState, PublicState, admin_router, public_router, se
 use tessari_oauth_constants::{
     DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS,
     KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS,
-    LOGOUT_SEND_TIMEOUT_SECS, PEER_DIRECTORIES_SECS, PEER_DIRECTORIES_TIMEOUT_SECS,
+    LOGOUT_SEND_TIMEOUT_SECS, MAIL_DELIVERY_INTERVAL_SECS, MAIL_DELIVERY_RUN_TIMEOUT_SECS,
+    MAIL_SEND_TIMEOUT_SECS, PEER_DIRECTORIES_SECS, PEER_DIRECTORIES_TIMEOUT_SECS,
     SHUTDOWN_DRAIN_SECS,
 };
 use tessari_oauth_core::discovery;
-use tessari_oauth_daemons::{DirectoryRefresh, KeyRotation, LogoutDelivery, Peer, PeerDirectories};
+use tessari_oauth_daemons::{
+    DirectoryRefresh, KeyRotation, LogoutDelivery, MailDelivery, Peer, PeerDirectories,
+};
 use tessari_oauth_infrastructure::backchannel::Poster;
 use tessari_oauth_infrastructure::config::NodeConfig;
 use tessari_oauth_infrastructure::custody::{Kek, Passwords};
+use tessari_oauth_infrastructure::mail::MailRelay;
 use tessari_oauth_infrastructure::tessaridb::{Database, StoreConfig};
 use tessari_oauth_infrastructure::{ListenerTls, listener_config};
 use tessari_oauth_storage::companies::{CompanyStatus, Elsewhere, Served};
@@ -34,6 +38,12 @@ mod bootstrap;
 mod peers;
 
 pub(crate) type Failure = Box<dyn Error + Send + Sync>;
+
+/// Where the server reaches out: clients' back-channel endpoints always, the mail relay when one is configured.
+struct Outbound {
+    poster: Poster,
+    relay: Option<MailRelay>,
+}
 
 /// The TLS configuration of each listener: the public one always, the admin console's when it was given one.
 struct Listeners {
@@ -109,14 +119,21 @@ fn start() -> Result<(), Failure> {
         discovery::metadata(&issuer, SIGNING_ALGORITHM)
             .map_err(|_| format!("{issuer} is not a valid issuer"))?;
     }
-    let poster = Poster::with_native_roots(Duration::from_secs(LOGOUT_SEND_TIMEOUT_SECS))?;
+    let outbound = Outbound {
+        poster: Poster::with_native_roots(Duration::from_secs(LOGOUT_SEND_TIMEOUT_SECS))?,
+        relay: config
+            .mail
+            .as_ref()
+            .map(|mail| MailRelay::load(mail, Duration::from_secs(MAIL_SEND_TIMEOUT_SECS)))
+            .transpose()?,
+    };
     let database = Database::new(store, config.store.connections.get())?;
     let storage = Storage::new(&database, &Tenancy::for_region(&config.region)?);
     let peers = peers::peers(&config)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    runtime.block_on(run(config, storage, peers, kek, passwords, tls, poster))
+    runtime.block_on(run(config, storage, peers, kek, passwords, tls, outbound))
 }
 
 /// How to reach the store the configuration names, its authority read from disk.
@@ -153,7 +170,7 @@ async fn run(
     kek: Arc<Kek>,
     passwords: Arc<Passwords>,
     tls: Listeners,
-    poster: Poster,
+    outbound: Outbound,
 ) -> Result<(), Failure> {
     let clock = system_clock();
     let served = Arc::new(Served::new(&config.public.url));
@@ -195,12 +212,23 @@ async fn run(
         keys: Arc::clone(&storage.keys),
         kek: Arc::clone(&kek),
         served: Arc::clone(&served),
-        sender: Arc::new(poster),
+        sender: Arc::new(outbound.poster),
         clock: Arc::clone(&clock),
         interval: Duration::from_secs(LOGOUT_DELIVERY_INTERVAL_SECS),
         timeout: Duration::from_secs(LOGOUT_DELIVERY_RUN_TIMEOUT_SECS),
     });
     let delivering = tokio::spawn(tessari_oauth_daemons::run(delivery, stopped.clone()));
+    let mailing = outbound.relay.map(|relay| {
+        let mail = Arc::new(MailDelivery {
+            outbox: Arc::clone(&storage.outbox),
+            kek: Arc::clone(&kek),
+            served: Arc::clone(&served),
+            sender: Arc::new(relay),
+            interval: Duration::from_secs(MAIL_DELIVERY_INTERVAL_SECS),
+            timeout: Duration::from_secs(MAIL_DELIVERY_RUN_TIMEOUT_SECS),
+        });
+        tokio::spawn(tessari_oauth_daemons::run(mail, stopped.clone()))
+    });
     let refresh = Arc::new(DirectoryRefresh {
         companies: Arc::clone(&storage.companies),
         served: Arc::clone(&served),
@@ -334,10 +362,14 @@ async fn run(
         _ = terminate.recv() => tracing::info!(signal = "SIGTERM", "shutting down"),
     }
     stop.send(true)?;
-    let (answered, answered_admin, rotated, delivered, refreshed, peered) =
+    let (answered, answered_admin, rotated, delivered, mailed, refreshed, peered) =
         tokio::time::timeout(Duration::from_secs(SHUTDOWN_DRAIN_SECS), async {
             let rotated = rotating.await;
             let delivered = delivering.await;
+            let mailed = match mailing {
+                Some(mailing) => Some(mailing.await),
+                None => None,
+            };
             let refreshed = refreshing.await;
             let peered = match reading_peers {
                 Some(reading) => Some(reading.await),
@@ -349,6 +381,7 @@ async fn run(
                 answered_admin,
                 rotated,
                 delivered,
+                mailed,
                 refreshed,
                 peered,
             )
@@ -357,6 +390,7 @@ async fn run(
         .map_err(|_| format!("requests still in flight after {SHUTDOWN_DRAIN_SECS} s"))?;
     rotated?;
     delivered?;
+    mailed.transpose()?;
     refreshed?;
     peered.transpose()?;
     answered_admin??;

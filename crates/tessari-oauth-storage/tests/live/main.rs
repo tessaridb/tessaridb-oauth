@@ -27,6 +27,7 @@ mod interactions_finish;
 mod keys;
 mod logouts;
 mod operators;
+mod outbox;
 mod passkeys;
 mod policies;
 mod refresh;
