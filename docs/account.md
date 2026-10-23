@@ -10,6 +10,10 @@ many recovery codes are left, and each passkey by its credential id, with when i
 synced, and the company's two-factor policy as `two_factor`. No secret, hash or key is part of it. Like the routes below
 it needs the session cookie, is counted under the account limit and is never cached.
 
+`POST <issuer>/account/api/me/verify` with `{}` mails a link that verifies that address: `202` once the mail is queued,
+`204` and no mail when the address is verified already, and `503 mail_unavailable` when the server has no mail relay.
+A newer request replaces the older link.
+
 `POST <issuer>/account/api/passkeys/remove` with `{"id": "<credential id>"}` removes one of the user's own passkeys.
 Changing how an account signs in needs a sign-in from the last ten minutes that reached the level the account's
 second factor gives (a password alone does not change an account that holds a passkey or an authenticator app),

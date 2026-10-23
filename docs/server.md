@@ -34,13 +34,13 @@ authorization belongs to the browser that brought it to `/oauth2/authorize`, by 
 (kept when the browser has one, drawn otherwise): another browser holding the request's id cannot sign in for it,
 answer its consent or receive its code.
 
-The sign-in, password-reset, consent and account pages are served by the binary itself at `<issuer>/login`,
-`<issuer>/login/reset`, `<issuer>/consent` and `<issuer>/account`, with their script, style and mark under
-`<issuer>/assets/`. The account page shows the signed-in
-user's address, how the account signs in, where it is signed in and which applications hold access; it signs out one
-session or every session after a confirmation, takes an application's access back, saying when the tokens it already
-holds stop working, changes the password, issues new recovery codes shown once, turns on an authenticator app from a
-key shown once, and adds or removes passkeys. Without a session it offers a sign-in
+The sign-in, password-reset, address-verification, consent and account pages are served by the binary itself at
+`<issuer>/login`, `<issuer>/login/reset`, `<issuer>/login/verify`, `<issuer>/consent` and `<issuer>/account`, with
+their script, style and mark under `<issuer>/assets/`. The account page shows the signed-in user's address and
+offers a link that verifies it, how the account signs in, where it is signed in and which applications hold access; it
+signs out one session or every session after a confirmation, takes an application's access back, saying when the
+tokens it already holds stop working, changes the password, issues new recovery codes shown once, turns on an
+authenticator app from a key shown once, and adds or removes passkeys. Without a session it offers a sign-in
 (`<issuer>/login?return=account`) that comes back to it, and it offers the same sign-in when a change needs a recent
 one. They load nothing from anywhere else, talk only to this server, submit no form, cannot be framed, follow the
 system's light or dark theme and work from the keyboard alone; a passkey is offered wherever the browser supports
@@ -66,6 +66,13 @@ the new password (`POST <issuer>/login/api/reset/complete`) changes the password
 passkeys stay, so the next sign-in still asks for them. Every session ends, every refresh token is revoked, the
 change is recorded and a notice goes to the address. A link that was never issued, was used, was replaced or has
 lapsed gets `400` `code_rejected`.
+
+An account's address stays unverified (`email_verified` is false) until a link sent to it is opened. With a relay
+set, a link to `<issuer>/login/verify#token=<token>` is mailed when an account sets its first password and whenever
+the signed-in user asks for one on the account page. It works once, for 24 hours, and a newer link replaces it. The
+page takes the token out of the address and posts it to `POST <issuer>/login/api/verify`, which marks the address
+verified and records it (`204`). A link that was never issued, was used, was replaced, has lapsed or was sent to an
+address the account no longer signs in with gets `400` `code_rejected`.
 
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listeners stop accepting, the requests in flight

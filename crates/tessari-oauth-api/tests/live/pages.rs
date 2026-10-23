@@ -21,12 +21,17 @@ use crate::routes::{live_storage, state};
 const PAGE_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
                            connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'";
 
-const SERVED: [(&str, &str, &str); 10] = [
+const SERVED: [(&str, &str, &str); 12] = [
     ("/acme/login", "text/html; charset=utf-8", "login.html"),
     (
         "/acme/login/reset",
         "text/html; charset=utf-8",
         "reset.html",
+    ),
+    (
+        "/acme/login/verify",
+        "text/html; charset=utf-8",
+        "verify.html",
     ),
     ("/acme/consent", "text/html; charset=utf-8", "consent.html"),
     ("/acme/account", "text/html; charset=utf-8", "account.html"),
@@ -39,6 +44,11 @@ const SERVED: [(&str, &str, &str); 10] = [
         "/acme/assets/reset.js",
         "text/javascript; charset=utf-8",
         "reset.js",
+    ),
+    (
+        "/acme/assets/verify.js",
+        "text/javascript; charset=utf-8",
+        "verify.js",
     ),
     (
         "/acme/assets/consent.js",
@@ -142,20 +152,22 @@ async fn the_pages_load_only_their_own_assets() {
             "{path} names the product until a company names itself"
         );
     }
-    // The reset page sits one level down, under the sign-in page, and reaches the same assets.
-    let (_, _, body) = fetch("/acme/login/reset").await;
-    for asset in [
-        "src=\"../assets/reset.js\"",
-        "href=\"../assets/pages.css\"",
-        "href=\"../assets/brand.css\"",
+    // The reset and verification pages sit one level down, under the sign-in page, and reach the same assets.
+    for (path, script) in [
+        ("/acme/login/reset", "src=\"../assets/reset.js\""),
+        ("/acme/login/verify", "src=\"../assets/verify.js\""),
     ] {
-        assert!(body.contains(asset), "the reset page loads {asset}");
+        let (_, _, body) = fetch(path).await;
+        for asset in [
+            script,
+            "href=\"../assets/pages.css\"",
+            "href=\"../assets/brand.css\"",
+        ] {
+            assert!(body.contains(asset), "{path} loads {asset}");
+        }
+        assert!(!body.contains("//"), "{path} names nothing off this origin");
+        assert!(body.contains("<span id=\"brand-name\">TessariDB OAuth</span>"));
     }
-    assert!(
-        !body.contains("//"),
-        "the reset page names nothing off this origin"
-    );
-    assert!(body.contains("<span id=\"brand-name\">TessariDB OAuth</span>"));
 }
 
 #[tokio::test]

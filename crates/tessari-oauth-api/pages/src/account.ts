@@ -18,6 +18,7 @@ import {
 import { removePasskey, wireApp, wireAppOff, wirePasskeyAdd } from "./account-enrol.ts";
 import { type Followups, wirePassword, wireRecoveryCodes } from "./account-factors.ts";
 import { showNames, wireProfile } from "./account-profile.ts";
+import { wireVerify } from "./account-verify.ts";
 import { showBrand } from "./brand.ts";
 import { ACCOUNT_TEXT, codesLeft, describeMethods, describeScope, refusalText, when } from "./copy.ts";
 import { type Answer, call, element, say } from "./dom.ts";
@@ -96,6 +97,7 @@ function showMe(base: string, me: Me, followups: Followups): void {
   const verified = element("verified", HTMLSpanElement);
   verified.textContent = me.emailVerified ? ACCOUNT_TEXT.verified : ACCOUNT_TEXT.unverified;
   verified.dataset["state"] = me.emailVerified ? "ok" : "warn";
+  element("verify-send", HTMLButtonElement).hidden = me.emailVerified;
   element("method-password", HTMLElement).textContent = me.password ? ACCOUNT_TEXT.set : ACCOUNT_TEXT.notSet;
   element("method-totp", HTMLElement).textContent = me.totp ? ACCOUNT_TEXT.on : ACCOUNT_TEXT.off;
   element("method-recovery", HTMLElement).textContent = codesLeft(me.recoveryCodes);
@@ -267,6 +269,7 @@ async function main(): Promise<void> {
   wireAppOff(base, followups);
   wirePasskeyAdd(base, followups);
   wireProfile(base, me.profile, followups);
+  wireVerify(base, followups);
   account.hidden = false;
   say("");
 }

@@ -238,6 +238,16 @@
     }
     return codes.select(count2) === "one" ? "1 code left" : `${count2} codes left`;
   }
+  var VERIFY_TEXT = {
+    confirming: "Confirming your email address.",
+    confirmed: "Email address confirmed",
+    confirmedNote: "Your account now shows this address as verified. You can close this page.",
+    invalidLink: "This confirmation link isn't complete. Open the link from the email again.",
+    spentLink: "This confirmation link has expired, was already used, or a newer one was sent. Ask for a new one on your account page.",
+    sending: "Sending a verification link.",
+    sent: "We sent a verification link to your address. It works for 24 hours.",
+    unavailable: "Email verification isn't set up here. Ask your administrator."
+  };
   var ACCOUNT_TEXT = {
     loading: "Loading your account.",
     missing: "This page could not find its account. Check the address and try again.",
@@ -824,6 +834,55 @@
     });
   }
 
+  // src/verify-read.ts
+  function sendOutcome(status, body, retryAfter) {
+    if (status === 202) {
+      return { kind: "sent" };
+    }
+    if (status === 204) {
+      return { kind: "verified" };
+    }
+    const code = field(body, "code");
+    if (status === 503 && code === "mail_unavailable") {
+      return { kind: "unavailable" };
+    }
+    if (status === 401 && code === "session_required") {
+      return { kind: "signed-out" };
+    }
+    return status === 429 ? refusal(status, body, retryAfter) : { kind: "retry" };
+  }
+
+  // src/account-verify.ts
+  function wireVerify(base, followups) {
+    const send = element("verify-send", HTMLButtonElement);
+    send.addEventListener("click", () => {
+      void (async () => {
+        send.disabled = true;
+        say(VERIFY_TEXT.sending);
+        const answer = await call("POST", `${base}/me/verify`, {});
+        send.disabled = false;
+        const outcome = sendOutcome(answer.status, answer.body, answer.retryAfter);
+        switch (outcome.kind) {
+          case "sent":
+            say(VERIFY_TEXT.sent);
+            return;
+          case "verified":
+            say("");
+            await followups.changed();
+            return;
+          case "unavailable":
+            say(VERIFY_TEXT.unavailable);
+            return;
+          case "signed-out":
+            followups.signedOut();
+            return;
+          default:
+            say(refusalText(outcome));
+        }
+      })();
+    });
+  }
+
   // src/brand-read.ts
   function text2(value) {
     return typeof value === "string" && value !== "" ? value : null;
@@ -933,6 +992,7 @@
     const verified = element("verified", HTMLSpanElement);
     verified.textContent = me.emailVerified ? ACCOUNT_TEXT.verified : ACCOUNT_TEXT.unverified;
     verified.dataset["state"] = me.emailVerified ? "ok" : "warn";
+    element("verify-send", HTMLButtonElement).hidden = me.emailVerified;
     element("method-password", HTMLElement).textContent = me.password ? ACCOUNT_TEXT.set : ACCOUNT_TEXT.notSet;
     element("method-totp", HTMLElement).textContent = me.totp ? ACCOUNT_TEXT.on : ACCOUNT_TEXT.off;
     element("method-recovery", HTMLElement).textContent = codesLeft(me.recoveryCodes);
@@ -1094,6 +1154,7 @@
     wireAppOff(base, followups);
     wirePasskeyAdd(base, followups);
     wireProfile(base, me.profile, followups);
+    wireVerify(base, followups);
     account.hidden = false;
     say("");
   }

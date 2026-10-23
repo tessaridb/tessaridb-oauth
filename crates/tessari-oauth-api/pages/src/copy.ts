@@ -101,6 +101,20 @@ export const RESET_TEXT = {
     "your second factor and passkeys are unchanged.",
 } as const;
 
+/** The words of the address-verification page and of the account page's request for a link. */
+export const VERIFY_TEXT = {
+  confirming: "Confirming your email address.",
+  confirmed: "Email address confirmed",
+  confirmedNote: "Your account now shows this address as verified. You can close this page.",
+  invalidLink: "This confirmation link isn't complete. Open the link from the email again.",
+  spentLink:
+    "This confirmation link has expired, was already used, or a newer one was sent. " +
+    "Ask for a new one on your account page.",
+  sending: "Sending a verification link.",
+  sent: "We sent a verification link to your address. It works for 24 hours.",
+  unavailable: "Email verification isn't set up here. Ask your administrator.",
+} as const;
+
 /** The words the account page shows, by place. */
 export const ACCOUNT_TEXT = {
   loading: "Loading your account.",

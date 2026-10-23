@@ -17,7 +17,7 @@ function local(what, text) {
   }
 }
 
-for (const page of ["login", "reset", "consent", "account", "console"]) {
+for (const page of ["login", "reset", "verify", "consent", "account", "console"]) {
   await build({
     entryPoints: [new URL(`./src/${page}.ts`, import.meta.url).pathname],
     outfile: new URL(`${page}.js`, ASSETS).pathname,
@@ -41,7 +41,16 @@ for (const page of ["login", "reset", "consent", "account", "console"]) {
   console.log(`${`${page}.js`.padEnd(12)} ${script.length} bytes, parses`);
 }
 
-const COPIED = ["login.html", "reset.html", "consent.html", "account.html", "console.html", "pages.css", "console.css"];
+const COPIED = [
+  "login.html",
+  "reset.html",
+  "verify.html",
+  "consent.html",
+  "account.html",
+  "console.html",
+  "pages.css",
+  "console.css",
+];
 for (const name of COPIED) {
   const text = await readFile(new URL(name, STATIC), "utf8");
   local(name, text);
