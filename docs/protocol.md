@@ -56,6 +56,25 @@ was issued: `auth_time`, `acr`, `amr` derived from the methods verified, `sid` (
 cookie), the request's `nonce` when one was sent, and `at_hash` binding it to the access token beside it, under the
 same pairwise `sub`. It carries no profile or contact data and lives five minutes.
 
+`acr` and `amr` come only from the methods verified in the sign-in behind the code, never from what the account has
+enrolled or what the request asked for: the server reads no `acr_values` and publishes no `acr_values_supported`.
+A recovery code counts as a one-time code. A passkey "verifies its user" when the authenticator checked a PIN or a
+biometric. Passkeys sync between devices, so no level here claims a device-bound key.
+
+| Methods verified in the sign-in | `acr` | `amr` |
+|---|---|---|
+| password | `urn:tessaridb:acr:sf` | `pwd` |
+| one-time or recovery code alone | `urn:tessaridb:acr:sf` | `otp` |
+| passkey that did not verify its user | `urn:tessaridb:acr:sf` | `hwk` |
+| password and a one-time or recovery code | `urn:tessaridb:acr:mfa` | `pwd`, `otp`, `mfa` |
+| password and a passkey that did not verify its user | `urn:tessaridb:acr:mfa` | `pwd`, `hwk`, `mfa` |
+| passkey that verified its user | `urn:tessaridb:acr:phr` | `hwk`, `mfa` |
+| password and a passkey that verified its user | `urn:tessaridb:acr:phr` | `pwd`, `hwk`, `mfa` |
+
+`sf` is one factor category, `mfa` two different ones (something known and something held), and `phr` a passkey that
+verified its user, which the browser binds to this origin. `mfa` in `amr` means two different categories ran; a
+one-time code and a recovery code together are still one.
+
 A client registered for refresh tokens also receives one, and redeems it at the same endpoint (RFC 6749 §6). Refresh
 tokens rotate on every use and are kept as digests only. The request is judged on the family's grant before the
 token is rotated, so a refused refresh leaves the token usable; the access token may be narrowed to fewer scopes or
