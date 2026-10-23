@@ -35,3 +35,10 @@ pub const EMAIL_CHANGE_APPLY_RUN_TIMEOUT_SECS: u64 = 45;
 
 /// How many due address changes one run applies per company; the rest wait for the next run.
 pub const EMAIL_CHANGE_APPLY_BATCH: u32 = 20;
+
+/// How many changes of sign-in address one account may ask for per window: each request mails an address the user
+/// typed, so the budget is what keeps an account from mailing at will.
+pub const EMAIL_CHANGE_REQUEST_LIMIT: u64 = 5;
+
+/// The window `EMAIL_CHANGE_REQUEST_LIMIT` counts in, in seconds.
+pub const EMAIL_CHANGE_REQUEST_WINDOW_SECS: u64 = 3_600;

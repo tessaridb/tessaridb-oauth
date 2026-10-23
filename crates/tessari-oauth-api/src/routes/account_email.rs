@@ -5,7 +5,10 @@
 //! account holds it, and does the same store work for both: a change held for a day, a mail to the new address and a
 //! mail to the old one. A free address gets a link that confirms the change; a held one gets a notice that somebody
 //! tried to use it, and its change can never be confirmed. The old address always gets a link that cancels the
-//! change until it takes effect. Values are never logged, recorded or echoed.
+//! change until it takes effect. An account may ask a few times an hour, since every request mails an address the
+//! user typed. Values are never logged, recorded or echoed.
+
+use std::num::NonZeroU64;
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
@@ -13,17 +16,23 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
-use tessari_oauth_constants::LOGIN_PATH;
+use tessari_oauth_constants::{
+    EMAIL_CHANGE_REQUEST_LIMIT, EMAIL_CHANGE_REQUEST_WINDOW_SECS, LOGIN_PATH,
+};
 use tessari_oauth_infrastructure::custody::random_secret;
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::email_changes::Addresses;
 use tessari_oauth_storage::outbox::NewMail;
+use tessari_oauth_storage::throttle::{Admission, Limit};
 use tessari_oauth_types::{EmailAddress, TenantId, Timestamp, UserId, VerifyToken, base64url};
 
 use super::account_factors::may_change;
 use super::login::{body, record, signed_in};
 use crate::state::PublicState;
 use crate::{Error, Result};
+
+/// The throttle group an account's address-change requests are counted in.
+const BUDGET_GROUP: &str = "address-change";
 
 /// The subject of the mail to the new address, free or held.
 const NEW_SUBJECT: &str = "Confirm your new sign-in address";
@@ -61,6 +70,7 @@ pub(super) async fn request(
     if account.email == new {
         return Ok(StatusCode::NO_CONTENT.into_response());
     }
+    spend_budget(&state, &tenant, &asking.user, now).await?;
     let held = state
         .users
         .find_by_email(&tenant, &new)
@@ -93,6 +103,30 @@ pub(super) async fn request(
     }
     recorded(&state, &tenant, &asking.user, now).await;
     Ok(StatusCode::ACCEPTED.into_response())
+}
+
+/// Spend one of the address changes `user` may ask for in this window, refusing past the budget: each request mails an
+/// address the user typed.
+async fn spend_budget(
+    state: &PublicState,
+    tenant: &TenantId,
+    user: &UserId,
+    now: Timestamp,
+) -> Result<()> {
+    let limit = Limit {
+        requests: NonZeroU64::new(EMAIL_CHANGE_REQUEST_LIMIT).ok_or(Error::Internal)?,
+        window_secs: NonZeroU64::new(EMAIL_CHANGE_REQUEST_WINDOW_SECS).ok_or(Error::Internal)?,
+    };
+    let account = format!("{}/{}", tenant.as_str(), user.as_str());
+    let admission = state
+        .throttle
+        .admit(BUDGET_GROUP, &account, limit, now)
+        .await
+        .map_err(Error::Store)?;
+    match admission {
+        Admission::Admitted { .. } => Ok(()),
+        Admission::Refused { retry_after_secs } => Err(Error::Throttled { retry_after_secs }),
+    }
 }
 
 fn fresh_token() -> Result<VerifyToken> {

@@ -4,7 +4,7 @@
 
 use axum::http::StatusCode;
 use serde_json::json;
-use tessari_oauth_constants::EMAIL_CHANGE_HOLD_SECS;
+use tessari_oauth_constants::{EMAIL_CHANGE_HOLD_SECS, EMAIL_CHANGE_REQUEST_LIMIT};
 use tessari_oauth_core::authentication::Method;
 use tessari_oauth_storage::outbox::QueuedMail;
 
@@ -143,4 +143,27 @@ async fn a_stale_sign_in_a_bad_address_or_the_same_address_change_nothing() {
     let same = ask(&server, Some(&fresh), KNOWN).await;
     assert_eq!(same.status, StatusCode::NO_CONTENT);
     assert!(queued(&server).await.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_account_asks_for_few_changes_an_hour_so_it_cannot_mail_at_will() {
+    let server = server(2).await;
+    let user = with_password(&server, KNOWN).await;
+    let cookie = session(&server, &user, "session-1", &[Method::Password], 0).await;
+
+    for at in 0..EMAIL_CHANGE_REQUEST_LIMIT {
+        let asked = ask(&server, Some(&cookie), &format!("ada{at}@new.example")).await;
+        assert_eq!(asked.status, StatusCode::ACCEPTED, "request {at}");
+    }
+    let mailed = queued(&server).await.len();
+    let past = ask(&server, Some(&cookie), "ada-last@new.example").await;
+
+    assert_eq!(past.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(past.body["code"], "rate_limited");
+    assert_eq!(queued(&server).await.len(), 0, "nothing more is mailed");
+    assert_eq!(
+        u64::try_from(mailed).expect("a count"),
+        EMAIL_CHANGE_REQUEST_LIMIT * 2
+    );
 }
