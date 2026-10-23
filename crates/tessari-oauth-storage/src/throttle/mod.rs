@@ -1,5 +1,6 @@
 //! Request counters: how many requests each client made to each route group in the current window.
 
+mod model;
 mod repository;
 mod service;
 mod signin;

@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tessari_oauth_constants::THROTTLE_SPACE_MAX_KEYS;
 use tessari_oauth_infrastructure::tessaridb::{Answer, Database, Number, Place, Value};
 
+use super::model::Counters;
 use super::repository::ThrottleRepository;
 use crate::{Error, Result};
 
@@ -27,33 +28,47 @@ fn unreadable(reason: &str) -> Error {
 #[async_trait]
 impl ThrottleRepository for TessaridbThrottleRepository {
     async fn prepare(&self, place: &Place) -> Result<()> {
-        // Names are checked plain by `Place`, which is what allows them into the text. The space holds at most
+        // Names are checked plain by `Place`, which is what allows them into the text. Each space holds at most
         // `THROTTLE_SPACE_MAX_KEYS` counters and evicts the least recently written past it, so a flood of distinct
-        // clients cannot grow it without bound.
+        // clients cannot grow it without bound. Request counts are held in the node's memory: no log record and no
+        // disk sync per request, and nothing a restart must keep.
         let namespace = place.namespace();
         let database = place.database();
+        let requests = Counters::Requests.space();
+        let signins = Counters::Signins.space();
         let script = format!(
             "DEFINE NAMESPACE IF NOT EXISTS {namespace}; USE NAMESPACE {namespace}; \
              DEFINE DATABASE IF NOT EXISTS {database}; USE DATABASE {database}; \
-             DEFINE SPACE IF NOT EXISTS counters MAX {THROTTLE_SPACE_MAX_KEYS};"
+             DEFINE SPACE IF NOT EXISTS {requests} IN MEMORY MAX {THROTTLE_SPACE_MAX_KEYS}; \
+             DEFINE SPACE IF NOT EXISTS {signins} MAX {THROTTLE_SPACE_MAX_KEYS};"
         );
         self.database.run_unplaced(&script, Vec::new()).await?;
         Ok(())
     }
 
-    async fn count(&self, place: &Place, key: &str, seconds: u64) -> Result<u64> {
+    async fn count(
+        &self,
+        place: &Place,
+        counters: Counters,
+        key: &str,
+        seconds: u64,
+    ) -> Result<u64> {
         let seconds =
             i64::try_from(seconds).map_err(|_| unreadable("a lifetime beyond i64 seconds"))?;
         // `INCR` keeps an existing expiry but gives a missing key none, so the counter is first created with its
         // expiry. Each statement reads and writes the key atomically; should the key lapse between the two, the
         // `INCR` makes a counter without expiry, which its window index retires from use and the space's bound
         // evicts.
+        // The space's name is one of this crate's own, never a request's.
+        let space = counters.space();
+        let statement = format!(
+            "SET {space}:$key = 0 IF ABSENT EXPIRE duration::from_secs($seconds); INCR {space}:$key;"
+        );
         let answers = self
             .database
             .run_at(
                 place,
-                "SET counters:$key = 0 IF ABSENT EXPIRE duration::from_secs($seconds); \
-                 INCR counters:$key;",
+                &statement,
                 vec![
                     ("key".to_owned(), Value::from(key)),
                     ("seconds".to_owned(), Value::from(seconds)),

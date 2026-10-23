@@ -2,7 +2,7 @@
 //!
 //! Each request adds one to the counter of its (group, window, client) and is admitted while the count stays within
 //! the limit. A window is numbered from the epoch, so every server process counting into one store agrees on it. A
-//! fixed window lets a client spend its limit at the end of one window and again at the start of the next — twice
+//! fixed window lets a client spend its limit at the end of one window and again at the start of the next: twice
 //! the limit across a boundary, the price of one write per request. A store that does not answer is an error and
 //! never an admission, so the caller refuses the request: the limit fails closed.
 //!
@@ -16,6 +16,7 @@ use std::sync::Arc;
 use tessari_oauth_constants::THROTTLE_WRITE_ATTEMPTS;
 use tessari_oauth_types::Timestamp;
 
+use super::model::Counters;
 use super::repository::ThrottleRepository;
 use crate::{Result, Tenancy, retry};
 
@@ -60,7 +61,7 @@ fn window(limit: Limit, now: Timestamp) -> (u64, u64) {
 }
 
 /// The counter's key. `group` is a name the caller's code chooses, never part of a request, and the window index
-/// holds no `:`, so the client — which may — comes last and cannot make two counters share a key.
+/// holds no `:`, so the client, which may, comes last and cannot make two counters share a key.
 fn counter_key(group: &str, index: u64, client: &str) -> String {
     format!("{group}:{index}:{client}")
 }
@@ -101,7 +102,7 @@ impl ThrottleService {
         let key = counter_key(group, index, client);
         let count = retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
             self.repository
-                .count(self.tenancy.throttle(), &key, seconds)
+                .count(self.tenancy.throttle(), Counters::Requests, &key, seconds)
         })
         .await?;
         Ok(if count > limit.requests.get() {

@@ -17,7 +17,10 @@ counted per client address in TessariDB (the connection's peer, or behind a prox
 right-most `X-Forwarded-For` address that is not a listed proxy), under separate limits; past the limit the answer
 is `429` with
 `Retry-After`, every counted answer carries `X-RateLimit-Limit`, `-Remaining` and `-Class`, and when the store
-cannot count the request is refused with `503` rather than served. A wrong password is also counted against the
+cannot count the request is refused with `503` rather than served. These request counts are held in the store node's
+memory, so counting costs no disk write and a count starts again after the node restarts or its leader changes; a
+namespace declared `MULTI MASTER` cannot hold them and every counted request is then refused. A wrong password is
+also counted against the
 address being signed in to, the client address and the pair of the two (a wrong one-time or recovery code against
 the first two); past a few failures that key is held for a
 short, growing time that ends by itself (never a lockout), and a wrong password and an address with no account get

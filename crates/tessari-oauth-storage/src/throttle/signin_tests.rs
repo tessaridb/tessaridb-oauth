@@ -8,6 +8,7 @@ use tessari_oauth_types::Timestamp;
 
 use super::hold_key;
 use crate::throttle::ThrottleService;
+use crate::throttle::model::Counters;
 use crate::throttle::repository::ThrottleRepository;
 use crate::{Result, Tenancy};
 
@@ -27,7 +28,9 @@ impl ThrottleRepository for Kept {
         Ok(())
     }
 
-    async fn count(&self, _: &Place, _: &str, _: u64) -> Result<u64> {
+    async fn count(&self, _: &Place, counters: Counters, _: &str, _: u64) -> Result<u64> {
+        // A sign-in failure is counted on disk, so a restart does not clear it.
+        assert_eq!(counters, Counters::Signins);
         Ok(self.failures)
     }
 

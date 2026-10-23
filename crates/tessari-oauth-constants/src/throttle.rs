@@ -1,6 +1,8 @@
-/// Most request counters the counters space holds at once; past it the least recently written are evicted in the
-/// committing transaction. A counter lives one window plus one more, so this bounds the distinct (route group, client)
-/// pairs counted per two windows; an evicted counter starts again from zero, which only ever favours that client.
+/// Most counters each of the region's two counter spaces holds at once; past it the least recently written are
+/// evicted in the committing transaction. The request counters are held in the store node's memory, so this also
+/// bounds what they take there. A request counter lives one window plus one more, so this bounds the distinct
+/// (route group, client) pairs counted per two windows; an evicted counter starts again from zero, which only ever
+/// favours that client.
 pub const THROTTLE_SPACE_MAX_KEYS: u64 = 1_000_000;
 
 /// How long a sign-in failure is remembered, in seconds: a key's failures count from its first failure for this long.

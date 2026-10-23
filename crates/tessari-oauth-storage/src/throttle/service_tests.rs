@@ -6,6 +6,7 @@ use tessari_oauth_infrastructure::tessaridb::Place;
 use tessari_oauth_types::Timestamp;
 
 use super::{Admission, Limit, ThrottleService, counter_key, window};
+use crate::throttle::model::Counters;
 use crate::throttle::repository::ThrottleRepository;
 use crate::{Error, Result, Tenancy};
 
@@ -40,7 +41,7 @@ fn a_counter_is_keyed_by_its_group_its_window_and_its_client() {
 /// A backend answering the counts it is given, in order, and recording what it was asked.
 struct Counts {
     answers: Mutex<Vec<u64>>,
-    asked: Mutex<Vec<(Place, String, u64)>>,
+    asked: Mutex<Vec<(Place, Counters, String, u64)>>,
 }
 
 #[async_trait]
@@ -49,11 +50,19 @@ impl ThrottleRepository for Counts {
         Ok(())
     }
 
-    async fn count(&self, place: &Place, key: &str, seconds: u64) -> Result<u64> {
-        self.asked
-            .lock()
-            .expect("unpoisoned")
-            .push((place.clone(), key.to_owned(), seconds));
+    async fn count(
+        &self,
+        place: &Place,
+        counters: Counters,
+        key: &str,
+        seconds: u64,
+    ) -> Result<u64> {
+        self.asked.lock().expect("unpoisoned").push((
+            place.clone(),
+            counters,
+            key.to_owned(),
+            seconds,
+        ));
         Ok(self.answers.lock().expect("unpoisoned").remove(0))
     }
 
@@ -100,11 +109,13 @@ async fn a_client_is_admitted_up_to_the_limit_and_refused_until_its_window_ends(
         ]
     );
     let asked = counts.asked.lock().expect("unpoisoned");
-    let (place, key, seconds) = &asked[0];
+    let (place, counters, key, seconds) = &asked[0];
     assert_eq!(
         (place.namespace(), place.database()),
         ("oauth_eu", "throttle")
     );
+    // A request is counted in memory, not on disk.
+    assert_eq!(*counters, Counters::Requests);
     assert_eq!(key, "metadata:16:203.0.113.9");
     // The rest of the window plus one more, so a store clock running ahead cannot end the count early.
     assert_eq!(*seconds, 80);
@@ -119,7 +130,7 @@ impl ThrottleRepository for Down {
         Err(down())
     }
 
-    async fn count(&self, _: &Place, _: &str, _: u64) -> Result<u64> {
+    async fn count(&self, _: &Place, _: Counters, _: &str, _: u64) -> Result<u64> {
         Err(down())
     }
 

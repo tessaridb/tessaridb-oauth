@@ -1,8 +1,8 @@
 //! Sign-in failures: counted per key in the region's counters, and a hold the store ends by itself.
 //!
 //! A failure adds one to its key's count, which lives the memory window from the key's first failure. Once the count
-//! is past the key's free failures, a hold is written beside it — the instant it ends, under an expiry of the same
-//! length — so the store itself retires the hold and no hold can outlive its cap: nothing here is a lockout. A
+//! is past the key's free failures, a hold is written beside it (the instant it ends, under an expiry of the same
+//! length), so the store itself retires the hold and no hold can outlive its cap: nothing here is a lockout. A
 //! sign-in asks for the longest hold of its keys before it verifies anything. The counters are shared by every
 //! server process counting into the region, so running more processes does not multiply an attacker's attempts, and
 //! a write the store answers `retry` is made again, so simultaneous failures are each counted.
@@ -12,6 +12,7 @@ use tessari_oauth_core::signin::{SigninKey, hold_secs};
 use tessari_oauth_types::Timestamp;
 
 use super::ThrottleService;
+use super::model::Counters;
 use crate::{Error, Result, retry};
 
 /// The name of a kind of key inside a counter's key.
@@ -23,7 +24,7 @@ const fn kind(key: SigninKey) -> &'static str {
     }
 }
 
-/// The failure count of a key. The kind is a fixed word holding no `:`, so the value — which may — comes last and
+/// The failure count of a key. The kind is a fixed word holding no `:`, so the value, which may, comes last and
 /// two keys cannot share a counter, nor a sign-in key a request counter, whose group names never start `signin`.
 fn count_key(key: SigninKey, value: &str) -> String {
     format!("signin:{}:{value}", kind(key))
@@ -35,7 +36,7 @@ fn hold_key(key: SigninKey, value: &str) -> String {
 }
 
 impl ThrottleService {
-    /// Count a failed sign-in against each of `keys` — a kind and the value the ceremony names it by — at `now`.
+    /// Count a failed sign-in against each of `keys` (a kind and the value the ceremony names it by) at `now`.
     ///
     /// # Errors
     ///
@@ -45,7 +46,8 @@ impl ThrottleService {
         for &(key, value) in keys {
             let counted = count_key(key, value);
             let failures = retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
-                self.repository.count(place, &counted, SIGNIN_MEMORY_SECS)
+                self.repository
+                    .count(place, Counters::Signins, &counted, SIGNIN_MEMORY_SECS)
             })
             .await?;
             let hold = hold_secs(key, failures);

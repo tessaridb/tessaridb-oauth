@@ -3,6 +3,7 @@
 
 use std::num::NonZeroU64;
 
+use tessari_oauth_constants::THROTTLE_SPACE_MAX_KEYS;
 use tessari_oauth_infrastructure::tessaridb::{Answer, Database, Place, Value};
 use tessari_oauth_storage::throttle::{Admission, Limit};
 use tessari_oauth_storage::{Storage, Tenancy};
@@ -79,7 +80,7 @@ async fn a_counter_expires_by_itself_after_its_window_and_one_more() {
     let answers = database
         .run_at(
             &place,
-            "RETURN TTL counters:$key;",
+            "RETURN TTL requests:$key;",
             vec![("key".to_owned(), Value::from(key.as_str()))],
         )
         .await
@@ -92,6 +93,42 @@ async fn a_counter_expires_by_itself_after_its_window_and_one_more() {
         }) => assert!((100..=110).contains(seconds), "{seconds}"),
         other => panic!("no expiry on the counter: {other:?}"),
     }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn request_counters_are_held_in_the_store_nodes_memory_and_failures_on_disk() {
+    let (storage, database, namespace) = prepared(2).await;
+    admit(&storage, "metadata", "203.0.113.9").await;
+    let place = Place::new(namespace, "throttle").expect("a place");
+    let answers = database
+        .run_at(
+            &place,
+            "INFO FOR TABLE requests; INFO FOR TABLE counters;",
+            Vec::new(),
+        )
+        .await
+        .expect("answered");
+    let definitions: Vec<String> = answers
+        .iter()
+        .map(|answer| match answer {
+            Answer::Value {
+                value: Value::Object(info),
+                ..
+            } => match info.get("definition") {
+                Some(Value::String(definition)) => definition.trim().to_owned(),
+                other => panic!("no definition: {other:?}"),
+            },
+            other => panic!("not a table's description: {other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        definitions,
+        [
+            format!("DEFINE SPACE requests IN MEMORY MAX {THROTTLE_SPACE_MAX_KEYS};"),
+            format!("DEFINE SPACE counters MAX {THROTTLE_SPACE_MAX_KEYS};"),
+        ]
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
