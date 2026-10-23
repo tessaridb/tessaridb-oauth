@@ -16,6 +16,7 @@
   var ROLES = ["users", "clients", "policy", "audit", "companies"];
   var NEEDS = [
     ["users", "users"],
+    ["groups", "users"],
     ["clients", "clients"],
     ["operators", null],
     ["policy", "policy"],
@@ -44,9 +45,14 @@
     if (section === "users" && id !== void 0 && parts.length === 2) {
       return { kind: "user", id: decodeURIComponent(id) };
     }
+    if (section === "groups" && id !== void 0 && parts.length === 2) {
+      return { kind: "group", id: decodeURIComponent(id), after: query.get("after") };
+    }
     switch (parts.length === 1 ? section : void 0) {
       case "users":
         return { kind: "users", email: query.get("email"), after: query.get("after") };
+      case "groups":
+        return { kind: "groups", after: query.get("after") };
       case "clients":
         return { kind: "clients", after: query.get("after") };
       case "operators":
@@ -1927,6 +1933,8 @@
     switch (at.kind) {
       case "user":
         return "users";
+      case "group":
+        return "groups";
       case "overview":
         return null;
       default:

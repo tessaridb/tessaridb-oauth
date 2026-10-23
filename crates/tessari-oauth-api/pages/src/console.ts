@@ -31,6 +31,8 @@ function sectionOf(at: Route): Section | null {
   switch (at.kind) {
     case "user":
       return "users";
+    case "group":
+      return "groups";
     case "overview":
       return null;
     default:
