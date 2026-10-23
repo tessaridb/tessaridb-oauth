@@ -14,6 +14,13 @@ it needs the session cookie, is counted under the account limit and is never cac
 `204` and no mail when the address is verified already, and `503 mail_unavailable` when the server has no mail relay.
 A newer request replaces the older link.
 
+`POST <issuer>/account/api/me/email` with `{"email": "<new address>"}` asks to change the address the account signs in
+with. It needs the recent sign-in described below (`401 reauthentication_required`) and a mail relay
+(`503 mail_unavailable`); an address no account can sign in with is `400 email_rejected`, and the account's own address
+answers `204` and sends nothing. Any other address answers `202` whether or not another account uses it. The change
+takes effect a day after the request, once the new address confirms it and unless the current address cancels it
+first (see [the server guide](server.md)). Past five requests in an hour the answer is `429` with `Retry-After`.
+
 `POST <issuer>/account/api/passkeys/remove` with `{"id": "<credential id>"}` removes one of the user's own passkeys.
 Changing how an account signs in needs a sign-in from the last ten minutes that reached the level the account's
 second factor gives (a password alone does not change an account that holds a passkey or an authenticator app),

@@ -34,10 +34,11 @@ authorization belongs to the browser that brought it to `/oauth2/authorize`, by 
 (kept when the browser has one, drawn otherwise): another browser holding the request's id cannot sign in for it,
 answer its consent or receive its code.
 
-The sign-in, password-reset, address-verification, consent and account pages are served by the binary itself at
-`<issuer>/login`, `<issuer>/login/reset`, `<issuer>/login/verify`, `<issuer>/consent` and `<issuer>/account`, with
-their script, style and mark under `<issuer>/assets/`. The account page shows the signed-in user's address and
-offers a link that verifies it, how the account signs in, where it is signed in and which applications hold access; it
+The sign-in, password-reset, address-verification, address-change, consent and account pages are served by the binary
+itself at `<issuer>/login`, `<issuer>/login/reset`, `<issuer>/login/verify`, `<issuer>/login/email`,
+`<issuer>/consent` and `<issuer>/account`, with their script, style and mark under `<issuer>/assets/`. The account
+page shows the signed-in user's address, offers a link that verifies it and a change to another one, how the account
+signs in, where it is signed in and which applications hold access; it
 signs out one session or every session after a confirmation, takes an application's access back, saying when the
 tokens it already holds stop working, changes the password, issues new recovery codes shown once, turns on an
 authenticator app from a key shown once, and adds or removes passkeys. Without a session it offers a sign-in
@@ -73,6 +74,19 @@ the signed-in user asks for one on the account page. It works once, for 24 hours
 page takes the token out of the address and posts it to `POST <issuer>/login/api/verify`, which marks the address
 verified and records it (`204`). A link that was never issued, was used, was replaced, has lapsed or was sent to an
 address the account no longer signs in with gets `400` `code_rejected`.
+
+The signed-in user changes the address the account signs in with from the account page, which needs a sign-in from the
+last ten minutes. The new address gets a link to `<issuer>/login/email#confirm=<token>` that works for 24 hours, and the
+current address gets one to `<issuer>/login/email#cancel=<token>` that names the new address. The change waits a day
+from the request even when it is confirmed at once, so the current address can still cancel it. Every minute a task
+applies the confirmed changes that are due, each in one transaction: the new address then signs in, already verified,
+the old one is free, and both get a notice. When another account has taken the new address in the meantime, the change
+is dropped and the current address is told it still signs in. An address another account already signs in with gets
+the same `202` as a free one and a notice with no link, so asking says nothing about who has an account. An account
+may ask five times an hour. The page posts a confirmation at once (`POST <issuer>/login/api/email/confirm`, `202` with
+`effective_at`), but a cancellation only when the user presses its button (`POST <issuer>/login/api/email/cancel`,
+`204`), so a mail filter that opens links cannot cancel a change. A link that was never issued, was used, was replaced,
+has lapsed or whose change already took effect gets `400` `code_rejected`.
 
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listeners stop accepting, the requests in flight
