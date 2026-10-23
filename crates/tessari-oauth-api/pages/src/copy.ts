@@ -121,7 +121,7 @@ export const ENROL_TEXT = {
   hint: "At least 15 characters. A few unrelated words work well.",
   passwordRequired: "Choose a password.",
   saving: "Saving your password.",
-  set: "Your password is set. Sign in with it from the application you were invited to.",
+  set: "Your password is set. Sign in with it from the application you use, or from the sign-in page.",
 } as const;
 
 /** The words of the address-verification page and of the account page's request for a link. */

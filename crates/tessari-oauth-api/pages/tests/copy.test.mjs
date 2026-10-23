@@ -31,3 +31,9 @@ test("every refusal says what happened and what to do next", () => {
   assert.match(refusalText({ kind: "throttled", seconds: 30 }), /30 seconds/);
   assert.match(refusalText({ kind: "throttled", seconds: 1 }), /1 second\b/);
 });
+
+test("a first password set says to sign in, whoever opened the account", async () => {
+  const { ENROL_TEXT } = await import("../src/copy.ts");
+  assert.doesNotMatch(ENROL_TEXT.set, /invited/, "an account its owner opened was invited by nobody");
+  assert.match(ENROL_TEXT.set, /Sign in with it/);
+});
