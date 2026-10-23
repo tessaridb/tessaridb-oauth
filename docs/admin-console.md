@@ -42,6 +42,12 @@ first answer back, and the same key with another change is refused. Every change
 the operator, the role, the change and the reason. `GET` and `PUT <ADMIN_URL>/admin/<company>/api/policy/two-factor`
 (role `policy`) read and change the company's two-factor policy; a change names the policy it replaces in `expected`,
 and when another change came first it is refused as `changed_meanwhile` and changes nothing.
+`GET` and `PUT <ADMIN_URL>/admin/<company>/api/policy/registration` (role `policy`) read and change whether people
+may open their own account: `{revision, open, domains, reason}`, where `domains` lists up to 20 domains and an empty
+list means any address. A change names the `revision` it read and is refused as `changed_meanwhile` when another
+came first; a domain that is not one, a repeat or a 21st is refused as `domains_rejected` with the rule in words. The
+Policy view shows the registration beside the two-factor policy and asks for the company id typed out before a
+change, like a two-factor change.
 
 `GET <ADMIN_URL>/admin/<company>/api/users?limit=&after=` (role `users`) lists the company's accounts in id order, at
 most 100 a page (50 unless `limit` says), with `next` naming the cursor of the following page while one may follow

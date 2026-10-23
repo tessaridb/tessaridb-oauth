@@ -51,7 +51,7 @@ once and `npm run build` there; `npm run verify` type-checks, runs the page test
 assets differ from a rebuild.
 
 With `SMTP_URL` set the server sends mail through that relay: a password-reset link, an enrolment link an operator
-sends, and a notice to the account's address when its sign-in changes (password changed or reset, a passkey or
+sends or a registration asks for, a notice to an address that asked to open an account it already has, and a notice to the account's address when its sign-in changes (password changed or reset, a passkey or
 authenticator app added or removed, new
 recovery codes, a recovery code used, every session signed out). A notice carries no link. A request only writes the
 mail, sealed under the KEK, to a queue in the company's database; a background task sends what is due every five
@@ -76,6 +76,18 @@ An operator can send a new account its enrolment code by mail instead of handing
 first password (`POST <issuer>/login/api/enroll`), at least 15 characters. The code is spent only when a password is
 accepted, so a refused one can be tried again; an unknown, used or replaced code gets `400` `code_rejected` before the
 password is looked at, and an account that already has a password gets `409` `already_enrolled` and keeps it.
+
+A company can let people open their own account. It is closed until an operator opens it in the console, and
+`GET <issuer>/login/api/registration` answers `{"open": true}` or `{"open": false}` and nothing more. While it is
+open, the sign-in page offers "Create an account", which sends `POST <issuer>/login/api/register` with the typed
+address. A closed company answers `404`, a server with no relay `503` `mail_unavailable`, an address that cannot be
+one `400` `email_rejected`, and an address at a domain the company does not list `400` `address_not_accepted`.
+Every other address gets `202` and the same body, and the mailbox learns the rest: an address with no account gets
+a new account and an enrolment link, an account that never set a password gets a new link that replaces the old one,
+an account that signs in gets a notice and no link, and a disabled account gets nothing. The requester is never told
+that an address is taken. Each address may be asked for 3 times an hour and each client address 10 times, whatever
+the addresses. Opening an account sets no password and opens no session, and the address stays unverified until its
+own link is opened.
 
 An account's address stays unverified (`email_verified` is false) until a link sent to it is opened. With a relay
 set, a link to `<issuer>/login/verify#token=<token>` is mailed when an account sets its first password and whenever
