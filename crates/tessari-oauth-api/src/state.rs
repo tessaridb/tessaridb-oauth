@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_storage::audit::AuditService;
+use tessari_oauth_storage::brands::BrandService;
 use tessari_oauth_storage::clients::ClientService;
 use tessari_oauth_storage::codes::CodeService;
 use tessari_oauth_storage::companies::Served;
@@ -46,6 +47,8 @@ pub struct PublicState {
     pub subjects: Arc<SubjectService>,
     /// Each company's groups, released at UserInfo under the `groups` scope.
     pub groups: Arc<GroupService>,
+    /// Each company's brand and logo on its public pages.
+    pub brands: Arc<BrandService>,
     /// The key-encryption key signing keys and salts are sealed under.
     pub kek: Arc<Kek>,
     /// The request counters.

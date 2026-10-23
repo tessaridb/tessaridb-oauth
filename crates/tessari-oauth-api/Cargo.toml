@@ -39,6 +39,7 @@ url.workspace = true
 tessari-oauth-test-support.workspace = true
 rcgen.workspace = true
 ring.workspace = true
+png.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util"] }
 
 [lints]

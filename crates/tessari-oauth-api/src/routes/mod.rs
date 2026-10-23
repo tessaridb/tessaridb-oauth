@@ -11,6 +11,7 @@ mod account_password;
 mod account_sessions;
 mod account_totp;
 mod authorize;
+mod brand;
 mod browser;
 mod jwks;
 mod login;
@@ -43,7 +44,10 @@ pub fn public_router(state: PublicState) -> Router {
         .iter()
         .fold(Router::new(), |router, (path, _, _)| {
             router.route(&format!("/{{tenant}}{path}"), get(pages::asset))
-        });
+        })
+        .route("/{tenant}/assets/brand.css", get(brand::css))
+        .route("/{tenant}/assets/brand.json", get(brand::json))
+        .route("/{tenant}/assets/logo.png", get(brand::logo));
     let reads = pages
         .route(
             "/{tenant}/.well-known/oauth-authorization-server",

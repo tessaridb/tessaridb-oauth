@@ -19,7 +19,7 @@ use crate::state::PublicState;
 use crate::{Error, Result};
 
 /// What a page may load and do.
-const POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
+pub(super) const POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
                       connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'";
 
 /// One served file: the path under the tenant, its type, its bytes.
