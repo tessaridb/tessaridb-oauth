@@ -1,6 +1,6 @@
 # Platform operators
 
-The emergency path for the first operator, and operator roles.
+The emergency path for the first operator, operator roles, and what to do when a signing key may be exposed.
 
 
 ```sh
@@ -25,3 +25,27 @@ Operator roles are held per company and per task: `users`, `clients`, `policy`, 
 which only users of the `system` company may hold. A grant names who gave it and why, may carry an expiry after which
 it no longer counts, and is refused when it names its own holder as the giver. Every grant and revoke is on the
 company's audit trail.
+
+## A signing key that may be exposed
+
+When a company's private signing key may have been read by someone else (a leaked backup, a host compromise, a
+departing operator who could reach the key-encryption key), withdraw it at once; there is no reason to wait:
+
+1. Find the key: `GET <ADMIN_URL>/admin/<company>/api/keys` lists each key with its `kid` and `state`; the one to
+   withdraw is usually the `signing` one.
+2. Withdraw it with an operator holding `keys`: `POST <ADMIN_URL>/admin/<company>/api/keys/<kid>/withdraw` with a
+   `reason`. The answer names the key `withdrawn` and the `replacement`, if one had to be made. When no other key
+   could sign, the replacement is made before the withdrawal and signs at once; otherwise a key already published
+   takes over. The withdrawn key leaves the key set in the same request, and the console then shows it `withdrawn`.
+3. Expect what the key signed to stop verifying. A service that fetches the key set again refuses those tokens at
+   once; one that cached it may accept them for up to five minutes, the cache lifetime the key set is served with,
+   which is also how long an access token or ID token lives. A token forged with the exposed key is bounded the same
+   way. Refresh tokens are random values the server holds only as digests, not signed, so they stay valid and need
+   no revocation for a key exposure.
+4. Tell the company's integrators which `kid` was withdrawn and when, so a service that pins keys or caches them
+   longer than five minutes can drop it.
+5. Check the company's audit trail for the `keys.withdraw` entry and for anything else done with the same access.
+
+Every key of every company is sealed with the server's key-encryption key (`TESSARIDB_OAUTH_KEK`). If that file
+itself may be exposed, withdrawing keys is not enough, because a replacement is sealed with the same file; this
+version has no command that re-seals the keys under a new key-encryption key.
