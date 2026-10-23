@@ -28,7 +28,7 @@ export function refusalText(refused: Refusal): string {
 
 const SCOPES: Readonly<Record<string, string>> = {
   openid: "Confirmation that you signed in, and who you are to this application",
-  profile: "Your name and basic profile details",
+  profile: "Your name: full, given and family",
   email: "Your email address and whether it is verified",
   offline_access: "Access while you are signed out or not using it",
   groups: "The groups you are in at this company, and the roles they give you",
@@ -138,4 +138,7 @@ export const ACCOUNT_TEXT = {
   passkeyCancelled: "No passkey was added.",
   passkeyAdded: "Passkey added. You were signed out on your other devices.",
   passkeyRemoved: "Passkey removed. You were signed out on your other devices.",
+  nameHint: "Applications you allow to see your name get these. Leave a field empty to clear it.",
+  nameRejected: "A name can be up to 100 characters, with no line breaks or tabs. Shorten it and try again.",
+  nameSaved: "Your name is saved. Applications see the change the next time they ask.",
 } as const;

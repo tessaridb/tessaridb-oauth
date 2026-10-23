@@ -66,6 +66,18 @@
   function text(value) {
     return typeof value === "string" ? value : null;
   }
+  function nameOrNull(value) {
+    return typeof value === "string" || value === null ? value : void 0;
+  }
+  function readNames(value) {
+    const name = nameOrNull(field(value, "name"));
+    const givenName = nameOrNull(field(value, "given_name"));
+    const familyName = nameOrNull(field(value, "family_name"));
+    if (name === void 0 || givenName === void 0 || familyName === void 0) {
+      return null;
+    }
+    return { name, givenName, familyName };
+  }
   function flag(value) {
     return typeof value === "boolean" ? value : null;
   }
@@ -101,10 +113,11 @@
     const recoveryCodes = count(field(factors, "recovery_codes"));
     const passkeys = every(field(factors, "passkeys"), readPasskey);
     const twoFactor = policy(field(answer, "two_factor"));
-    if (email === null || emailVerified === null || password === null || totp === null || recoveryCodes === null || passkeys === null || twoFactor === null) {
+    const profile = readNames(field(answer, "profile"));
+    if (email === null || emailVerified === null || password === null || totp === null || recoveryCodes === null || passkeys === null || twoFactor === null || profile === null) {
       return null;
     }
-    return { email, emailVerified, password, totp, recoveryCodes, passkeys, twoFactor };
+    return { email, emailVerified, password, totp, recoveryCodes, passkeys, twoFactor, profile };
   }
   function policy(value) {
     return value === "off" || value === "optional" || value === "required" ? value : null;
@@ -144,6 +157,12 @@
   }
   function readEndBy(answer) {
     return count(field(answer, "access_tokens_end_by"));
+  }
+  function readSavedNames(answer) {
+    return readNames(field(answer, "profile"));
+  }
+  function profileRefused(status, body) {
+    return status === 400 && field(body, "code") === "profile_rejected";
   }
   function readIssuedCodes(answer) {
     const codes2 = strings(field(answer, "codes"));
@@ -189,7 +208,7 @@
   }
   var SCOPES = {
     openid: "Confirmation that you signed in, and who you are to this application",
-    profile: "Your name and basic profile details",
+    profile: "Your name: full, given and family",
     email: "Your email address and whether it is verified",
     offline_access: "Access while you are signed out or not using it",
     groups: "The groups you are in at this company, and the roles they give you"
@@ -262,7 +281,10 @@
     passkeyNotAccepted: "That passkey couldn't be added. Try again, or use a different device.",
     passkeyCancelled: "No passkey was added.",
     passkeyAdded: "Passkey added. You were signed out on your other devices.",
-    passkeyRemoved: "Passkey removed. You were signed out on your other devices."
+    passkeyRemoved: "Passkey removed. You were signed out on your other devices.",
+    nameHint: "Applications you allow to see your name get these. Leave a field empty to clear it.",
+    nameRejected: "A name can be up to 100 characters, with no line breaks or tabs. Shorten it and try again.",
+    nameSaved: "Your name is saved. Applications see the change the next time they ask."
   };
 
   // src/dom.ts
@@ -713,6 +735,95 @@
     await followups.changed();
   }
 
+  // src/account-profile.ts
+  var FIELDS = [
+    { id: "name-full", key: "name" },
+    { id: "name-given", key: "givenName" },
+    { id: "name-family", key: "familyName" }
+  ];
+  function showNames(names) {
+    for (const { id, key } of FIELDS) {
+      element(`${id}-shown`, HTMLElement).textContent = names[key] ?? ACCOUNT_TEXT.notSet;
+    }
+  }
+  function formError(inputs, text3) {
+    const error = element("names-error", HTMLParagraphElement);
+    error.textContent = text3 ?? "";
+    error.hidden = text3 === null;
+    for (const input of inputs) {
+      if (text3 === null) {
+        input.removeAttribute("aria-invalid");
+      } else {
+        input.setAttribute("aria-invalid", "true");
+      }
+    }
+    if (text3 !== null) {
+      inputs[0]?.focus();
+    }
+  }
+  function wireProfile(base, kept, followups) {
+    let names = kept;
+    const open = element("names-open", HTMLButtonElement);
+    const form = element("names-form", HTMLFormElement);
+    const cancel = element("names-cancel", HTMLButtonElement);
+    const inputs = FIELDS.map(({ id }) => element(id, HTMLInputElement));
+    element("names-hint", HTMLParagraphElement).textContent = ACCOUNT_TEXT.nameHint;
+    const close = () => {
+      formError(inputs, null);
+      form.hidden = true;
+      open.hidden = false;
+      open.focus();
+    };
+    open.addEventListener("click", () => {
+      FIELDS.forEach(({ key }, at) => {
+        const input = inputs[at];
+        if (input !== void 0) {
+          input.value = names[key] ?? "";
+        }
+      });
+      form.hidden = false;
+      open.hidden = true;
+      inputs[0]?.focus();
+    });
+    cancel.addEventListener("click", close);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void (async () => {
+        const [full, given, family] = inputs;
+        say("");
+        const submit = form.querySelector("button[type=submit]");
+        if (submit instanceof HTMLButtonElement) {
+          submit.disabled = true;
+        }
+        const answer = await call("POST", `${base}/profile`, {
+          name: full?.value ?? "",
+          given_name: given?.value ?? "",
+          family_name: family?.value ?? ""
+        });
+        if (submit instanceof HTMLButtonElement) {
+          submit.disabled = false;
+        }
+        const saved = answer.ok ? readSavedNames(answer.body) : null;
+        if (saved !== null) {
+          names = saved;
+          showNames(saved);
+          close();
+          say(ACCOUNT_TEXT.nameSaved);
+          return;
+        }
+        if (profileRefused(answer.status, answer.body)) {
+          formError(inputs, ACCOUNT_TEXT.nameRejected);
+          return;
+        }
+        if (changeRefusal(answer.status, answer.body) === "signed-out") {
+          followups.signedOut();
+          return;
+        }
+        say(answer.ok ? ACCOUNT_TEXT.unreadable : refusalText(refusal(answer.status, answer.body, answer.retryAfter)));
+      })();
+    });
+  }
+
   // src/brand-read.ts
   function text2(value) {
     return typeof value === "string" && value !== "" ? value : null;
@@ -962,6 +1073,7 @@
       signedOut: () => signedOut(ACCOUNT_TEXT.signedOut)
     };
     showMe(base, me, followups);
+    showNames(me.profile);
     showSessions(base, sessions);
     showGrants(base, grants);
     element("everywhere-warning", HTMLParagraphElement).textContent = ACCOUNT_TEXT.everywhereConfirm;
@@ -981,6 +1093,7 @@
     wireApp(base, followups);
     wireAppOff(base, followups);
     wirePasskeyAdd(base, followups);
+    wireProfile(base, me.profile, followups);
     account.hidden = false;
     say("");
   }

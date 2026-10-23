@@ -8,7 +8,7 @@ import { describeScope, refusalText } from "../src/copy.ts";
 test("a standard scope is described, any other shown as it is", () => {
   assert.match(describeScope("openid"), /sign/i);
   assert.match(describeScope("email"), /email/i);
-  assert.match(describeScope("profile"), /name/i);
+  assert.equal(describeScope("profile"), "Your name: full, given and family", "what profile releases, exactly");
   assert.match(describeScope("offline_access"), /signed out|not using/i);
   assert.match(describeScope("groups"), /groups/i);
   assert.match(describeScope("groups"), /roles/i);

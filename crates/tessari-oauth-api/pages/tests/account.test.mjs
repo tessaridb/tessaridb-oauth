@@ -11,7 +11,9 @@ import {
   readIssuedCodes,
   appAsked,
   enrolmentDue,
+  profileRefused,
   readMe,
+  readSavedNames,
   readSessions,
 } from "../src/account-read.ts";
 
@@ -33,6 +35,7 @@ test("the account is read with its sign-in methods", () => {
       passkeys: [{ id: "cred-1", created_at: 1700000000, synced: true }],
     },
     two_factor: "required",
+    profile: { name: "Ada Lovelace", given_name: "Ada", family_name: null },
   });
   assert.deepEqual(me, {
     email: "ada@example.com",
@@ -42,8 +45,18 @@ test("the account is read with its sign-in methods", () => {
     recoveryCodes: 3,
     passkeys: [{ id: "cred-1", createdAt: 1700000000, synced: true }],
     twoFactor: "required",
+    profile: { name: "Ada Lovelace", givenName: "Ada", familyName: null },
   });
   assert.equal(readMe({ email: "ada@example.com", email_verified: true }), null, "no factors");
+  const factors = { password: true, totp: false, recovery_codes: 0, passkeys: [] };
+  const base = { email: "ada@example.com", email_verified: true, factors, two_factor: "optional" };
+  assert.equal(readMe(base), null, "no profile");
+  assert.equal(readMe({ ...base, profile: { name: "Ada" } }), null, "a name left out rather than null");
+  assert.equal(
+    readMe({ ...base, profile: { name: 7, given_name: null, family_name: null } }),
+    null,
+    "a name of another type",
+  );
   assert.equal(
     readMe({
       email: 7,
@@ -167,4 +180,22 @@ test("a required policy wants a second factor from an account holding none", () 
   assert.equal(enrolmentDue(held("required", false, 1)), false, "a passkey");
   assert.equal(enrolmentDue(held("optional", false, 0)), false);
   assert.equal(enrolmentDue(held("off", false, 0)), false);
+});
+
+test("a saved profile is read back as the three names the account now keeps", () => {
+  assert.deepEqual(readSavedNames({ profile: { name: null, given_name: "Ada", family_name: "Lovelace" } }), {
+    name: null,
+    givenName: "Ada",
+    familyName: "Lovelace",
+  });
+  assert.equal(readSavedNames({ profile: { given_name: "Ada", family_name: "Lovelace" } }), null, "a name missing");
+  assert.equal(readSavedNames({ name: "Ada", given_name: null, family_name: null }), null, "not under profile");
+  assert.equal(readSavedNames(null), null);
+});
+
+test("only the profile rule's own refusal reads as a refused name", () => {
+  assert.equal(profileRefused(400, { code: "profile_rejected", message: "a name must be at most 100 characters" }), true);
+  assert.equal(profileRefused(400, { code: "invalid_request" }), false, "another 400");
+  assert.equal(profileRefused(401, { code: "profile_rejected" }), false, "another status");
+  assert.equal(profileRefused(400, null), false);
 });

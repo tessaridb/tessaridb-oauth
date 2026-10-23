@@ -28,6 +28,41 @@
           <p class="who"><strong id="email"></strong> <span id="verified" class="badge"></span></p>
         </section>
 
+        <section aria-labelledby="names-title">
+          <h2 id="names-title">Your name</h2>
+          <dl class="facts">
+            <dt>Full name</dt><dd id="name-full-shown"></dd>
+            <dt>Given name</dt><dd id="name-given-shown"></dd>
+            <dt>Family name</dt><dd id="name-family-shown"></dd>
+          </dl>
+          <div class="actions">
+            <button type="button" id="names-open" class="secondary">Change your name</button>
+          </div>
+          <form id="names-form" class="panel" hidden novalidate>
+            <p id="names-hint" class="hint"></p>
+            <div class="field">
+              <label for="name-full">Full name</label>
+              <input id="name-full" name="name" type="text" autocomplete="name"
+                     aria-describedby="names-hint names-error">
+            </div>
+            <div class="field">
+              <label for="name-given">Given name</label>
+              <input id="name-given" name="given-name" type="text" autocomplete="given-name"
+                     aria-describedby="names-hint names-error">
+            </div>
+            <div class="field">
+              <label for="name-family">Family name</label>
+              <input id="name-family" name="family-name" type="text" autocomplete="family-name"
+                     aria-describedby="names-hint names-error">
+            </div>
+            <p id="names-error" class="field-error" hidden></p>
+            <div class="actions">
+              <button type="submit" class="primary">Save</button>
+              <button type="button" id="names-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
+        </section>
+
         <section aria-labelledby="methods-title">
           <h2 id="methods-title">How you sign in</h2>
           <p id="enrol-due" class="notice" hidden></p>

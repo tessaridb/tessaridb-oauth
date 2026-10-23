@@ -14,6 +14,13 @@ export interface HeldPasskey {
 /** The company's two-factor policy: no second factor, each user's choice, or one held by every user. */
 export type TwoFactorPolicy = "off" | "optional" | "required";
 
+/** The names the account keeps, each null until the user sets it. */
+export interface Names {
+  name: string | null;
+  givenName: string | null;
+  familyName: string | null;
+}
+
 /** The signed-in user's account and how it signs in. */
 export interface Me {
   email: string;
@@ -23,6 +30,7 @@ export interface Me {
   recoveryCodes: number;
   passkeys: HeldPasskey[];
   twoFactor: TwoFactorPolicy;
+  profile: Names;
 }
 
 /** One of the user's sessions at this issuer. */
@@ -54,6 +62,22 @@ export function accountApi(pathname: string): string | null {
 
 function text(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+/** A name as kept: a string, or null for one not set; anything else, a name left out included, is undefined. */
+function nameOrNull(value: unknown): string | null | undefined {
+  return typeof value === "string" || value === null ? value : undefined;
+}
+
+/** The three names under `value`, or null when any is missing or of another type. */
+function readNames(value: unknown): Names | null {
+  const name = nameOrNull(field(value, "name"));
+  const givenName = nameOrNull(field(value, "given_name"));
+  const familyName = nameOrNull(field(value, "family_name"));
+  if (name === undefined || givenName === undefined || familyName === undefined) {
+    return null;
+  }
+  return { name, givenName, familyName };
 }
 
 function flag(value: unknown): boolean | null {
@@ -98,6 +122,7 @@ export function readMe(answer: unknown): Me | null {
   const recoveryCodes = count(field(factors, "recovery_codes"));
   const passkeys = every(field(factors, "passkeys"), readPasskey);
   const twoFactor = policy(field(answer, "two_factor"));
+  const profile = readNames(field(answer, "profile"));
   if (
     email === null ||
     emailVerified === null ||
@@ -105,11 +130,12 @@ export function readMe(answer: unknown): Me | null {
     totp === null ||
     recoveryCodes === null ||
     passkeys === null ||
-    twoFactor === null
+    twoFactor === null ||
+    profile === null
   ) {
     return null;
   }
-  return { email, emailVerified, password, totp, recoveryCodes, passkeys, twoFactor };
+  return { email, emailVerified, password, totp, recoveryCodes, passkeys, twoFactor, profile };
 }
 
 function policy(value: unknown): TwoFactorPolicy | null {
@@ -162,6 +188,16 @@ export function readGrants(answer: unknown): ListedGrant[] | null {
 /** When the access tokens already issued stop working, from an answer that ended something. */
 export function readEndBy(answer: unknown): number | null {
   return count(field(answer, "access_tokens_end_by"));
+}
+
+/** `POST account/api/profile`: the names the account keeps after the change. */
+export function readSavedNames(answer: unknown): Names | null {
+  return readNames(field(answer, "profile"));
+}
+
+/** Whether a change of names was refused by the names rule (length or a control character). */
+export function profileRefused(status: number, body: unknown): boolean {
+  return status === 400 && field(body, "code") === "profile_rejected";
 }
 
 /** New recovery codes, shown once: a non-empty list of codes, or null. */

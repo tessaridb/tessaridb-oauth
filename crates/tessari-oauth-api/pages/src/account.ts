@@ -1,6 +1,7 @@
-// The account page. It asks the account API who is signed in, how the account signs in, where it is signed in and
-// which applications hold access, and lets the user end a session, sign out everywhere or take an application's
-// access back. Without a session it says how to get one; nothing is shown that the API did not answer.
+// The account page. It asks the account API who is signed in, the names the account keeps, how it signs in, where
+// it is signed in and which applications hold access, and lets the user change their names, end a session, sign
+// out everywhere or take an application's access back. Without a session it says how to get one; nothing is
+// shown that the API did not answer.
 
 import {
   type ListedGrant,
@@ -16,6 +17,7 @@ import {
 } from "./account-read.ts";
 import { removePasskey, wireApp, wireAppOff, wirePasskeyAdd } from "./account-enrol.ts";
 import { type Followups, wirePassword, wireRecoveryCodes } from "./account-factors.ts";
+import { showNames, wireProfile } from "./account-profile.ts";
 import { showBrand } from "./brand.ts";
 import { ACCOUNT_TEXT, codesLeft, describeMethods, describeScope, refusalText, when } from "./copy.ts";
 import { type Answer, call, element, say } from "./dom.ts";
@@ -244,6 +246,7 @@ async function main(): Promise<void> {
     signedOut: () => signedOut(ACCOUNT_TEXT.signedOut),
   };
   showMe(base, me, followups);
+  showNames(me.profile);
   showSessions(base, sessions);
   showGrants(base, grants);
   element("everywhere-warning", HTMLParagraphElement).textContent = ACCOUNT_TEXT.everywhereConfirm;
@@ -263,6 +266,7 @@ async function main(): Promise<void> {
   wireApp(base, followups);
   wireAppOff(base, followups);
   wirePasskeyAdd(base, followups);
+  wireProfile(base, me.profile, followups);
   account.hidden = false;
   say("");
 }
