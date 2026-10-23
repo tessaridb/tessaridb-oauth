@@ -1,10 +1,11 @@
-//! The directory on TessariDB: one `companies` table in the region's `directory` database.
+//! The directory on TessariDB: the `companies` table and the one-record `region` table in the region's `directory`
+//! database.
 
 use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
 use super::CompanyEntity;
-use super::entity::ListedEntity;
+use super::entity::{ListedEntity, RegionEntity};
 use super::repository::CompanyRepository;
 use crate::{Result, answers};
 
@@ -30,7 +31,8 @@ impl CompanyRepository for TessaridbCompanyRepository {
              DEFINE TABLE IF NOT EXISTS companies (\
              name string REQUIRED, \
              status string REQUIRED ASSERT $value IN ['provisioning', 'active', 'suspended'], \
-             created_at int REQUIRED, created_by string REQUIRED);"
+             created_at int REQUIRED, created_by string REQUIRED); \
+             DEFINE TABLE IF NOT EXISTS region (base_url string REQUIRED);"
         );
         self.database.run_unplaced(&script, Vec::new()).await?;
         Ok(())
@@ -117,5 +119,25 @@ impl CompanyRepository for TessaridbCompanyRepository {
             )
             .await?;
         Ok(())
+    }
+
+    async fn record_base(&self, place: &Place, base_url: &str) -> Result<()> {
+        // The record is the whole of what the region says about itself, so replacing it is the write meant.
+        self.database
+            .run_at(
+                place,
+                "UPSERT region:'base' = { base_url: $base_url };",
+                vec![("base_url".to_owned(), Value::from(base_url))],
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn base(&self, place: &Place) -> Result<Option<RegionEntity>> {
+        let answers = self
+            .database
+            .run_at(place, "SELECT * FROM region:'base';", Vec::new())
+            .await?;
+        answers::single(answers, "region")
     }
 }

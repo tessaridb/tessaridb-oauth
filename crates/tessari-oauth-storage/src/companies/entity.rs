@@ -26,6 +26,20 @@ impl FromRecord for CompanyEntity {
     }
 }
 
+/// The region's own record in its directory: the public base URL its companies' issuers are under.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RegionEntity {
+    pub(crate) base_url: String,
+}
+
+impl FromRecord for RegionEntity {
+    fn from_row(mut row: Row) -> Result<Self, MappingFault> {
+        Ok(Self {
+            base_url: row.take("base_url")?,
+        })
+    }
+}
+
 /// One listed company: the record id as the node spells it, and the row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ListedEntity {

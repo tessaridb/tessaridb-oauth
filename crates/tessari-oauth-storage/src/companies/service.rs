@@ -4,10 +4,12 @@
 use std::sync::Arc;
 
 use tessari_oauth_constants::{COMPANY_NAME_MAX_CHARS, COMPANY_PAGE_MAX};
+use tessari_oauth_infrastructure::tessaridb::Database;
 use tessari_oauth_types::{ErrorCategory, TenantId, Timestamp};
 
 use super::entity::ListedEntity;
 use super::repository::CompanyRepository;
+use super::tessaridb::TessaridbCompanyRepository;
 use super::{Company, CompanyEntity, CompanyStatus, Created};
 use crate::{Error, Result, Tenancy, answers};
 
@@ -44,6 +46,40 @@ impl CompanyService {
     /// When the store is unavailable or refuses a definition.
     pub async fn prepare(&self) -> Result<()> {
         self.repository.prepare(self.tenancy.directory()).await
+    }
+
+    /// The directory of the region `tenancy` names, read over `database`: how a server reads another region's
+    /// companies, through a connection whose account may read that directory and nothing else.
+    #[must_use]
+    pub fn reading(database: &Database, tenancy: Tenancy) -> Self {
+        Self::new(
+            Arc::new(TessaridbCompanyRepository::new(database.clone())),
+            tenancy,
+        )
+    }
+
+    /// Record `base_url` (the region's public URL, no trailing slash) as where this region's issuers are.
+    ///
+    /// # Errors
+    ///
+    /// Store failures.
+    pub async fn record_base(&self, base_url: &str) -> Result<()> {
+        self.repository
+            .record_base(self.tenancy.directory(), base_url.trim_end_matches('/'))
+            .await
+    }
+
+    /// Where this region's issuers are, when the region has recorded it.
+    ///
+    /// # Errors
+    ///
+    /// Store failures and [`Error::Unreadable`].
+    pub async fn base(&self) -> Result<Option<String>> {
+        Ok(self
+            .repository
+            .base(self.tenancy.directory())
+            .await?
+            .map(|region| region.base_url))
     }
 
     /// Create the company `id` called `name`, in `provisioning`, recorded as created by `by` at `now`.

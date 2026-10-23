@@ -205,3 +205,24 @@ async fn only_active_companies_are_served() {
     active.sort_by(|left, right| left.as_str().cmp(right.as_str()));
     assert_eq!(active, [id("alpha"), id("delta")]);
 }
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn the_region_records_one_base_url_and_a_later_one_replaces_it() {
+    let storage = directory().await;
+    assert_eq!(storage.companies.base().await.expect("read"), None);
+    storage
+        .companies
+        .record_base("https://eu.id.example.com/")
+        .await
+        .expect("recorded");
+    storage
+        .companies
+        .record_base("https://eu2.id.example.com")
+        .await
+        .expect("recorded again");
+    assert_eq!(
+        storage.companies.base().await.expect("read").as_deref(),
+        Some("https://eu2.id.example.com")
+    );
+}

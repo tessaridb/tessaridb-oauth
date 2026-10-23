@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::Place;
 
 use super::CompanyEntity;
-use super::entity::ListedEntity;
+use super::entity::{ListedEntity, RegionEntity};
 use crate::Result;
 
 /// The directory of companies.
@@ -29,4 +29,10 @@ pub(crate) trait CompanyRepository: Send + Sync {
 
     /// Move the company under `id` from status `from` to `to`; refused when it is not in `from` or does not exist.
     async fn transition(&self, place: &Place, id: &str, from: &str, to: &str) -> Result<()>;
+
+    /// Record `base_url` as the region's public base URL, replacing any earlier one.
+    async fn record_base(&self, place: &Place, base_url: &str) -> Result<()>;
+
+    /// The region's recorded public base URL.
+    async fn base(&self, place: &Place) -> Result<Option<RegionEntity>>;
 }
