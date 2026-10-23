@@ -1,3 +1,5 @@
+use tessari_oauth_core::mail_template::{MailKind, compose};
+
 use super::Change;
 
 const ALL: [Change; 9] = [
@@ -36,7 +38,10 @@ fn a_notice_names_its_change_and_its_issuer_and_carries_no_link_of_its_own() {
     let issuer = "https://id.example.com/acme";
     let mut said = Vec::new();
     for change in ALL {
-        let (subject, text) = change.notice(issuer);
+        let shipped = MailKind::SigninChanged.built_in();
+        let rendered =
+            compose(MailKind::SigninChanged, &shipped, &change.values(issuer)).expect("renders");
+        let (subject, text) = (rendered.subject, rendered.text);
         assert_eq!(subject, "Your sign-in changed");
         assert!(text.contains(issuer), "{text}");
         assert!(text.contains(change.what()), "{text}");

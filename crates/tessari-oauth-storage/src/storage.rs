@@ -20,6 +20,7 @@ use crate::groups::{GroupService, TessaridbGroupRepository};
 use crate::interactions::{InteractionService, TessaridbInteractionRepository};
 use crate::keys::{KeyService, TessaridbKeyRepository};
 use crate::logouts::{LogoutService, TessaridbLogoutRepository};
+use crate::mail_templates::{MailTemplateService, TessaridbMailTemplateRepository};
 use crate::operators::{OperatorService, TessaridbOperatorRepository};
 use crate::outbox::{OutboxService, TessaridbOutboxRepository};
 use crate::passkeys::{PasskeyService, TessaridbPasskeyRepository};
@@ -90,6 +91,8 @@ pub struct Storage {
     pub verifications: Arc<VerificationService>,
     /// Requested changes of a sign-in address.
     pub email_changes: Arc<EmailChangeService>,
+    /// The wording of the mail the server sends.
+    pub mail_templates: Arc<MailTemplateService>,
     /// Which users of each company may administer it, and for which tasks.
     pub operators: Arc<OperatorService>,
     /// Admin console sign-ins and sessions.
@@ -181,6 +184,10 @@ impl Storage {
             )),
             email_changes: Arc::new(EmailChangeService::new(
                 email_change_repository,
+                tenancy.clone(),
+            )),
+            mail_templates: Arc::new(MailTemplateService::new(
+                Arc::new(TessaridbMailTemplateRepository::new(database.clone())),
                 tenancy.clone(),
             )),
             operators: Arc::new(OperatorService::new(

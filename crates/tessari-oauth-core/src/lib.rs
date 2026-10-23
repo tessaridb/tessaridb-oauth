@@ -21,6 +21,7 @@ pub mod jose;
 pub mod keys;
 pub mod logo;
 pub mod logout;
+pub mod mail_template;
 mod params;
 pub mod password;
 pub mod refresh;

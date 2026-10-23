@@ -19,26 +19,21 @@ use serde::Deserialize;
 use tessari_oauth_constants::{
     EMAIL_CHANGE_REQUEST_LIMIT, EMAIL_CHANGE_REQUEST_WINDOW_SECS, LOGIN_PATH,
 };
+use tessari_oauth_core::mail_template::{MailKind, Placeholder};
 use tessari_oauth_infrastructure::custody::random_secret;
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::email_changes::Addresses;
-use tessari_oauth_storage::outbox::NewMail;
 use tessari_oauth_storage::throttle::{Admission, Limit};
 use tessari_oauth_types::{EmailAddress, TenantId, Timestamp, UserId, VerifyToken, base64url};
 
 use super::account_factors::may_change;
 use super::login::{body, record, signed_in};
+use super::mail::compose;
 use crate::state::PublicState;
 use crate::{Error, Result};
 
 /// The throttle group an account's address-change requests are counted in.
 const BUDGET_GROUP: &str = "address-change";
-
-/// The subject of the mail to the new address, free or held.
-const NEW_SUBJECT: &str = "Confirm your new sign-in address";
-
-/// The subject of the mail to the old address.
-const OLD_SUBJECT: &str = "Your sign-in address is changing";
 
 #[derive(Deserialize)]
 pub(super) struct NewEmail {
@@ -88,12 +83,45 @@ pub(super) async fn request(
         .issue(&tenant, (&confirm, &cancel), &asking.user, &addresses, now)
         .await
         .map_err(Error::Store)?;
+    // Both branches read the wording once and queue two mails, so a held address costs what a free one costs.
+    let issued = [(Placeholder::Issuer, issuer.as_ref())];
     let to_new = if held {
-        taken_notice(&issuer, &addresses.new)
+        compose(
+            &state,
+            &tenant,
+            MailKind::EmailTaken,
+            Some(addresses.new.clone()),
+            &issued,
+        )
+        .await?
     } else {
-        confirm_mail(&issuer, &addresses.new, &confirm)
+        let link = format!("{issuer}{LOGIN_PATH}/email#confirm={}", confirm.expose());
+        let values = [
+            (Placeholder::Issuer, issuer.as_ref()),
+            (Placeholder::Link, link.as_str()),
+        ];
+        compose(
+            &state,
+            &tenant,
+            MailKind::EmailConfirm,
+            Some(addresses.new.clone()),
+            &values,
+        )
+        .await?
     };
-    let to_old = cancel_mail(&issuer, &addresses, &cancel);
+    let cancel_link = format!("{issuer}{LOGIN_PATH}/email#cancel={}", cancel.expose());
+    let to_old = compose(
+        &state,
+        &tenant,
+        MailKind::EmailCancel,
+        Some(addresses.old.clone()),
+        &[
+            (Placeholder::Issuer, issuer.as_ref()),
+            (Placeholder::Link, cancel_link.as_str()),
+            (Placeholder::NewAddress, addresses.new.as_str()),
+        ],
+    )
+    .await?;
     for mail in [to_new, to_old] {
         state
             .outbox
@@ -133,49 +161,6 @@ fn fresh_token() -> Result<VerifyToken> {
     Ok(VerifyToken::from_secret(base64url::encode(
         &random_secret().map_err(|_| Error::Internal)?,
     )))
-}
-
-/// The mail that lets the new address confirm the change.
-fn confirm_mail(issuer: &str, new: &EmailAddress, confirm: &VerifyToken) -> NewMail {
-    let link = format!("{issuer}{LOGIN_PATH}/email#confirm={}", confirm.expose());
-    NewMail {
-        to: Some(new.clone()),
-        subject: NEW_SUBJECT.to_owned(),
-        text: format!(
-            "Someone asked to sign in to an account at {issuer} with this address instead of the one it uses now.\n\n\
-             To confirm it, open this link within 24 hours:\n{link}\n\n\
-             The change takes effect a day after it was asked for, unless it is cancelled from the old address.\n\
-             If you did not ask, ignore this mail; nothing changes.\n"
-        ),
-    }
-}
-
-/// The mail to a new address another account already signs in with: nothing it can confirm.
-fn taken_notice(issuer: &str, new: &EmailAddress) -> NewMail {
-    NewMail {
-        to: Some(new.clone()),
-        subject: NEW_SUBJECT.to_owned(),
-        text: format!(
-            "Someone asked to sign in to another account at {issuer} with this address.\n\n\
-             This address already signs in to an account there, so nothing changes and it stays with that account.\n\
-             If you did not expect this, you can ignore it.\n"
-        ),
-    }
-}
-
-/// The mail that lets the old address cancel the change until it takes effect.
-fn cancel_mail(issuer: &str, addresses: &Addresses, cancel: &VerifyToken) -> NewMail {
-    let link = format!("{issuer}{LOGIN_PATH}/email#cancel={}", cancel.expose());
-    let new = addresses.new.as_str();
-    NewMail {
-        to: Some(addresses.old.clone()),
-        subject: OLD_SUBJECT.to_owned(),
-        text: format!(
-            "Someone signed in to your account at {issuer} asked to change the address it signs in with to {new}.\n\n\
-             The change takes effect 24 hours after it was asked for, once the new address confirms it.\n\
-             If you did not ask, cancel it with this link before then, and change your password:\n{link}\n"
-        ),
-    }
 }
 
 async fn recorded(state: &PublicState, tenant: &TenantId, user: &UserId, now: Timestamp) {

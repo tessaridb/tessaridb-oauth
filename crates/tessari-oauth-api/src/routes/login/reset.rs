@@ -18,22 +18,20 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use tessari_oauth_constants::{CURRENT_PEPPER, LOGIN_PATH};
+use tessari_oauth_core::mail_template::{MailKind, Placeholder};
 use tessari_oauth_core::password::{Usage, accept};
 use tessari_oauth_core::two_factor::asks_second_factor;
 use tessari_oauth_infrastructure::custody::{random_secret, token_id};
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
-use tessari_oauth_storage::outbox::NewMail;
 use tessari_oauth_storage::refresh::Holder;
 use tessari_oauth_storage::users::StoredPassword;
 use tessari_oauth_types::{EmailAddress, ResetToken, TenantId, Timestamp, UserId, base64url};
 
 use super::{body, record};
+use crate::routes::mail::compose;
 use crate::routes::notice::{Change, notify};
 use crate::state::PublicState;
 use crate::{Error, Result};
-
-/// The subject of every reset mail, known address or not.
-const RESET_SUBJECT: &str = "Reset your password";
 
 #[derive(Deserialize)]
 pub(in crate::routes) struct ResetRequest {
@@ -80,16 +78,14 @@ pub(in crate::routes) async fn request_reset(
         .await
         .map_err(Error::Store)?;
     let link = format!("{issuer}{LOGIN_PATH}/reset#token={}", token.expose());
-    let mail = NewMail {
+    let mail = compose(
+        &state,
+        &tenant,
+        MailKind::Reset,
         to,
-        subject: RESET_SUBJECT.to_owned(),
-        text: format!(
-            "Someone asked to reset the password of your account at {issuer}.\n\n\
-             To choose a new password, open this link within 30 minutes:\n{link}\n\n\
-             Your second factor and passkeys stay as they are.\n\
-             If you did not ask, ignore this mail; your password does not change.\n"
-        ),
-    };
+        &[(Placeholder::Issuer, &issuer), (Placeholder::Link, &link)],
+    )
+    .await?;
     state
         .outbox
         .enqueue(&tenant, &state.kek, &mail)

@@ -14,17 +14,15 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use tessari_oauth_constants::LOGIN_PATH;
+use tessari_oauth_core::mail_template::{MailKind, Placeholder};
 use tessari_oauth_infrastructure::custody::random_secret;
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
-use tessari_oauth_storage::outbox::NewMail;
 use tessari_oauth_types::{EmailAddress, TenantId, Timestamp, UserId, VerifyToken, base64url};
 
 use super::{body, record};
+use crate::routes::mail::compose;
 use crate::state::PublicState;
 use crate::{Error, Result};
-
-/// The subject of every verification mail.
-const VERIFY_SUBJECT: &str = "Confirm your email address";
 
 #[derive(Deserialize)]
 pub(in crate::routes) struct Verification {
@@ -49,15 +47,14 @@ pub(in crate::routes) async fn send_verification(
         .await
         .map_err(Error::Store)?;
     let link = format!("{issuer}{LOGIN_PATH}/verify#token={}", token.expose());
-    let mail = NewMail {
-        to: Some(address.clone()),
-        subject: VERIFY_SUBJECT.to_owned(),
-        text: format!(
-            "Someone asked to confirm this address for an account at {issuer}.\n\n\
-             To confirm it, open this link within 24 hours:\n{link}\n\n\
-             If you did not ask, ignore this mail; nothing changes.\n"
-        ),
-    };
+    let mail = compose(
+        state,
+        tenant,
+        MailKind::Verify,
+        Some(address.clone()),
+        &[(Placeholder::Issuer, issuer), (Placeholder::Link, &link)],
+    )
+    .await?;
     state
         .outbox
         .enqueue(tenant, &state.kek, &mail)

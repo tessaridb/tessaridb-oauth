@@ -60,6 +60,11 @@ pub(crate) async fn server(connections: usize) -> Server {
     let storage = fresh_storage(plain_node().expect("the plain node is named"), connections)
         .expect("a configuration the pool accepts");
     storage.throttle.prepare().await.expect("counters prepared");
+    storage
+        .mail_templates
+        .seed_defaults(Timestamp::from_unix_secs(NOW))
+        .await
+        .expect("mail wording seeded");
     let kek = Arc::new(fresh_kek().expect("a key-encryption key"));
     let mut published = String::new();
     for name in ["acme", "initech"] {
@@ -164,6 +169,7 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         resets: Arc::clone(&storage.resets),
         verifications: Arc::clone(&storage.verifications),
         email_changes: Arc::clone(&storage.email_changes),
+        mail_templates: Arc::clone(&storage.mail_templates),
         mail: true,
     }
 }

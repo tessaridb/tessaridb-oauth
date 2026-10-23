@@ -32,6 +32,7 @@ fn daemon(storage: &Storage, kek: &Arc<Kek>, at: u64) -> EmailChangeApply {
     served.replace([acme()]);
     EmailChangeApply {
         email_changes: Arc::clone(&storage.email_changes),
+        mail_templates: Arc::clone(&storage.mail_templates),
         outbox: Arc::clone(&storage.outbox),
         audit: Arc::clone(&storage.audit),
         kek: Arc::clone(kek),
@@ -116,6 +117,11 @@ async fn a_due_change_moves_the_account_and_a_taken_address_is_refused() {
         .provision(&acme())
         .await
         .expect("provisioned");
+    storage
+        .mail_templates
+        .seed_defaults(Timestamp::from_unix_secs(NOW))
+        .await
+        .expect("mail wording seeded");
     let kek = fresh_kek();
     let ada = register(&storage, "ada@example.com").await;
     let carol = register(&storage, "carol@example.com").await;

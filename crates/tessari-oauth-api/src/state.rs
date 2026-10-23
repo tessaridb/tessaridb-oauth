@@ -18,6 +18,7 @@ use tessari_oauth_storage::factors::FactorService;
 use tessari_oauth_storage::groups::GroupService;
 use tessari_oauth_storage::interactions::InteractionService;
 use tessari_oauth_storage::keys::KeyService;
+use tessari_oauth_storage::mail_templates::MailTemplateService;
 use tessari_oauth_storage::outbox::OutboxService;
 use tessari_oauth_storage::passkeys::PasskeyService;
 use tessari_oauth_storage::policies::PolicyService;
@@ -103,6 +104,8 @@ pub struct PublicState {
     pub verifications: Arc<VerificationService>,
     /// Requested changes of a sign-in address.
     pub email_changes: Arc<EmailChangeService>,
+    /// The wording of the mail the server sends.
+    pub mail_templates: Arc<MailTemplateService>,
     /// Whether a mail relay is configured, so the flows that send mail are offered.
     pub mail: bool,
 }

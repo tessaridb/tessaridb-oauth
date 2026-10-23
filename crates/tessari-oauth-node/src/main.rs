@@ -195,6 +195,7 @@ async fn run(
     }
     served.replace(storage.companies.active().await?);
     storage.throttle.prepare().await?;
+    storage.mail_templates.seed_defaults(clock()).await?;
     let (stop, stopped) = watch::channel(false);
     let rotation = Arc::new(KeyRotation {
         keys: Arc::clone(&storage.keys),
@@ -233,6 +234,7 @@ async fn run(
     // Always: a change confirmed while mail was set up still takes effect, and its notices wait in the queue.
     let changes = Arc::new(EmailChangeApply {
         email_changes: Arc::clone(&storage.email_changes),
+        mail_templates: Arc::clone(&storage.mail_templates),
         outbox: Arc::clone(&storage.outbox),
         audit: Arc::clone(&storage.audit),
         kek: Arc::clone(&kek),
@@ -335,6 +337,7 @@ async fn run(
         resets: Arc::clone(&storage.resets),
         verifications: Arc::clone(&storage.verifications),
         email_changes: Arc::clone(&storage.email_changes),
+        mail_templates: Arc::clone(&storage.mail_templates),
         mail: mailing.is_some(),
     };
     // Signals are taken before the listener opens, so no signal can arrive while the default action still applies.

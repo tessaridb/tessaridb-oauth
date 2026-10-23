@@ -2,9 +2,11 @@
 //! change somebody else made is seen by the person it was made to. A notice carries no link and no secret. Without a
 //! relay nothing is sent; a notice that cannot be queued is logged and never undoes the change it reports.
 
-use tessari_oauth_storage::outbox::NewMail;
+use tessari_oauth_core::mail_template::{MailKind, Placeholder};
 use tessari_oauth_types::{TenantId, UserId};
 
+use super::mail::compose;
+use crate::Error;
 use crate::state::PublicState;
 
 /// A change to how an account signs in.
@@ -56,16 +58,12 @@ impl Change {
         }
     }
 
-    /// The notice to `to`'s owner about this change at `issuer`.
-    fn notice(self, issuer: &str) -> (String, String) {
-        (
-            "Your sign-in changed".to_owned(),
-            format!(
-                "Something changed in how your account at {issuer} signs in.\n\n{}\n\n\
-                 If you did not do this, tell your administrator.\n",
-                self.what()
-            ),
-        )
+    /// The values a notice of this change at `issuer` is filled in with.
+    const fn values(self, issuer: &str) -> [(Placeholder, &str); 2] {
+        [
+            (Placeholder::Issuer, issuer),
+            (Placeholder::Change, self.what()),
+        ]
     }
 }
 
@@ -78,17 +76,23 @@ pub(super) async fn notify(state: &PublicState, tenant: &TenantId, user: &UserId
         return;
     };
     let queued = async {
-        let account = state.users.find(tenant, user).await?;
+        let account = state.users.find(tenant, user).await.map_err(Error::Store)?;
         let Some(account) = account else {
             return Ok(());
         };
-        let (subject, text) = change.notice(&issuer);
-        let mail = NewMail {
-            to: Some(account.email),
-            subject,
-            text,
-        };
-        state.outbox.enqueue(tenant, &state.kek, &mail).await
+        let mail = compose(
+            state,
+            tenant,
+            MailKind::SigninChanged,
+            Some(account.email),
+            &change.values(&issuer),
+        )
+        .await?;
+        state
+            .outbox
+            .enqueue(tenant, &state.kek, &mail)
+            .await
+            .map_err(Error::Store)
     };
     if let Err(failure) = queued.await {
         tracing::warn!(

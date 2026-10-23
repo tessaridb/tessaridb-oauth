@@ -68,6 +68,7 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         resets: Arc::clone(&storage.resets),
         verifications: Arc::clone(&storage.verifications),
         email_changes: Arc::clone(&storage.email_changes),
+        mail_templates: Arc::clone(&storage.mail_templates),
         mail: true,
     }
 }
@@ -154,6 +155,13 @@ pub(crate) async fn live_storage() -> Storage {
     let storage = fresh_storage(plain_node().expect("the plain node is named"), 2)
         .expect("a configuration the pool accepts");
     storage.throttle.prepare().await.expect("counters prepared");
+    storage
+        .mail_templates
+        .seed_defaults(tessari_oauth_types::Timestamp::from_unix_secs(
+            1_800_000_000,
+        ))
+        .await
+        .expect("mail wording seeded");
     storage
 }
 

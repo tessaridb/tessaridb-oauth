@@ -20,6 +20,7 @@ pub mod groups;
 pub mod interactions;
 pub mod keys;
 pub mod logouts;
+pub mod mail_templates;
 pub mod operators;
 pub mod outbox;
 pub mod passkeys;

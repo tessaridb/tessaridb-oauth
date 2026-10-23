@@ -10,28 +10,26 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tessari_oauth_constants::EMAIL_CHANGE_APPLY_BATCH;
+use tessari_oauth_core::mail_template::{self, MailKind, Placeholder, Rendered};
 use tessari_oauth_infrastructure::custody::Kek;
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind, AuditService};
 use tessari_oauth_storage::companies::Served;
 use tessari_oauth_storage::email_changes::{DueChange, EmailChangeService};
+use tessari_oauth_storage::mail_templates::MailTemplateService;
 use tessari_oauth_storage::outbox::{NewMail, OutboxService};
-use tessari_oauth_types::{Clock, TenantId, Timestamp};
+use tessari_oauth_types::{Clock, EmailAddress, TenantId, Timestamp};
 
 use crate::daemon::{Daemon, DaemonFuture, DaemonReport};
 use crate::{Error, Result};
 
 const NAME: &str = "email-change-apply";
 
-/// The subject of the notices of an applied change.
-const CHANGED_SUBJECT: &str = "Your sign-in address has changed";
-
-/// The subject of the notice of a refused change.
-const UNCHANGED_SUBJECT: &str = "Your sign-in address was not changed";
-
 /// The address-change daemon and everything a run needs.
 pub struct EmailChangeApply {
     /// The requested changes.
     pub email_changes: Arc<EmailChangeService>,
+    /// The wording of the mail the server sends.
+    pub mail_templates: Arc<MailTemplateService>,
     /// The mail queue notices go to.
     pub outbox: Arc<OutboxService>,
     /// The audit trail.
@@ -81,8 +79,26 @@ impl EmailChangeApply {
             // The change is settled once the store answers, so what follows is told and recorded but never undoes it.
             if applied {
                 tally.applied = tally.applied.saturating_add(1);
-                self.notify(tenant, &applied_to_old(issuer, change)).await;
-                self.notify(tenant, &applied_to_new(issuer, change)).await;
+                let new = change.new_address.as_str();
+                let values = [
+                    (Placeholder::Issuer, issuer),
+                    (Placeholder::NewAddress, new),
+                ];
+                self.notify(
+                    tenant,
+                    MailKind::EmailAppliedOld,
+                    &change.old_address,
+                    &values,
+                )
+                .await;
+                let values = [(Placeholder::Issuer, issuer)];
+                self.notify(
+                    tenant,
+                    MailKind::EmailAppliedNew,
+                    &change.new_address,
+                    &values,
+                )
+                .await;
                 self.record(tenant, change, "applied", now).await;
             } else {
                 self.email_changes
@@ -90,15 +106,39 @@ impl EmailChangeApply {
                     .await
                     .map_err(|failure| store(&failure))?;
                 tally.refused = tally.refused.saturating_add(1);
-                self.notify(tenant, &refused_to_old(issuer, change)).await;
+                let values = [(Placeholder::Issuer, issuer)];
+                self.notify(tenant, MailKind::EmailRefused, &change.old_address, &values)
+                    .await;
                 self.record(tenant, change, "refused", now).await;
             }
         }
         Ok(())
     }
 
-    async fn notify(&self, tenant: &TenantId, mail: &NewMail) {
-        if let Err(failure) = self.outbox.enqueue(tenant, &self.kek, mail).await {
+    /// Queue `kind`'s notice to `to` in `tenant`'s wording; a notice that cannot be queued is logged and never undoes
+    /// the change it reports.
+    async fn notify(
+        &self,
+        tenant: &TenantId,
+        kind: MailKind,
+        to: &EmailAddress,
+        values: &[(Placeholder, &str)],
+    ) {
+        let queued = async {
+            let template = self.mail_templates.resolve(tenant, kind).await?;
+            // The shipped wording always renders with the values its kind carries.
+            let Some(Rendered { subject, text }) = mail_template::compose(kind, &template, values)
+            else {
+                return Ok(());
+            };
+            let mail = NewMail {
+                to: Some(to.clone()),
+                subject,
+                text,
+            };
+            self.outbox.enqueue(tenant, &self.kek, &mail).await
+        };
+        if let Err(failure) = queued.await {
             tracing::error!(
                 daemon = NAME,
                 event = "notice_unqueued",
@@ -139,40 +179,6 @@ fn store(failure: &tessari_oauth_storage::Error) -> Error {
         daemon: NAME,
         message: failure.to_string(),
         category: failure.category(),
-    }
-}
-
-/// The notice to the old address that the account no longer signs in with it.
-fn applied_to_old(issuer: &str, change: &DueChange) -> NewMail {
-    let new = change.new_address.as_str();
-    NewMail {
-        to: Some(change.old_address.clone()),
-        subject: CHANGED_SUBJECT.to_owned(),
-        text: format!(
-            "Your account at {issuer} now signs in with {new} instead of this address.\n\n\
-             If you did not ask for this, contact the administrator of that sign-in service.\n"
-        ),
-    }
-}
-
-/// The notice to the new address that the account now signs in with it.
-fn applied_to_new(issuer: &str, change: &DueChange) -> NewMail {
-    NewMail {
-        to: Some(change.new_address.clone()),
-        subject: CHANGED_SUBJECT.to_owned(),
-        text: format!("Your account at {issuer} now signs in with this address.\n"),
-    }
-}
-
-/// The notice to the old address that the change did not take effect.
-fn refused_to_old(issuer: &str, change: &DueChange) -> NewMail {
-    NewMail {
-        to: Some(change.old_address.clone()),
-        subject: UNCHANGED_SUBJECT.to_owned(),
-        text: format!(
-            "The change of the address your account at {issuer} signs in with did not take effect, and this \
-             address still signs in.\n\nYou can ask for the change again from your account page.\n"
-        ),
     }
 }
 
