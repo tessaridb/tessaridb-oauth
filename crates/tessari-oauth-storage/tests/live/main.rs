@@ -18,6 +18,7 @@ mod codes;
 mod companies;
 mod consents;
 mod console;
+mod email_changes;
 mod enrolments;
 mod factor_removal;
 mod factors;

@@ -19,3 +19,10 @@ pub const MAIL_DELIVERY_INTERVAL_SECS: u64 = 5;
 
 /// The most one run of the mail worker may take, in seconds: below the queue's 60-second hold.
 pub const MAIL_DELIVERY_RUN_TIMEOUT_SECS: u64 = 45;
+
+/// How long the link that confirms a new sign-in address works, in seconds.
+pub const EMAIL_CHANGE_CONFIRM_SECS: u64 = 86_400;
+
+/// How long a change of sign-in address is held after it was asked for, in seconds, so that the link mailed to the
+/// old address can still cancel it (the change waits for this even when the new address was confirmed at once).
+pub const EMAIL_CHANGE_HOLD_SECS: u64 = 86_400;

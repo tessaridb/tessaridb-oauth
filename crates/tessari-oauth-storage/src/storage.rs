@@ -13,6 +13,7 @@ use crate::clients::{ClientService, TessaridbClientRepository};
 use crate::codes::{CodeService, TessaridbCodeRepository};
 use crate::companies::{CompanyService, TessaridbCompanyRepository};
 use crate::consents::{ConsentService, TessaridbConsentRepository};
+use crate::email_changes::{EmailChangeService, TessaridbEmailChangeRepository};
 use crate::enrolments::{EnrolmentService, TessaridbEnrolmentRepository};
 use crate::factors::{FactorService, TessaridbFactorRepository};
 use crate::groups::{GroupService, TessaridbGroupRepository};
@@ -87,6 +88,8 @@ pub struct Storage {
     pub resets: Arc<ResetService>,
     /// The address-verification tokens mail carries.
     pub verifications: Arc<VerificationService>,
+    /// Requested changes of a sign-in address.
+    pub email_changes: Arc<EmailChangeService>,
     /// Which users of each company may administer it, and for which tasks.
     pub operators: Arc<OperatorService>,
     /// Admin console sign-ins and sessions.
@@ -128,6 +131,8 @@ impl Storage {
         let reset_repository = Arc::new(TessaridbResetRepository::new(database.clone()));
         let verification_repository =
             Arc::new(TessaridbVerificationRepository::new(database.clone()));
+        let email_change_repository =
+            Arc::new(TessaridbEmailChangeRepository::new(database.clone()));
         let operator_repository = Arc::new(TessaridbOperatorRepository::new(database.clone()));
         let admin_repository = Arc::new(TessaridbAdminRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
@@ -172,6 +177,10 @@ impl Storage {
             resets: Arc::new(ResetService::new(reset_repository, tenancy.clone())),
             verifications: Arc::new(VerificationService::new(
                 verification_repository,
+                tenancy.clone(),
+            )),
+            email_changes: Arc::new(EmailChangeService::new(
+                email_change_repository,
                 tenancy.clone(),
             )),
             operators: Arc::new(OperatorService::new(

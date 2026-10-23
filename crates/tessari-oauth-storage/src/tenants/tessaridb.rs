@@ -32,6 +32,9 @@ use crate::Result;
 /// digest of its sign-in cookie value, for the ten minutes (`INTERACTION_TTL_SECS`) its authorization request is kept.
 /// `sessions` holds a user's session under the digest of its session cookie value, for at most the week
 /// (`SESSION_ABSOLUTE_SECS`) a session lasts, found for its user's own list by `by_user`.
+/// `email_changes` holds a requested change of an account's sign-in address under the digest of the token that
+/// confirms it, with the digest of the token that cancels it, for the two days a change may take; `by_user` lets a
+/// newer request replace it and `by_cancel` finds it from the old address's link.
 /// `enrolments` holds a user's one live enrolment code under its digest for 72 hours, found by `by_user` when a new code
 /// replaces it. `operator_grants` holds each role a user may administer the company with under `<user id>.<role>`,
 /// with who gave it, why and until when, found for its holder by `by_user`. `admin_signins` holds a sign-in to the
@@ -131,6 +134,11 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE TABLE IF NOT EXISTS address_verifications (\
      user_id string REQUIRED, address string REQUIRED, created_at int REQUIRED) EXPIRE AFTER 24h; \
      DEFINE INDEX IF NOT EXISTS by_user ON address_verifications FIELDS user_id; \
+     DEFINE TABLE IF NOT EXISTS email_changes (\
+     user_id string REQUIRED, old_address string REQUIRED, new_address string REQUIRED, \
+     cancel_digest string REQUIRED, created_at int REQUIRED, confirmed_at int) EXPIRE AFTER 48h; \
+     DEFINE INDEX IF NOT EXISTS by_user ON email_changes FIELDS user_id; \
+     DEFINE INDEX IF NOT EXISTS by_cancel ON email_changes FIELDS cancel_digest; \
      DEFINE TABLE IF NOT EXISTS operator_grants (\
      user_id string REQUIRED, role_name string REQUIRED, granted_by string REQUIRED, granted_at int REQUIRED, \
      reason string REQUIRED); \

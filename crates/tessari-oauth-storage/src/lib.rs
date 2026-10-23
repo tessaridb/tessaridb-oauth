@@ -12,6 +12,7 @@ pub mod companies;
 pub mod consents;
 mod console;
 pub use console::provision;
+pub mod email_changes;
 pub mod enrolments;
 mod error;
 pub mod factors;
