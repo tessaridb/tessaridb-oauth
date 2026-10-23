@@ -28,6 +28,7 @@ use crate::policies::{PolicyService, TessaridbPolicyRepository};
 use crate::refresh::{RefreshService, TessaridbRefreshRepository};
 use crate::replay::{ReplayService, TessaridbReplayRepository};
 use crate::resets::{ResetService, TessaridbResetRepository};
+use crate::sealed::{SealedService, TessaridbSealedRepository};
 use crate::sessions::{SessionService, TessaridbSessionRepository};
 use crate::signins::{SigninService, TessaridbSigninRepository};
 use crate::subjects::{SubjectService, TessaridbSecretRepository};
@@ -99,6 +100,8 @@ pub struct Storage {
     pub admin: Arc<AdminService>,
     /// The audit trail.
     pub audit: Arc<AuditService>,
+    /// Every value sealed under the key-encryption key, for sealing again under a new one.
+    pub sealed: Arc<SealedService>,
 }
 
 impl Storage {
@@ -118,6 +121,7 @@ impl Storage {
         let secret_repository = Arc::new(TessaridbSecretRepository::new(database.clone()));
         let throttle_repository = Arc::new(TessaridbThrottleRepository::new(database.clone()));
         let audit_repository = Arc::new(TessaridbAuditRepository::new(database.clone()));
+        let sealed_repository = Arc::new(TessaridbSealedRepository::new(database.clone()));
         let user_repository = Arc::new(TessaridbUserRepository::new(database.clone()));
         let enrolment_repository = Arc::new(TessaridbEnrolmentRepository::new(database.clone()));
         let factor_repository = Arc::new(TessaridbFactorRepository::new(database.clone()));
@@ -197,6 +201,7 @@ impl Storage {
             )),
             admin: Arc::new(AdminService::new(admin_repository, tenancy.clone())),
             audit,
+            sealed: Arc::new(SealedService::new(sealed_repository, tenancy.clone())),
         }
     }
 }

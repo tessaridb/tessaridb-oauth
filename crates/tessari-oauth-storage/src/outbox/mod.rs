@@ -10,4 +10,5 @@ mod tessaridb;
 pub use entity::MailEntity;
 pub use model::{NewMail, QueuedMail};
 pub use service::OutboxService;
+pub(crate) use service::binding as mail_binding;
 pub(crate) use tessaridb::TessaridbOutboxRepository;

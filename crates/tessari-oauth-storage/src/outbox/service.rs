@@ -28,7 +28,7 @@ fn unreadable(reason: &str) -> Error {
 }
 
 /// What a mail is sealed for: its own record, so a sealed value copied onto another record does not open.
-fn binding(id: &str) -> String {
+pub(crate) fn binding(id: &str) -> String {
     format!("mail:{id}")
 }
 

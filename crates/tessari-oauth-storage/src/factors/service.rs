@@ -41,12 +41,12 @@ const fn invalid(reason: &'static str) -> Error {
 }
 
 /// What the secret is sealed for: one user's one-time code factor.
-fn binding(user: &UserId) -> String {
+pub(crate) fn binding(user: &UserId) -> String {
     format!("totp:{}", user.as_str())
 }
 
 /// What a secret being enrolled is sealed for, apart from an enrolled one, so neither opens as the other.
-fn pending_binding(user: &UserId) -> String {
+pub(crate) fn pending_binding(user: &UserId) -> String {
     format!("totp-pending:{}", user.as_str())
 }
 

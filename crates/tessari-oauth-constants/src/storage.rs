@@ -91,6 +91,9 @@ pub const COMPANY_NAME_MAX_CHARS: usize = 100;
 /// The most companies one directory page holds.
 pub const COMPANY_PAGE_MAX: u32 = 100;
 
+/// How many sealed values a re-seal reads in one page, so a large table never meets the store's answer ceiling.
+pub const RESEAL_PAGE: u32 = 500;
+
 /// How often a node re-reads which companies are active, in seconds: a company created, suspended or resumed on any
 /// node is served or refused everywhere within this long.
 pub const DIRECTORY_REFRESH_SECS: u64 = 5;

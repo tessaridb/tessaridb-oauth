@@ -38,6 +38,7 @@ mod refresh_grant;
 mod refresh_replay;
 mod refresh_revoke;
 mod replay;
+mod reseal;
 mod resets;
 mod sessions;
 mod signer;

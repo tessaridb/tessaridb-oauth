@@ -48,8 +48,39 @@ departing operator who could reach the key-encryption key), withdraw it at once;
 5. Check the company's audit trail for the `keys.withdraw` entry and for anything else done with the same access.
 
 Every key of every company is sealed with the server's key-encryption key (`TESSARIDB_OAUTH_KEK`). If that file
-itself may be exposed, withdrawing keys is not enough, because a replacement is sealed with the same file; this
-version has no command that re-seals the keys under a new key-encryption key.
+itself may be exposed, withdrawing keys is not enough, because a replacement is sealed with the same file: re-seal
+under a new key-encryption key as below.
+
+## A key-encryption key that may be exposed
+
+The key-encryption key seals five kinds of value in each company's database: its signing keys, the salt its pairwise
+subjects are made from, each authenticator app's secret, each authenticator being added, and each queued mail. To
+move all of them to a new key:
+
+1. Stop every node of the region. A node still serving seals what it writes under the old key.
+2. Make the new key: 32 random bytes in a file only its owner can read (`head -c 32 /dev/urandom > new.key`,
+   `chmod 600 new.key`).
+3. With the server's environment, `TESSARIDB_OAUTH_KEK` naming the new file, run
+   `tessaridb-oauth reseal --old-kek <old file>`. It walks every company in the region's directory, seals each value
+   again under the new key, then walks them again to check that every value opens under it. Its last line counts what
+   it found: `{"companies":2,"provisioning":0,"resealed":9,"already":0,"unopened":0,"finished":true}`. It exits 0
+   only when `finished` is true.
+4. Start the nodes with the new key.
+
+A run that stops part way can be run again: a value already under the new key is counted `already` and not written.
+`unopened` counts values that open under neither key; they are left as they were, and the run does not finish
+until they are explained. A company still being provisioned is counted in `provisioning` and not read; finish its
+provisioning and run again. The command refuses when the old and the new file hold the same key.
+
+What re-sealing does not do:
+
+- Backups taken before the re-seal still open with the old key. Destroy the old file only once every such backup has
+  expired or been destroyed.
+- If a copy of the store or a backup was taken together with the exposed key, the sealed values themselves may have
+  been read. Re-sealing does not make them secret again: also withdraw every company's signing keys (above), have
+  users add their authenticator apps again, and expire every backup sealed under the old key.
+- The pairwise salt is kept, not replaced, because a new salt would change every pairwise `sub` a client knows its
+  users by.
 
 ## A leaked client credential
 

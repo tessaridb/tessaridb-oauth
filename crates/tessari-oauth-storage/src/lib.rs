@@ -29,6 +29,7 @@ pub mod refresh;
 pub mod replay;
 pub mod resets;
 mod retry;
+pub mod sealed;
 pub mod sessions;
 pub mod signins;
 mod storage;

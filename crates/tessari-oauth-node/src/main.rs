@@ -37,6 +37,7 @@ use tokio::sync::watch;
 
 mod bootstrap;
 mod peers;
+mod reseal;
 
 pub(crate) type Failure = Box<dyn Error + Send + Sync>;
 
@@ -69,6 +70,12 @@ fn main() -> ExitCode {
                 },
                 |()| ExitCode::SUCCESS,
             );
+        }
+        Some((command, rest)) if command == reseal::COMMAND => {
+            return reseal::run(rest).unwrap_or_else(|failure| {
+                tracing::error!(error = %failure, "the re-seal failed");
+                ExitCode::FAILURE
+            });
         }
         Some((other, _)) => {
             tracing::error!(command = %other, "not a command this binary knows");
