@@ -2702,9 +2702,48 @@
         return "No account of this company is asked for a second factor: a password alone signs in, including for accounts that enrolled one.";
     }
   }
+  function readRegistration(body) {
+    const open = field(body, "open");
+    const domains = strings(field(body, "domains"));
+    const revision = field(body, "revision");
+    if (typeof open !== "boolean" || domains === null) {
+      return null;
+    }
+    if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0) {
+      return null;
+    }
+    return { open, domains, revision };
+  }
+  function domainsFrom(typed) {
+    return typed.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "");
+  }
+  function sameDomains(left, right) {
+    const lower = (names) => names.map((name2) => name2.toLowerCase()).sort();
+    const [a, b] = [lower(left), lower(right)];
+    return a.length === b.length && a.every((name2, at) => name2 === b[at]);
+  }
+  function registrationConsequence(from, to) {
+    if (from.open === to.open && sameDomains(from.domains, to.domains)) {
+      return null;
+    }
+    if (!to.open) {
+      return from.open ? "Nobody can open an account of this company by themselves any more; operators still create accounts." : "Registration stays closed; the domains are kept for when it opens.";
+    }
+    const who = to.domains.length === 0 ? "Anyone with any email address" : `Anyone with an address at ${to.domains.join(", ")}`;
+    return `${who} can open an account of this company by themselves, and sets its password from a mailed link.`;
+  }
+  function domainsRefusal(status, body) {
+    const rule = field(body, "message");
+    if (status !== 400 || field(body, "code") !== "domains_rejected" || typeof rule !== "string") {
+      return null;
+    }
+    return `The domains were refused: ${rule}.`;
+  }
 
   // src/policy.ts
   var PATH4 = "api/policy/two-factor";
+  var REGISTRATION_PATH = "api/policy/registration";
+  var REGISTRATION = ["closed", "open"];
   function badge(policy) {
     const made = make("span", "badge", policy);
     made.dataset["state"] = policy === "off" ? "warn" : "ok";
@@ -2787,18 +2826,128 @@
     const heading2 = make("h2", "", "Change it");
     return make("section", "change-form", heading2, picker.group, reason.row, said, review, confirmPanel);
   }
+  function registrationForm(screen, company2, current, redraw) {
+    const keyFor = keys();
+    const picker = segmented("Registration", "registration", REGISTRATION, current.open ? "open" : "closed");
+    const domains = make("textarea", "mono");
+    domains.id = "registration-domains";
+    domains.rows = 3;
+    domains.spellcheck = false;
+    domains.value = current.domains.join("\n");
+    const domainsLabel = make("label", "", "Address domains, one per line (none: any address)");
+    domainsLabel.htmlFor = domains.id;
+    const reason = reasonField("registration-reason");
+    const said = notice();
+    const consequence = make("p", "");
+    const typed = make("input", "mono");
+    typed.type = "text";
+    typed.autocomplete = "off";
+    typed.spellcheck = false;
+    const confirmPanel = make(
+      "div",
+      "confirm",
+      consequence,
+      labelled("registration-company", `Type the company id ${company2} to confirm`, typed)
+    );
+    confirmPanel.hidden = true;
+    const unreview = () => {
+      confirmPanel.hidden = true;
+    };
+    picker.group.addEventListener("change", unreview);
+    domains.addEventListener("input", unreview);
+    const chosen = () => ({
+      open: picker.chosen() === "open",
+      domains: domainsFrom(domains.value)
+    });
+    const review = button("Review the change", "primary", () => {
+      said.hidden = true;
+      const effect = registrationConsequence(current, chosen());
+      if (effect === null) {
+        said.textContent = "That is already the registration policy. Change it to review a change.";
+        said.hidden = false;
+        return;
+      }
+      if (reasonIn(reason.input, said) === null) {
+        return;
+      }
+      consequence.textContent = effect;
+      confirmPanel.hidden = false;
+      typed.focus();
+    });
+    const apply = button("Change registration", "danger", () => {
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      if (!confirmedBy(typed.value, company2)) {
+        said.textContent = `Type ${company2} exactly to confirm.`;
+        said.hidden = false;
+        typed.setAttribute("aria-invalid", "true");
+        typed.focus();
+        return;
+      }
+      typed.removeAttribute("aria-invalid");
+      const body = { revision: current.revision, ...chosen(), reason: why };
+      void change(REGISTRATION_PATH, keyFor, body, "PUT").then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        const made = answer.ok ? readRegistration(answer.body) : null;
+        if (made !== null) {
+          redraw(made.open ? "Registration is now open." : "Registration is now closed.");
+          return;
+        }
+        if (answer.status === 409) {
+          redraw(changeRefusalText("changed_meanwhile"));
+          return;
+        }
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : domainsRefusal(answer.status, answer.body) ?? refusedText(screen, answer, "The registration policy");
+        if (text2 !== null) {
+          said.textContent = text2;
+          said.hidden = false;
+        }
+      });
+    });
+    const keep = button("Keep registration as it is", "secondary", unreview);
+    confirmPanel.append(make("div", "actions", apply, keep));
+    return make(
+      "section",
+      "change-form",
+      make("h2", "", "Change registration"),
+      picker.group,
+      make("div", "field", domainsLabel, domains),
+      reason.row,
+      said,
+      review,
+      confirmPanel
+    );
+  }
+  function registrationFact(registration) {
+    if (!registration.open) {
+      const closed = make("span", "badge", "closed");
+      closed.dataset["state"] = "ok";
+      return closed;
+    }
+    const open = make("span", "badge", "open");
+    open.dataset["state"] = "warn";
+    const to = registration.domains.length === 0 ? "any address" : registration.domains.join(", ");
+    return make("span", "", open, ` to ${to}`);
+  }
   async function policyView(screen, company2, message = "") {
     say("Loading the policy.");
-    const answer = await call("GET", PATH4);
+    const [answer, registered] = await Promise.all([call("GET", PATH4), call("GET", REGISTRATION_PATH)]);
     if (!screen.live()) {
       return;
     }
-    if (!answer.ok) {
-      refusedOn(screen, "Sign-in policy", answer, "The policy");
-      return;
+    for (const each of [answer, registered]) {
+      if (!each.ok) {
+        refusedOn(screen, "Sign-in policy", each, "The policy");
+        return;
+      }
     }
     const current = readPolicy(answer.body);
-    if (current === null) {
+    const registration = readRegistration(registered.body);
+    if (current === null || registration === null) {
       unreadable(screen, "Sign-in policy");
       return;
     }
@@ -2806,9 +2955,21 @@
     show(
       screen.view,
       heading("Sign-in policy"),
-      make("p", "lead", "Whether accounts of this company sign in with a second factor. Operators always do."),
-      make("dl", "facts", make("dt", "", "Two-factor"), make("dd", "", badge(current))),
-      changeForm(screen, company2, current, redraw)
+      make(
+        "p",
+        "lead",
+        "Whether accounts of this company sign in with a second factor, and who may open one by themselves. Operators always use a second factor."
+      ),
+      make(
+        "dl",
+        "facts",
+        make("dt", "", "Two-factor"),
+        make("dd", "", badge(current)),
+        make("dt", "", "Registration"),
+        make("dd", "", registrationFact(registration))
+      ),
+      changeForm(screen, company2, current, redraw),
+      registrationForm(screen, company2, registration, redraw)
     );
     say(message);
   }
