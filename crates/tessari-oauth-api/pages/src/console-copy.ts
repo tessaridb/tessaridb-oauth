@@ -113,6 +113,20 @@ export function groupRefusalText(code: string): string {
   }
 }
 
+/** The words for a change to the signing keys the server refused with `code`. */
+export function keyRefusalText(code: string): string {
+  switch (code) {
+    case "successor_waiting":
+      return "A successor is already published and waits to sign. It takes over by itself; make another after that.";
+    case "key_not_found":
+      return "This company has no such key. Reload the view to see its keys as they are.";
+    case "already_withdrawn":
+      return "This key is already withdrawn. Reload the view to see its keys as they are.";
+    default:
+      return changeRefusalText(code);
+  }
+}
+
 /** The words for a brand or logo change the server refused with `code`. */
 export function brandRefusalText(code: string): string {
   switch (code) {

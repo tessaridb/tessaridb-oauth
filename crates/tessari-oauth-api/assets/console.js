@@ -6,7 +6,7 @@
       return void 0;
     }
     const fields = Object.entries(value);
-    return fields.find(([name]) => name === key)?.[1];
+    return fields.find(([name2]) => name2 === key)?.[1];
   }
   function strings(value) {
     return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : null;
@@ -24,7 +24,7 @@
   }
 
   // src/console-read.ts
-  var ROLES = ["users", "clients", "policy", "audit", "companies"];
+  var ROLES = ["users", "clients", "policy", "keys", "audit", "companies"];
   var NEEDS = [
     ["users", "users"],
     ["groups", "users"],
@@ -32,11 +32,12 @@
     ["operators", null],
     ["policy", "policy"],
     ["branding", "policy"],
+    ["keys", "keys"],
     ["audit", "audit"],
     ["companies", "companies"]
   ];
-  function isRole(name) {
-    return ROLES.some((role) => role === name);
+  function isRole(name2) {
+    return ROLES.some((role) => role === name2);
   }
   function readMe(body) {
     const user = field(body, "user");
@@ -73,6 +74,8 @@
         return { kind: "policy" };
       case "branding":
         return { kind: "branding" };
+      case "keys":
+        return { kind: "keys" };
       case "audit": {
         const after = query.get("after");
         return { kind: "audit", after: after !== null && /^\d+$/.test(after) ? Number(after) : null };
@@ -95,8 +98,8 @@
       return { kind: "not_found" };
     }
     if (status === 429) {
-      const seconds3 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
-      return { kind: "throttled", seconds: seconds3 };
+      const seconds4 = retryAfter !== null && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
+      return { kind: "throttled", seconds: seconds4 };
     }
     if ((status === 400 || status === 403 || status === 409) && typeof code === "string") {
       return { kind: "refused", code };
@@ -142,14 +145,14 @@
     input2.id = id;
     return make("div", "field", label2, input2);
   }
-  function segmented(legend, name, options, checked) {
+  function segmented(legend, name2, options, checked) {
     const group = make("fieldset", "segmented", make("legend", "", legend));
     const inputs = [];
     for (const option of options) {
       const input2 = make("input", "");
       input2.type = "radio";
-      input2.name = name;
-      input2.id = `${name}-${option}`;
+      input2.name = name2;
+      input2.id = `${name2}-${option}`;
       input2.value = option;
       input2.checked = option === checked;
       const label2 = make("label", "", option);
@@ -286,6 +289,18 @@
         return "This account is not in this group any more. Reload the view to see the current members.";
       case "too_many_groups":
         return "This account is already in as many groups as one account may be. Take it out of one first.";
+      default:
+        return changeRefusalText(code);
+    }
+  }
+  function keyRefusalText(code) {
+    switch (code) {
+      case "successor_waiting":
+        return "A successor is already published and waits to sign. It takes over by itself; make another after that.";
+      case "key_not_found":
+        return "This company has no such key. Reload the view to see its keys as they are.";
+      case "already_withdrawn":
+        return "This key is already withdrawn. Reload the view to see its keys as they are.";
       default:
         return changeRefusalText(code);
     }
@@ -491,9 +506,9 @@
   }
 
   // src/audit.ts
-  function moment(seconds3) {
+  function moment(seconds4) {
     return new Intl.DateTimeFormat(void 0, { dateStyle: "medium", timeStyle: "medium" }).format(
-      new Date(seconds3 * 1e3)
+      new Date(seconds4 * 1e3)
     );
   }
   function row(event) {
@@ -567,21 +582,21 @@
     return value === null || typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : void 0;
   }
   function readBranding(body) {
-    const name = text(field(body, "name"));
+    const name2 = text(field(body, "name"));
     const accent = text(field(body, "accent"));
     const supportUrl = text(field(body, "support_url"));
     const privacyUrl = text(field(body, "privacy_url"));
     const logo = whole(field(body, "logo"));
     const revision = whole(field(body, "revision"));
-    if (name === void 0 || accent === void 0 || supportUrl === void 0 || privacyUrl === void 0 || logo === void 0 || revision === void 0 || revision === null) {
+    if (name2 === void 0 || accent === void 0 || supportUrl === void 0 || privacyUrl === void 0 || logo === void 0 || revision === void 0 || revision === null) {
       return null;
     }
-    return { name, accent, supportUrl, privacyUrl, logo, revision };
+    return { name: name2, accent, supportUrl, privacyUrl, logo, revision };
   }
-  function brandingBody(revision, name, accent, supportUrl, privacyUrl, reason) {
+  function brandingBody(revision, name2, accent, supportUrl, privacyUrl, reason) {
     return {
       revision,
-      name,
+      name: name2,
       accent,
       ...supportUrl === "" ? {} : { support_url: supportUrl },
       ...privacyUrl === "" ? {} : { privacy_url: privacyUrl },
@@ -638,8 +653,8 @@
   }
   function brandForm(screen, brand, redraw) {
     const keyFor = keys();
-    const name = input("text", brand.name);
-    name.maxLength = 64;
+    const name2 = input("text", brand.name);
+    name2.maxLength = 64;
     const accent = input("text", brand.accent, "mono");
     accent.maxLength = 7;
     accent.placeholder = "#1f4fd8";
@@ -662,7 +677,7 @@
         return;
       }
       const links = [support.value.trim(), privacy.value.trim()];
-      const body = brandingBody(brand.revision, name.value, accent.value, ...links, why);
+      const body = brandingBody(brand.revision, name2.value, accent.value, ...links, why);
       void change(PATH, keyFor, body, "PUT").then((answer) => {
         if (!screen.live()) {
           return;
@@ -683,7 +698,7 @@
       "section",
       "change-form",
       make("h2", "", "Change it"),
-      labelled("brand-name", "Name", name),
+      labelled("brand-name", "Name", name2),
       colourRow,
       labelled("brand-support", "Help link (https, optional)", support),
       labelled("brand-privacy", "Privacy link (https, optional)", privacy),
@@ -781,22 +796,22 @@
   var ID_MAX_BYTES = 63;
   var NAME_MAX_CHARS = 100;
   var STATUSES = ["provisioning", "active", "suspended"];
-  function isStatus(name) {
-    return STATUSES.some((status) => status === name);
+  function isStatus(name2) {
+    return STATUSES.some((status) => status === name2);
   }
   function companiesPath(after) {
     return after === null ? "api/companies" : `api/companies?${new URLSearchParams({ after }).toString()}`;
   }
   function readCompany(value) {
     const id = field(value, "id");
-    const name = field(value, "name");
+    const name2 = field(value, "name");
     const status = field(value, "status");
     const createdAt = field(value, "created_at");
     const createdBy = field(value, "created_by");
-    if (typeof id !== "string" || id === "" || typeof name !== "string" || !isStatus(status) || typeof createdAt !== "number" || !Number.isSafeInteger(createdAt) || createdAt < 0 || typeof createdBy !== "string") {
+    if (typeof id !== "string" || id === "" || typeof name2 !== "string" || !isStatus(status) || typeof createdAt !== "number" || !Number.isSafeInteger(createdAt) || createdAt < 0 || typeof createdBy !== "string") {
       return null;
     }
-    return { id, name, status, createdAt, createdBy };
+    return { id, name: name2, status, createdAt, createdBy };
   }
   function readCompaniesPage(body) {
     const listed = field(body, "companies");
@@ -819,9 +834,9 @@
     return id.length <= ID_MAX_BYTES && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(id) ? id : null;
   }
   function companyNameOf(typed) {
-    const name = typed.trim();
-    const length = [...name].length;
-    return length >= 1 && length <= NAME_MAX_CHARS && !/\p{Cc}/u.test(name) ? name : null;
+    const name2 = typed.trim();
+    const length = [...name2].length;
+    return length >= 1 && length <= NAME_MAX_CHARS && !/\p{Cc}/u.test(name2) ? name2 : null;
   }
 
   // src/companies.ts
@@ -830,8 +845,8 @@
     badge2.dataset["state"] = company2.status === "active" ? "ok" : "warn";
     return badge2;
   }
-  function day(seconds3) {
-    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds3 * 1e3));
+  function day(seconds4) {
+    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds4 * 1e3));
   }
   function createForm(screen, created) {
     const keyFor = keys();
@@ -839,10 +854,10 @@
     id.type = "text";
     id.autocomplete = "off";
     id.spellcheck = false;
-    const name = make("input", "");
-    name.type = "text";
-    name.autocomplete = "off";
-    name.maxLength = 100;
+    const name2 = make("input", "");
+    name2.type = "text";
+    name2.autocomplete = "off";
+    name2.maxLength = 100;
     const reason = reasonField("company-reason");
     const said = notice();
     const submit = make("button", "primary", "Create the company");
@@ -852,7 +867,7 @@
       "change-form",
       make("h2", "", "Create a company"),
       labelled("company-id", "Id (lowercase letters, digits and inner hyphens; it becomes the issuer path)", id),
-      labelled("company-name", "Name people see", name),
+      labelled("company-name", "Name people see", name2),
       reason.row,
       said,
       submit
@@ -861,9 +876,9 @@
       event.preventDefault();
       said.hidden = true;
       const chosen = companyIdOf(id.value);
-      const named = companyNameOf(name.value);
+      const named = companyNameOf(name2.value);
       if (chosen === null || named === null) {
-        const wrong = chosen === null ? id : name;
+        const wrong = chosen === null ? id : name2;
         said.textContent = chosen === null ? "Give an id of 1 to 63 lowercase letters, digits and inner hyphens." : "Give a name of 1 to 100 characters.";
         said.hidden = false;
         wrong.setAttribute("aria-invalid", "true");
@@ -871,7 +886,7 @@
         return;
       }
       id.removeAttribute("aria-invalid");
-      name.removeAttribute("aria-invalid");
+      name2.removeAttribute("aria-invalid");
       const why = reasonIn(reason.input, said);
       if (why === null) {
         return;
@@ -1549,6 +1564,247 @@
     say(takePending());
   }
 
+  // src/keys-read.ts
+  var STATES = ["signing", "waiting", "previous", "retiring", "withdrawn"];
+  function name(value) {
+    return typeof value === "string" && value !== "" ? value : null;
+  }
+  function seconds2(value) {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  function readKey(item) {
+    const kid = name(field(item, "kid"));
+    const algorithm = name(field(item, "algorithm"));
+    const createdAt = seconds2(field(item, "created_at"));
+    const state = STATES.find((known) => known === field(item, "state"));
+    const sent = field(item, "signs_from");
+    const signsFrom = sent === null ? null : seconds2(sent);
+    if (kid === null || algorithm === null || createdAt === null || state === void 0) {
+      return null;
+    }
+    if (sent !== null && signsFrom === null) {
+      return null;
+    }
+    return { kid, algorithm, createdAt, state, signsFrom };
+  }
+  function readKeys(body) {
+    const items = field(body, "keys");
+    if (!Array.isArray(items)) {
+      return null;
+    }
+    const keys2 = items.map(readKey);
+    return keys2.every((key) => key !== null) ? keys2 : null;
+  }
+  function readRotated(body) {
+    const kid = name(field(body, "kid"));
+    const signsFrom = seconds2(field(body, "signs_from"));
+    return kid === null || signsFrom === null ? null : { kid, signsFrom };
+  }
+  function readWithdrawn(body) {
+    const withdrawn = name(field(body, "withdrawn"));
+    const sent = field(body, "replacement");
+    const replacement = sent === null ? null : name(sent);
+    if (withdrawn === null || sent !== null && replacement === null) {
+      return null;
+    }
+    return { withdrawn, replacement };
+  }
+
+  // src/keys.ts
+  var PATH2 = "api/keys";
+  function stateText(key) {
+    switch (key.state) {
+      case "signing":
+        return "Signs new tokens";
+      case "waiting":
+        return key.signsFrom === null ? "Published, waiting to sign" : `Published, signs from ${when(key.signsFrom)}`;
+      case "previous":
+        return "Published for the tokens it signed";
+      case "retiring":
+        return "No longer published";
+      case "withdrawn":
+        return "Withdrawn";
+    }
+  }
+  function keysTable(list, withdraw) {
+    const head = make(
+      "tr",
+      "",
+      make("th", "", "Key"),
+      make("th", "", "Algorithm"),
+      make("th", "", "Published"),
+      make("th", "", "State"),
+      make("th", "", "Actions")
+    );
+    for (const cell of head.children) {
+      cell.setAttribute("scope", "col");
+    }
+    const body = make("tbody", "");
+    for (const key of list) {
+      const action = make("td", "");
+      if (key.state !== "withdrawn") {
+        const pressed = button("Withdraw", "secondary", () => withdraw(key));
+        pressed.setAttribute("aria-label", `Withdraw ${key.kid}`);
+        action.append(pressed);
+      }
+      body.append(
+        make(
+          "tr",
+          "",
+          make("td", "", make("code", "", key.kid)),
+          make("td", "", key.algorithm),
+          make("td", "", when(key.createdAt)),
+          make("td", "", key.state === "signing" ? make("span", "pill", stateText(key)) : stateText(key)),
+          action
+        )
+      );
+    }
+    return make("table", "grid", make("thead", "", head), body);
+  }
+  function withdrawalPanel(screen, key, host, redraw) {
+    const keyFor = keys();
+    const typed = make("input", "mono");
+    typed.type = "text";
+    typed.autocomplete = "off";
+    typed.spellcheck = false;
+    const reason = reasonField("withdraw-reason");
+    const said = notice();
+    const withdraw = button("Withdraw the key", "danger", () => {
+      if (!confirmedBy(typed.value, key.kid)) {
+        return;
+      }
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      withdraw.disabled = true;
+      void change(`${PATH2}/${encodeURIComponent(key.kid)}/withdraw`, keyFor, { reason: why }).then((answer) => {
+        withdraw.disabled = false;
+        if (!screen.live()) {
+          return;
+        }
+        const done = answer.ok ? readWithdrawn(answer.body) : null;
+        if (done !== null) {
+          redraw(
+            done.replacement === null ? `Key ${done.withdrawn} withdrawn.` : `Key ${done.withdrawn} withdrawn; key ${done.replacement} was made to sign in its place.`
+          );
+          return;
+        }
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "That key", keyRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
+          said.hidden = false;
+        }
+      });
+    });
+    withdraw.disabled = true;
+    typed.addEventListener("input", () => {
+      withdraw.disabled = !confirmedBy(typed.value, key.kid);
+    });
+    const keep = button("Keep it", "secondary", () => {
+      host.replaceChildren();
+      say(`Key ${key.kid} kept.`);
+    });
+    host.replaceChildren(
+      make(
+        "section",
+        "change-form confirm",
+        make("h2", "", "Withdraw ", make("code", "", key.kid), "?"),
+        make(
+          "p",
+          "",
+          "Do this when the key may have been exposed. It is taken out of the key set at once, so every token it signed stops verifying; a service that cached the key set can still accept them for up to five minutes. Refresh tokens are not revoked. When no other key can sign, a new one is made first. This cannot be undone."
+        ),
+        labelled("withdraw-typed", "Type the key id to confirm", typed),
+        reason.row,
+        said,
+        make("div", "actions", withdraw, keep)
+      )
+    );
+    typed.focus();
+    say(`Confirm withdrawing key ${key.kid}.`);
+  }
+  function rotateForm(screen, waiting, redraw) {
+    if (waiting) {
+      return make(
+        "section",
+        "change-form",
+        make("h2", "", "Make a successor"),
+        make("p", "", "A successor is already published and waiting. It starts signing by itself.")
+      );
+    }
+    const keyFor = keys();
+    const reason = reasonField("rotate-reason");
+    const said = notice();
+    const start2 = button("Make a successor now", "primary", () => {
+      said.hidden = true;
+      const why = reasonIn(reason.input, said);
+      if (why === null) {
+        return;
+      }
+      void change(`${PATH2}/rotate`, keyFor, { reason: why }).then((answer) => {
+        if (!screen.live()) {
+          return;
+        }
+        const made = answer.ok ? readRotated(answer.body) : null;
+        if (made !== null) {
+          redraw(`Key ${made.kid} is published and signs from ${when(made.signsFrom)}.`);
+          return;
+        }
+        const text2 = answer.ok ? "The server answered in a shape the console cannot read." : refusedText(screen, answer, "The key", keyRefusalText);
+        if (text2 !== null) {
+          said.textContent = text2;
+          said.hidden = false;
+        }
+      });
+    });
+    return make(
+      "section",
+      "change-form",
+      make("h2", "", "Make a successor"),
+      make(
+        "p",
+        "",
+        "Keys are replaced every 30 days by themselves. A successor made now is published at once and signs five minutes later; the key it replaces stays published for an hour so the tokens it signed still verify."
+      ),
+      reason.row,
+      said,
+      make("div", "actions", start2)
+    );
+  }
+  async function keysView(screen, message = "") {
+    say("Loading the signing keys.");
+    const answer = await call("GET", PATH2);
+    if (!screen.live()) {
+      return;
+    }
+    if (!answer.ok) {
+      refusedOn(screen, "Signing keys", answer, "The keys");
+      return;
+    }
+    const list = readKeys(answer.body);
+    if (list === null) {
+      unreadable(screen, "Signing keys");
+      return;
+    }
+    const redraw = (said) => void keysView(screen, said);
+    const withdrawal = make("div", "");
+    const withdraw = (key) => withdrawalPanel(screen, key, withdrawal, redraw);
+    show(
+      screen.view,
+      heading("Signing keys"),
+      make("p", "lead", "The keys this company's issuer signs tokens with. No private part of a key is ever shown."),
+      list.length === 0 ? make("p", "empty", "No key yet; one is made within five minutes.") : keysTable(list, withdraw),
+      withdrawal,
+      rotateForm(
+        screen,
+        list.some((key) => key.state === "waiting"),
+        redraw
+      )
+    );
+    say(message);
+  }
+
   // src/clients-read.ts
   var ALGORITHMS = ["EdDSA", "ES256"];
   var GRANTS = ["authorization_code", "refresh_token", "client_credentials"];
@@ -1769,13 +2025,13 @@
     label2.htmlFor = id;
     return { input: input2, row: make("div", "field", label2, input2) };
   }
-  function toggles(legend, name, options, on) {
+  function toggles(legend, name2, options, on) {
     const group = make("fieldset", "segmented", make("legend", "", legend));
     const inputs = [];
     for (const option of options) {
       const input2 = make("input", "");
       input2.type = "checkbox";
-      input2.id = `${name}-${option}`;
+      input2.id = `${name2}-${option}`;
       input2.value = option;
       input2.checked = on.includes(option);
       const label2 = make("label", "", option);
@@ -1914,16 +2170,16 @@
     const body = make("tbody", "");
     for (const client of clients) {
       const kind = make("span", "badge", client.kind);
-      const name = make("td", "", make("code", "", client.id));
+      const name2 = make("td", "", make("code", "", client.id));
       if (client.console) {
-        name.append(make("div", "", make("span", "pill", "this console")));
+        name2.append(make("div", "", make("span", "pill", "this console")));
       }
       const signs = client.assertionAlg === null ? kind : make("span", "", kind, ` ${client.assertionAlg}`);
       body.append(
         make(
           "tr",
           "",
-          name,
+          name2,
           make("td", "", signs),
           make("td", "", values(client.redirectUris)),
           make("td", "", values(client.scopeCeiling)),
@@ -1986,16 +2242,16 @@
   function operatorsPath(after) {
     return after === null ? "api/operators" : `api/operators?${new URLSearchParams({ after }).toString()}`;
   }
-  function seconds2(value) {
+  function seconds3(value) {
     return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
   }
   function readGrant(value) {
     const user = field(value, "user");
     const role = field(value, "role");
     const grantedBy = field(value, "granted_by");
-    const grantedAt = seconds2(field(value, "granted_at"));
+    const grantedAt = seconds3(field(value, "granted_at"));
     const expires = field(value, "expires_at");
-    const expiresAt = expires === null ? null : seconds2(expires);
+    const expiresAt = expires === null ? null : seconds3(expires);
     const reason = field(value, "reason");
     if (typeof user !== "string" || user === "" || typeof role !== "string" || !isRole(role) || typeof grantedBy !== "string" || grantedAt === null || expires !== null && expiresAt === null || typeof reason !== "string") {
       return null;
@@ -2037,8 +2293,8 @@
 
   // src/operators.ts
   var DAYS_WRONG = "Give a whole number of days from 1 to 365, or leave it empty for 90.";
-  function day2(seconds3) {
-    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds3 * 1e3));
+  function day2(seconds4) {
+    return new Intl.DateTimeFormat(void 0, { dateStyle: "medium" }).format(new Date(seconds4 * 1e3));
   }
   function grantForm(screen, roles, granted) {
     const keyFor = keys();
@@ -2230,8 +2486,8 @@
 
   // src/policy-read.ts
   var POLICIES = ["off", "optional", "required"];
-  function isPolicy(name) {
-    return POLICIES.some((policy) => policy === name);
+  function isPolicy(name2) {
+    return POLICIES.some((policy) => policy === name2);
   }
   function readPolicy(body) {
     const policy = field(body, "policy");
@@ -2252,7 +2508,7 @@
   }
 
   // src/policy.ts
-  var PATH2 = "api/policy/two-factor";
+  var PATH3 = "api/policy/two-factor";
   function badge(policy) {
     const made = make("span", "badge", policy);
     made.dataset["state"] = policy === "off" ? "warn" : "ok";
@@ -2308,7 +2564,7 @@
         return;
       }
       typed.removeAttribute("aria-invalid");
-      void change(PATH2, keyFor, { expected: current, policy: chosen, reason: why }, "PUT").then((answer) => {
+      void change(PATH3, keyFor, { expected: current, policy: chosen, reason: why }, "PUT").then((answer) => {
         if (!screen.live()) {
           return;
         }
@@ -2337,7 +2593,7 @@
   }
   async function policyView(screen, company2, message = "") {
     say("Loading the policy.");
-    const answer = await call("GET", PATH2);
+    const answer = await call("GET", PATH3);
     if (!screen.live()) {
       return;
     }
@@ -2731,7 +2987,7 @@
     const current = sectionOf(at);
     for (const anchor of sections.querySelectorAll("[data-section]")) {
       const section = anchor.dataset["section"] ?? "";
-      anchor.hidden = !open.some((name) => name === section);
+      anchor.hidden = !open.some((name2) => name2 === section);
       if (section === current) {
         anchor.setAttribute("aria-current", "page");
       } else {
@@ -2804,6 +3060,9 @@
         return;
       case "branding":
         void brandingView(screen);
+        return;
+      case "keys":
+        void keysView(screen);
         return;
       case "audit":
         void auditView(screen, at.after);

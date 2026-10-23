@@ -5,9 +5,9 @@
 import { field, strings } from "./flow.ts";
 
 /** The operator roles the console knows, as the server names them. */
-export type Role = "users" | "clients" | "policy" | "audit" | "companies";
+export type Role = "users" | "clients" | "policy" | "keys" | "audit" | "companies";
 
-const ROLES: readonly Role[] = ["users", "clients", "policy", "audit", "companies"];
+const ROLES: readonly Role[] = ["users", "clients", "policy", "keys", "audit", "companies"];
 
 /** Who the console is signed in as. */
 export interface Me {
@@ -16,7 +16,16 @@ export interface Me {
 }
 
 /** A section of the console, named for the job it serves. */
-export type Section = "users" | "groups" | "clients" | "operators" | "policy" | "branding" | "audit" | "companies";
+export type Section =
+  | "users"
+  | "groups"
+  | "clients"
+  | "operators"
+  | "policy"
+  | "branding"
+  | "keys"
+  | "audit"
+  | "companies";
 
 /** The role a section needs; operators lists the grants of whatever roles the viewer holds, so it needs none. */
 const NEEDS: readonly [Section, Role | null][] = [
@@ -26,6 +35,7 @@ const NEEDS: readonly [Section, Role | null][] = [
   ["operators", null],
   ["policy", "policy"],
   ["branding", "policy"],
+  ["keys", "keys"],
   ["audit", "audit"],
   ["companies", "companies"],
 ];
@@ -41,6 +51,7 @@ export type Route =
   | { kind: "operators"; after: string | null }
   | { kind: "policy" }
   | { kind: "branding" }
+  | { kind: "keys" }
   | { kind: "audit"; after: number | null }
   | { kind: "companies"; after: string | null };
 
@@ -89,6 +100,8 @@ export function route(hash: string): Route {
       return { kind: "policy" };
     case "branding":
       return { kind: "branding" };
+    case "keys":
+      return { kind: "keys" };
     case "audit": {
       const after = query.get("after");
       return { kind: "audit", after: after !== null && /^\d+$/.test(after) ? Number(after) : null };
