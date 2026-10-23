@@ -113,3 +113,13 @@ has lapsed or whose change already took effect gets `400` `code_rejected`.
 Logs are JSON on standard output, filtered by
 `RUST_LOG` (`info` by default). On `SIGINT` or `SIGTERM` the listeners stop accepting, the requests in flight
 finish within 25 seconds, and the process exits 0.
+
+A line about something that happened carries an `event` field; these are the ones worth an alert. At `ERROR`:
+`break_glass` (the emergency operator path ran) and `audit_unrecorded` (an event could not be appended to the audit
+trail; an issuance it belonged to was not answered). At `WARN`, worth an alert on any occurrence: `code_replayed` (a
+redeemed code presented again; the refresh family it started is revoked), `refresh_reused` (a rotated refresh token
+presented again; its family is revoked), `passkey_clone_suspected` (a passkey's counter did not move forward) and
+`recovery_code_used`. At `WARN`, worth an alert on a rise above the usual rate: `signin_rejected` (a rejected
+sign-in credential), `authorization_refused`, `userinfo_refused` (its `reason` `AccessTokenUnverified` covers a
+token whose signature, key or algorithm is not the issuer's), `logout_untold` and `mail_abandoned`. The server sends
+no alerts itself.
