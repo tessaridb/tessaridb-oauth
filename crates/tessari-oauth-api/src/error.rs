@@ -64,6 +64,9 @@ pub enum Error {
     /// The code does not come from the secret being enrolled.
     #[error("the code was not accepted")]
     CodeRejected,
+    /// No mail relay is configured, so a flow that sends mail is not offered; the same answer for every address.
+    #[error("mail is not configured")]
+    MailUnavailable,
     /// The new password breaks one of the rules for new passwords.
     #[error("the password was not accepted")]
     PasswordRejected(PasswordRefused),
@@ -121,6 +124,7 @@ impl Error {
             }
             Self::ReasonRequired | Self::IdempotencyKeyRequired => ErrorCategory::Validation,
             Self::IdempotencyKeyReused | Self::ChangeInProgress => ErrorCategory::Conflict,
+            Self::MailUnavailable => ErrorCategory::Unavailable,
         }
     }
 }
@@ -202,6 +206,11 @@ impl IntoResponse for Error {
                 StatusCode::BAD_REQUEST,
                 "code_rejected",
                 "the code was not accepted; start again",
+            ),
+            (Self::MailUnavailable, _) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "mail_unavailable",
+                "this server does not send mail; ask an administrator",
             ),
             (Self::PasswordRejected(rule), _) => (
                 StatusCode::BAD_REQUEST,

@@ -17,10 +17,12 @@ use tessari_oauth_storage::factors::FactorService;
 use tessari_oauth_storage::groups::GroupService;
 use tessari_oauth_storage::interactions::InteractionService;
 use tessari_oauth_storage::keys::KeyService;
+use tessari_oauth_storage::outbox::OutboxService;
 use tessari_oauth_storage::passkeys::PasskeyService;
 use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::refresh::RefreshService;
 use tessari_oauth_storage::replay::ReplayService;
+use tessari_oauth_storage::resets::ResetService;
 use tessari_oauth_storage::sessions::SessionService;
 use tessari_oauth_storage::signins::SigninService;
 use tessari_oauth_storage::subjects::SubjectService;
@@ -91,6 +93,12 @@ pub struct PublicState {
     pub elsewhere: Arc<Elsewhere>,
     /// The clock the key rule is judged at.
     pub clock: Clock,
+    /// The mail owed and not yet sent.
+    pub outbox: Arc<OutboxService>,
+    /// Password-reset tokens.
+    pub resets: Arc<ResetService>,
+    /// Whether a mail relay is configured, so the flows that send mail are offered.
+    pub mail: bool,
 }
 
 impl PublicState {

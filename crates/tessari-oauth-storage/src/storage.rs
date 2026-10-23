@@ -25,6 +25,7 @@ use crate::passkeys::{PasskeyService, TessaridbPasskeyRepository};
 use crate::policies::{PolicyService, TessaridbPolicyRepository};
 use crate::refresh::{RefreshService, TessaridbRefreshRepository};
 use crate::replay::{ReplayService, TessaridbReplayRepository};
+use crate::resets::{ResetService, TessaridbResetRepository};
 use crate::sessions::{SessionService, TessaridbSessionRepository};
 use crate::signins::{SigninService, TessaridbSigninRepository};
 use crate::subjects::{SubjectService, TessaridbSecretRepository};
@@ -81,6 +82,8 @@ pub struct Storage {
     pub logouts: Arc<LogoutService>,
     /// The mail owed and not yet sent.
     pub outbox: Arc<OutboxService>,
+    /// The password-reset tokens mail carries.
+    pub resets: Arc<ResetService>,
     /// Which users of each company may administer it, and for which tasks.
     pub operators: Arc<OperatorService>,
     /// Admin console sign-ins and sessions.
@@ -119,6 +122,7 @@ impl Storage {
         let session_repository = Arc::new(TessaridbSessionRepository::new(database.clone()));
         let logout_repository = Arc::new(TessaridbLogoutRepository::new(database.clone()));
         let outbox_repository = Arc::new(TessaridbOutboxRepository::new(database.clone()));
+        let reset_repository = Arc::new(TessaridbResetRepository::new(database.clone()));
         let operator_repository = Arc::new(TessaridbOperatorRepository::new(database.clone()));
         let admin_repository = Arc::new(TessaridbAdminRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
@@ -160,6 +164,7 @@ impl Storage {
             sessions: Arc::new(SessionService::new(session_repository, tenancy.clone())),
             logouts: Arc::new(LogoutService::new(logout_repository, tenancy.clone())),
             outbox: Arc::new(OutboxService::new(outbox_repository, tenancy.clone())),
+            resets: Arc::new(ResetService::new(reset_repository, tenancy.clone())),
             operators: Arc::new(OperatorService::new(
                 operator_repository,
                 tenancy.clone(),

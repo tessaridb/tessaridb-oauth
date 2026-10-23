@@ -123,6 +123,14 @@ pub fn public_router(state: PublicState) -> Router {
             post(login::enroll),
         )
         .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/reset"),
+            post(login::request_reset),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/reset/complete"),
+            post(login::complete_reset),
+        )
+        .route(
             &format!("/{{tenant}}{LOGIN_API_PATH}/consent"),
             get(login::consent).post(login::decide),
         )

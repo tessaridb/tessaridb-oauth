@@ -64,6 +64,9 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         },
         elsewhere: Arc::new(Elsewhere::new()),
         clock: Arc::new(|| Timestamp::from_unix_secs(NOW)),
+        outbox: Arc::clone(&storage.outbox),
+        resets: Arc::clone(&storage.resets),
+        mail: true,
     }
 }
 

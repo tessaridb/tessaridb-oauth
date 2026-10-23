@@ -44,6 +44,7 @@ mod login_passkey;
 mod login_passkey_assertion;
 mod login_passkey_counts;
 mod login_password;
+mod login_reset;
 mod logout;
 mod pages;
 mod par;

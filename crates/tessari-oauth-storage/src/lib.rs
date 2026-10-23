@@ -25,6 +25,7 @@ pub mod passkeys;
 pub mod policies;
 pub mod refresh;
 pub mod replay;
+pub mod resets;
 mod retry;
 pub mod sessions;
 pub mod signins;

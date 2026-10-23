@@ -19,6 +19,7 @@ mod factors;
 mod identify;
 mod passkey;
 mod password;
+mod reset;
 
 pub(super) use begin::begin;
 pub(super) use consent::{consent, decide, signed_in};
@@ -27,6 +28,7 @@ pub(super) use factors::{recovery, totp};
 pub(super) use identify::identify;
 pub(super) use passkey::{passkey, passkey_options, relying_party};
 pub(super) use password::password;
+pub(super) use reset::{complete_reset, request_reset};
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
@@ -184,6 +186,12 @@ async fn settled(
             signin.ceremony.verified_methods(),
             now,
         )
+        .await
+        .map_err(Error::Store)?;
+    // The account's owner holds it again, so a reset link sent earlier stops working.
+    state
+        .resets
+        .cancel(tenant, user)
         .await
         .map_err(Error::Store)?;
     tracing::info!(
