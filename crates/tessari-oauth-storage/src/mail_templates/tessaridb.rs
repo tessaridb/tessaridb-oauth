@@ -6,6 +6,8 @@ use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
 use super::TemplateEntity;
 use super::repository::MailTemplateRepository;
+use tessari_oauth_types::ErrorCategory;
+
 use crate::{Result, answers};
 
 pub(crate) struct TessaridbMailTemplateRepository {
@@ -16,6 +18,18 @@ impl TessaridbMailTemplateRepository {
     pub(crate) const fn new(database: Database) -> Self {
         Self { database }
     }
+}
+
+/// The values a company's own wording is written with.
+fn own_values(kind: &str, template: &TemplateEntity) -> Vec<(String, Value)> {
+    let mut values = values(kind, template);
+    let by = template
+        .updated_by
+        .as_deref()
+        .map_or(Value::None, Value::from);
+    values.push(("by".to_owned(), by));
+    values.push(("revision".to_owned(), Value::from(template.revision)));
+    values
 }
 
 /// The values a default is written with.
@@ -72,6 +86,15 @@ impl MailTemplateRepository for TessaridbMailTemplateRepository {
         answers::single(answers, "mail default")
     }
 
+    async fn defaults(&self, place: &Place) -> Result<Vec<TemplateEntity>> {
+        // One row per kind, and there are nine kinds.
+        let answers = self
+            .database
+            .run_at(place, "SELECT * FROM mail_defaults LIMIT 50;", Vec::new())
+            .await?;
+        answers::records(answers, "mail default")
+    }
+
     async fn find_override(&self, place: &Place, kind: &str) -> Result<Option<TemplateEntity>> {
         let answers = self
             .database
@@ -93,7 +116,7 @@ impl MailTemplateRepository for TessaridbMailTemplateRepository {
         answers::records(answers, "mail template")
     }
 
-    async fn put_override(
+    async fn create_override(
         &self,
         place: &Place,
         kind: &str,
@@ -102,31 +125,59 @@ impl MailTemplateRepository for TessaridbMailTemplateRepository {
         self.database
             .run_at(
                 place,
-                "UPSERT mail_templates:$kind = { subject: $subject, text: $text, updated_at: $at, \
-                 updated_by: $by };",
-                {
-                    let mut values = values(kind, template);
-                    let by = template
-                        .updated_by
-                        .as_deref()
-                        .map_or(Value::None, Value::from);
-                    values.push(("by".to_owned(), by));
-                    values
-                },
+                "CREATE mail_templates:$kind = { subject: $subject, text: $text, updated_at: $at, \
+                 updated_by: $by, revision: $revision };",
+                own_values(kind, template),
             )
             .await?;
         Ok(())
     }
 
-    async fn delete_override(&self, place: &Place, kind: &str) -> Result<bool> {
-        let answers = self
+    async fn replace_override(
+        &self,
+        place: &Place,
+        kind: &str,
+        replaces: i64,
+        template: &TemplateEntity,
+    ) -> Result<bool> {
+        // The whole record, and only from the revision the caller read: a condition on an edit is a compare-and-set.
+        let mut values = own_values(kind, template);
+        values.push(("replaces".to_owned(), Value::from(replaces)));
+        let written = self
             .database
             .run_at(
                 place,
-                "DELETE mail_templates:$kind RETURN BEFORE;",
-                vec![("kind".to_owned(), Value::from(kind))],
+                "UPDATE mail_templates:$kind = { subject: $subject, text: $text, updated_at: $at, \
+                 updated_by: $by, revision: $revision } WHERE revision = $replaces;",
+                values,
             )
-            .await?;
-        Ok(answers::returned::<TemplateEntity>(answers, kind, "mail template")?.is_some())
+            .await;
+        moved_is_false(written.map_err(crate::Error::from))
+    }
+
+    async fn delete_override(&self, place: &Place, kind: &str, revision: i64) -> Result<bool> {
+        // The compare-and-set and the delete commit together, so two resets racing remove the record once.
+        let removed = self
+            .database
+            .run_at(
+                place,
+                "BEGIN; UPDATE mail_templates:$kind SET revision = $revision WHERE revision = $revision; \
+                 DELETE mail_templates:$kind; COMMIT;",
+                vec![
+                    ("kind".to_owned(), Value::from(kind)),
+                    ("revision".to_owned(), Value::from(revision)),
+                ],
+            )
+            .await;
+        moved_is_false(removed.map_err(crate::Error::from))
+    }
+}
+
+/// A write's outcome: done, or not done because the record is no longer at the revision named.
+fn moved_is_false<T>(written: Result<T>) -> Result<bool> {
+    match written {
+        Ok(_) => Ok(true),
+        Err(refused) if refused.category() == ErrorCategory::Conflict => Ok(false),
+        Err(failure) => Err(failure),
     }
 }

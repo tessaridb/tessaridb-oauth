@@ -13,6 +13,7 @@ mod enrolment;
 mod groups;
 mod groups_read;
 mod keys;
+mod mail;
 mod operator;
 mod operators;
 mod policy;
@@ -39,6 +40,7 @@ use tessari_oauth_storage::consents::ConsentService;
 use tessari_oauth_storage::enrolments::EnrolmentService;
 use tessari_oauth_storage::groups::GroupService;
 use tessari_oauth_storage::keys::KeyService;
+use tessari_oauth_storage::mail_templates::MailTemplateService;
 use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::refresh::RefreshService;
@@ -80,6 +82,8 @@ pub struct AdminState {
     pub brands: Arc<BrandService>,
     /// Each company's signing keys, which the console reads, adds to and withdraws.
     pub keys: Arc<KeyService>,
+    /// Each company's mail wording, which the console reads, replaces and resets.
+    pub mail_templates: Arc<MailTemplateService>,
     /// The key-encryption key a key made from the console is sealed under.
     pub kek: Arc<Kek>,
     /// The algorithm a key made from the console signs with, as the rotation daemon's keys do.
@@ -179,6 +183,12 @@ pub fn admin_router(state: AdminState) -> Router {
             "/admin/{company}/api/branding/logo/remove",
             post(branding::remove_logo),
         )
+        .route("/admin/{company}/api/mail", get(mail::read))
+        .route(
+            "/admin/{company}/api/mail/{kind}",
+            axum::routing::put(mail::set),
+        )
+        .route("/admin/{company}/api/mail/{kind}/reset", post(mail::reset))
         .route("/admin/{company}/api/keys", get(keys::read))
         .route("/admin/{company}/api/keys/rotate", post(keys::rotate))
         .route(

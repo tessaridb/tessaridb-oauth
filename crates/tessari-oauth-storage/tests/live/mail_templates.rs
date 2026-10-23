@@ -2,6 +2,7 @@
 //! a reset brings the default back, and wording that breaks its kind's rules is refused and never stored.
 
 use tessari_oauth_core::mail_template::{MailKind, Placeholder, Template, TemplateRefused};
+use tessari_oauth_storage::mail_templates::{Reset, Set};
 use tessari_oauth_types::{TenantId, Timestamp};
 
 use crate::fresh;
@@ -42,12 +43,40 @@ async fn a_company_sends_the_default_until_it_keeps_its_own_wording() {
         templates.resolve(&tenant("acme"), MailKind::Reset).await,
         Ok(shipped.clone())
     );
-    assert_eq!(templates.overrides(&tenant("acme")).await, Ok(Vec::new()));
+    let own_kinds = |wording: Vec<tessari_oauth_storage::mail_templates::Wording>| {
+        wording
+            .into_iter()
+            .filter(|row| row.own)
+            .map(|row| (row.kind, row.template, row.revision))
+            .collect::<Vec<_>>()
+    };
+    let before = templates
+        .wording(&tenant("acme"))
+        .await
+        .expect("the wording");
+    assert_eq!(before.len(), MailKind::ALL.len());
+    assert_eq!(own_kinds(before), Vec::new());
 
     let set = templates
-        .set(&tenant("acme"), MailKind::Reset, &own(), "operator-1", at())
+        .set(
+            &tenant("acme"),
+            (MailKind::Reset, 0),
+            &own(),
+            "operator-1",
+            at(),
+        )
         .await;
-    assert_eq!(set, Ok(Ok(())));
+    assert_eq!(set, Ok(Set::Made(1)));
+    let stale = templates
+        .set(
+            &tenant("acme"),
+            (MailKind::Reset, 0),
+            &own(),
+            "operator-2",
+            at(),
+        )
+        .await;
+    assert_eq!(stale, Ok(Set::Moved), "set meanwhile by somebody else");
     assert_eq!(
         templates.resolve(&tenant("acme"), MailKind::Reset).await,
         Ok(own())
@@ -63,17 +92,21 @@ async fn a_company_sends_the_default_until_it_keeps_its_own_wording() {
         "the other kinds keep theirs"
     );
     assert_eq!(
-        templates.overrides(&tenant("acme")).await,
-        Ok(vec![(MailKind::Reset, own())])
+        templates.wording(&tenant("acme")).await.map(own_kinds),
+        Ok(vec![(MailKind::Reset, own(), 1)])
     );
 
     assert_eq!(
-        templates.reset(&tenant("acme"), MailKind::Reset).await,
-        Ok(true)
+        templates.reset(&tenant("acme"), MailKind::Reset, 2).await,
+        Ok(Reset::Moved)
     );
     assert_eq!(
-        templates.reset(&tenant("acme"), MailKind::Reset).await,
-        Ok(false)
+        templates.reset(&tenant("acme"), MailKind::Reset, 1).await,
+        Ok(Reset::Made)
+    );
+    assert_eq!(
+        templates.reset(&tenant("acme"), MailKind::Reset, 1).await,
+        Ok(Reset::None)
     );
     assert_eq!(
         templates.resolve(&tenant("acme"), MailKind::Reset).await,
@@ -95,15 +128,22 @@ async fn wording_that_drops_the_link_is_refused_and_never_stored() {
     let set = templates
         .set(
             &tenant("acme"),
-            MailKind::Reset,
+            (MailKind::Reset, 0),
             &no_link,
             "operator-1",
             at(),
         )
         .await;
 
-    assert_eq!(set, Ok(Err(TemplateRefused::Missing(Placeholder::Link))));
-    assert_eq!(templates.overrides(&tenant("acme")).await, Ok(Vec::new()));
+    assert_eq!(
+        set,
+        Ok(Set::Refused(TemplateRefused::Missing(Placeholder::Link)))
+    );
+    let wording = templates
+        .wording(&tenant("acme"))
+        .await
+        .expect("the wording");
+    assert!(wording.iter().all(|row| !row.own && row.revision == 0));
     assert_eq!(
         templates.resolve(&tenant("acme"), MailKind::Reset).await,
         Ok(MailKind::Reset.built_in())

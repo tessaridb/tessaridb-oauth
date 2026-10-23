@@ -15,6 +15,8 @@ pub struct TemplateEntity {
     pub updated_at: i64,
     /// Who set it, for a company's override; none for a default.
     pub updated_by: Option<String>,
+    /// How many times a company set its own wording for the kind: 1 for the first; 0 for a default.
+    pub revision: i64,
 }
 
 impl FromRecord for TemplateEntity {
@@ -25,6 +27,7 @@ impl FromRecord for TemplateEntity {
             text: row.take("text")?,
             updated_at: row.take("updated_at")?,
             updated_by: row.take("updated_by")?,
+            revision: row.take::<Option<i64>>("revision")?.unwrap_or(0),
         })
     }
 }

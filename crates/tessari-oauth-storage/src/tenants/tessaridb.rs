@@ -140,7 +140,8 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      DEFINE INDEX IF NOT EXISTS by_user ON email_changes FIELDS user_id; \
      DEFINE INDEX IF NOT EXISTS by_cancel ON email_changes FIELDS cancel_digest; \
      DEFINE TABLE IF NOT EXISTS mail_templates (\
-     subject string REQUIRED, text string REQUIRED, updated_at int REQUIRED, updated_by string); \
+     subject string REQUIRED, text string REQUIRED, updated_at int REQUIRED, updated_by string, \
+     revision int REQUIRED); \
      DEFINE TABLE IF NOT EXISTS operator_grants (\
      user_id string REQUIRED, role_name string REQUIRED, granted_by string REQUIRED, granted_at int REQUIRED, \
      reason string REQUIRED); \

@@ -23,20 +23,34 @@ pub(crate) trait MailTemplateRepository: Send + Sync {
     /// The region's default for `kind`.
     async fn find_default(&self, place: &Place, kind: &str) -> Result<Option<TemplateEntity>>;
 
+    /// Every default the region keeps.
+    async fn defaults(&self, place: &Place) -> Result<Vec<TemplateEntity>>;
+
     /// A company's override of `kind`.
     async fn find_override(&self, place: &Place, kind: &str) -> Result<Option<TemplateEntity>>;
 
     /// Every override a company keeps.
     async fn overrides(&self, place: &Place) -> Result<Vec<TemplateEntity>>;
 
-    /// Store a company's override of `kind`, replacing any before.
-    async fn put_override(
+    /// Store a company's first override of `kind`; refused as a conflict when one is stored.
+    async fn create_override(
         &self,
         place: &Place,
         kind: &str,
         template: &TemplateEntity,
     ) -> Result<()>;
 
-    /// Remove a company's override of `kind`; whether there was one.
-    async fn delete_override(&self, place: &Place, kind: &str) -> Result<bool>;
+    /// Replace a company's override of `kind` whole, only while it is at revision `replaces`; false when it is at
+    /// another. A record that is not there at all is refused.
+    async fn replace_override(
+        &self,
+        place: &Place,
+        kind: &str,
+        replaces: i64,
+        template: &TemplateEntity,
+    ) -> Result<bool>;
+
+    /// Remove a company's override of `kind`, only while it is at `revision`; false when it is at another. A record
+    /// that is not there at all is refused.
+    async fn delete_override(&self, place: &Place, kind: &str, revision: i64) -> Result<bool>;
 }

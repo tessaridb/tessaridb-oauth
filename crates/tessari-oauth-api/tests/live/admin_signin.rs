@@ -34,6 +34,7 @@ pub(crate) fn console_state(server: &Server, console: &str) -> AdminState {
         policies: Arc::clone(&server.storage.policies),
         brands: Arc::clone(&server.storage.brands),
         keys: Arc::clone(&server.storage.keys),
+        mail_templates: Arc::clone(&server.storage.mail_templates),
         kek: Arc::clone(&server.kek),
         signing_algorithm: tessari_oauth_types::Algorithm::Es256,
         users: Arc::clone(&server.storage.users),

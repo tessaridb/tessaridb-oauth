@@ -22,6 +22,7 @@ mod admin_clients;
 mod admin_companies;
 mod admin_groups;
 mod admin_keys;
+mod admin_mail;
 mod admin_matrix;
 mod admin_operators;
 mod admin_pages;
