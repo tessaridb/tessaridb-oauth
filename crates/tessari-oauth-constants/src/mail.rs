@@ -26,3 +26,12 @@ pub const EMAIL_CHANGE_CONFIRM_SECS: u64 = 86_400;
 /// How long a change of sign-in address is held after it was asked for, in seconds, so that the link mailed to the
 /// old address can still cancel it (the change waits for this even when the new address was confirmed at once).
 pub const EMAIL_CHANGE_HOLD_SECS: u64 = 86_400;
+
+/// How often the address-change worker looks for changes whose hold is over, in seconds.
+pub const EMAIL_CHANGE_APPLY_INTERVAL_SECS: u64 = 60;
+
+/// The most one run of the address-change worker may take, in seconds: below its interval.
+pub const EMAIL_CHANGE_APPLY_RUN_TIMEOUT_SECS: u64 = 45;
+
+/// How many due address changes one run applies per company; the rest wait for the next run.
+pub const EMAIL_CHANGE_APPLY_BATCH: u32 = 20;

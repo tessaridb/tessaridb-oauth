@@ -8,6 +8,7 @@
 #![cfg(test)]
 
 mod directory_refresh;
+mod email_change_apply;
 mod key_rotation;
 mod logout_delivery;
 mod mail_delivery;

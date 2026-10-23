@@ -3,6 +3,7 @@
 
 mod daemon;
 mod directory_refresh;
+mod email_change_apply;
 mod error;
 mod key_rotation;
 mod logout_delivery;
@@ -12,6 +13,7 @@ mod runner;
 
 pub use daemon::{Daemon, DaemonFuture, DaemonReport};
 pub use directory_refresh::DirectoryRefresh;
+pub use email_change_apply::EmailChangeApply;
 pub use error::{Error, Result};
 pub use key_rotation::KeyRotation;
 pub use logout_delivery::{LogoutDelivery, LogoutSender};

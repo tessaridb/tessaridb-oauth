@@ -11,15 +11,16 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tessari_oauth_api::{AdminState, PublicState, admin_router, public_router, serve, trusting};
 use tessari_oauth_constants::{
-    DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS,
-    KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS,
-    LOGOUT_SEND_TIMEOUT_SECS, MAIL_DELIVERY_INTERVAL_SECS, MAIL_DELIVERY_RUN_TIMEOUT_SECS,
-    MAIL_SEND_TIMEOUT_SECS, PEER_DIRECTORIES_SECS, PEER_DIRECTORIES_TIMEOUT_SECS,
-    SHUTDOWN_DRAIN_SECS,
+    DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS, EMAIL_CHANGE_APPLY_INTERVAL_SECS,
+    EMAIL_CHANGE_APPLY_RUN_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS, KEY_ROTATION_RUN_TIMEOUT_SECS,
+    LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS, LOGOUT_SEND_TIMEOUT_SECS,
+    MAIL_DELIVERY_INTERVAL_SECS, MAIL_DELIVERY_RUN_TIMEOUT_SECS, MAIL_SEND_TIMEOUT_SECS,
+    PEER_DIRECTORIES_SECS, PEER_DIRECTORIES_TIMEOUT_SECS, SHUTDOWN_DRAIN_SECS,
 };
 use tessari_oauth_core::discovery;
 use tessari_oauth_daemons::{
-    DirectoryRefresh, KeyRotation, LogoutDelivery, MailDelivery, Peer, PeerDirectories,
+    DirectoryRefresh, EmailChangeApply, KeyRotation, LogoutDelivery, MailDelivery, Peer,
+    PeerDirectories,
 };
 use tessari_oauth_infrastructure::backchannel::Poster;
 use tessari_oauth_infrastructure::config::NodeConfig;
@@ -229,6 +230,18 @@ async fn run(
         });
         tokio::spawn(tessari_oauth_daemons::run(mail, stopped.clone()))
     });
+    // Always: a change confirmed while mail was set up still takes effect, and its notices wait in the queue.
+    let changes = Arc::new(EmailChangeApply {
+        email_changes: Arc::clone(&storage.email_changes),
+        outbox: Arc::clone(&storage.outbox),
+        audit: Arc::clone(&storage.audit),
+        kek: Arc::clone(&kek),
+        served: Arc::clone(&served),
+        clock: Arc::clone(&clock),
+        interval: Duration::from_secs(EMAIL_CHANGE_APPLY_INTERVAL_SECS),
+        timeout: Duration::from_secs(EMAIL_CHANGE_APPLY_RUN_TIMEOUT_SECS),
+    });
+    let changing = tokio::spawn(tessari_oauth_daemons::run(changes, stopped.clone()));
     let refresh = Arc::new(DirectoryRefresh {
         companies: Arc::clone(&storage.companies),
         served: Arc::clone(&served),
@@ -367,7 +380,7 @@ async fn run(
         _ = terminate.recv() => tracing::info!(signal = "SIGTERM", "shutting down"),
     }
     stop.send(true)?;
-    let (answered, answered_admin, rotated, delivered, mailed, refreshed, peered) =
+    let (answered, answered_admin, rotated, delivered, mailed, changed, refreshed, peered) =
         tokio::time::timeout(Duration::from_secs(SHUTDOWN_DRAIN_SECS), async {
             let rotated = rotating.await;
             let delivered = delivering.await;
@@ -375,6 +388,7 @@ async fn run(
                 Some(mailing) => Some(mailing.await),
                 None => None,
             };
+            let changed = changing.await;
             let refreshed = refreshing.await;
             let peered = match reading_peers {
                 Some(reading) => Some(reading.await),
@@ -387,6 +401,7 @@ async fn run(
                 rotated,
                 delivered,
                 mailed,
+                changed,
                 refreshed,
                 peered,
             )
@@ -396,6 +411,7 @@ async fn run(
     rotated?;
     delivered?;
     mailed.transpose()?;
+    changed?;
     refreshed?;
     peered.transpose()?;
     answered_admin??;
