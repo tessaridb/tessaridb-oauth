@@ -23,6 +23,7 @@ sha2.workspace = true
 subtle.workspace = true
 coset.workspace = true
 url.workspace = true
+png.workspace = true
 unicode-normalization.workspace = true
 
 [lints]

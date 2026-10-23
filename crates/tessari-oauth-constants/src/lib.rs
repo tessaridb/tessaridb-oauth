@@ -1,6 +1,7 @@
 //! Every number and fixed alphabet with a meaning in TessariDB OAuth, typed and documented with its unit
 //! and the specification it comes from.
 
+mod branding;
 mod encoding;
 mod endpoints;
 mod ids;
@@ -15,6 +16,10 @@ mod throttle;
 mod totp;
 mod webauthn;
 
+pub use branding::{
+    ACCENT_MIN_CONTRAST, BRAND_LINK_MAX_LEN, BRAND_NAME_MAX_CHARS, LOGO_DECODE_MAX_BYTES,
+    LOGO_MAX_BYTES, LOGO_MAX_SIDE,
+};
 pub use encoding::{BASE64URL_ALPHABET, SHA256_BASE64URL_LEN};
 pub use endpoints::{
     ACCOUNT_API_PATH, ACCOUNT_PATH, AUTHORIZATION_PATH, AUTHORIZE_BODY_MAX_BYTES,
