@@ -229,6 +229,14 @@
     allowed: "Access allowed. Taking you back to the application.",
     denied: "Access denied. Taking you back to the application."
   };
+  var REGISTER_TEXT = {
+    sending: "Sending the link to open your account.",
+    sent: "We sent an email to that address. If it can open an account here, the email carries a link to choose a password, which works for 72 hours.",
+    unavailable: "Opening an account by email isn't set up here. Ask your administrator for an account.",
+    domain: "Accounts here are opened only for addresses at this company's own domains.",
+    address: "That isn't an email address an account can use. Check it and try again.",
+    closed: "This company doesn't open accounts from the sign-in page any more. Ask your administrator for one."
+  };
   var RESET_TEXT = {
     sending: "Sending a reset link.",
     sent: "If an account uses that address, we sent it a link to choose a new password. It works for 30 minutes.",
@@ -240,6 +248,30 @@
     saving: "Saving your new password.",
     changed: "Password changed. You were signed out everywhere. Sign in with your new password; your second factor and passkeys are unchanged."
   };
+
+  // src/register-read.ts
+  function readOpen(body) {
+    return field(body, "open") === true;
+  }
+  function registerOutcome(status, body, retryAfter) {
+    const code2 = field(body, "code");
+    if (status === 202) {
+      return { kind: "sent" };
+    }
+    if (status === 503 && code2 === "mail_unavailable") {
+      return { kind: "unavailable" };
+    }
+    if (status === 400 && code2 === "address_not_accepted") {
+      return { kind: "domain" };
+    }
+    if (status === 400 && code2 === "email_rejected") {
+      return { kind: "address" };
+    }
+    if (status === 404) {
+      return { kind: "closed" };
+    }
+    return status === 429 ? refusal(status, body, retryAfter) : { kind: "retry" };
+  }
 
   // src/reset-read.ts
   function requestOutcome(status, body, retryAfter) {
@@ -390,6 +422,38 @@
         say(refusalText(outcome));
     }
   }
+  async function register(base, address) {
+    busy(true);
+    say(REGISTER_TEXT.sending);
+    const answer = await call("POST", `${base}/register`, { email: address });
+    busy(false);
+    const outcome = registerOutcome(answer.status, answer.body, answer.retryAfter);
+    switch (outcome.kind) {
+      case "sent":
+      case "unavailable":
+      case "domain":
+      case "closed":
+        say(REGISTER_TEXT[outcome.kind]);
+        return;
+      case "address":
+        fieldError(email, REGISTER_TEXT.address);
+        email.focus();
+        return;
+      default:
+        say(refusalText(outcome));
+    }
+  }
+  async function offerRegistration(base) {
+    const answer = await call("GET", `${base}/registration`);
+    const offer2 = element("register", HTMLButtonElement);
+    offer2.hidden = !(answer.ok && readOpen(answer.body));
+    offer2.addEventListener("click", () => {
+      const address = value(email, TEXT.emailRequired);
+      if (address !== null) {
+        void register(base, address);
+      }
+    });
+  }
   async function main() {
     const base = apiBase(location.pathname, "login");
     const asked = beginBody(location.search);
@@ -427,6 +491,7 @@
       reveal.setAttribute("aria-pressed", String(!shown));
       reveal.textContent = shown ? "Show" : "Hide";
     });
+    void offerRegistration(base);
     element("forgot", HTMLButtonElement).addEventListener("click", () => {
       const address = element("who", HTMLElement).textContent ?? "";
       if (address !== "") {

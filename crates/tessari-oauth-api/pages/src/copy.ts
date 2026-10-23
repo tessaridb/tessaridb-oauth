@@ -86,6 +86,18 @@ export function codesLeft(count: number): string {
   return codes.select(count) === "one" ? "1 code left" : `${count} codes left`;
 }
 
+/** The words for opening an account from the sign-in page; the same for every address the company accepts. */
+export const REGISTER_TEXT = {
+  sending: "Sending the link to open your account.",
+  sent:
+    "We sent an email to that address. If it can open an account here, the email carries a link to choose a " +
+    "password, which works for 72 hours.",
+  unavailable: "Opening an account by email isn't set up here. Ask your administrator for an account.",
+  domain: "Accounts here are opened only for addresses at this company's own domains.",
+  address: "That isn't an email address an account can use. Check it and try again.",
+  closed: "This company doesn't open accounts from the sign-in page any more. Ask your administrator for one.",
+} as const;
+
 /** The words for a forgotten password, on the sign-in page and on the page its link opens. */
 export const RESET_TEXT = {
   sending: "Sending a reset link.",

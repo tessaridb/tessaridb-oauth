@@ -4,7 +4,7 @@
 // Everything the user typed stays in place when a step is refused.
 
 import { showBrand } from "./brand.ts";
-import { RESET_TEXT, TEXT, refusalText } from "./copy.ts";
+import { REGISTER_TEXT, RESET_TEXT, TEXT, refusalText } from "./copy.ts";
 import { type Answer, call, element, fieldError, say } from "./dom.ts";
 import {
   type Step,
@@ -16,6 +16,7 @@ import {
   refusal,
   toBase64url,
 } from "./flow.ts";
+import { readOpen, registerOutcome } from "./register-read.ts";
 import { requestOutcome } from "./reset-read.ts";
 
 const STEP_FORMS: readonly Step[] = ["identify", "first_factor", "second_factor"];
@@ -172,6 +173,42 @@ async function forgot(base: string, address: string): Promise<void> {
   }
 }
 
+/** Ask to open an account for `address`; every address the company accepts reads the same answer. */
+async function register(base: string, address: string): Promise<void> {
+  busy(true);
+  say(REGISTER_TEXT.sending);
+  const answer = await call("POST", `${base}/register`, { email: address });
+  busy(false);
+  const outcome = registerOutcome(answer.status, answer.body, answer.retryAfter);
+  switch (outcome.kind) {
+    case "sent":
+    case "unavailable":
+    case "domain":
+    case "closed":
+      say(REGISTER_TEXT[outcome.kind]);
+      return;
+    case "address":
+      fieldError(email, REGISTER_TEXT.address);
+      email.focus();
+      return;
+    default:
+      say(refusalText(outcome));
+  }
+}
+
+/** Offer to open an account when the company lets people do so; a closed or unreadable answer offers nothing. */
+async function offerRegistration(base: string): Promise<void> {
+  const answer = await call("GET", `${base}/registration`);
+  const offer = element("register", HTMLButtonElement);
+  offer.hidden = !(answer.ok && readOpen(answer.body));
+  offer.addEventListener("click", () => {
+    const address = value(email, TEXT.emailRequired);
+    if (address !== null) {
+      void register(base, address);
+    }
+  });
+}
+
 async function main(): Promise<void> {
   const base = apiBase(location.pathname, "login");
   const asked = beginBody(location.search);
@@ -209,6 +246,7 @@ async function main(): Promise<void> {
     reveal.setAttribute("aria-pressed", String(!shown));
     reveal.textContent = shown ? "Show" : "Hide";
   });
+  void offerRegistration(base);
   element("forgot", HTMLButtonElement).addEventListener("click", () => {
     const address = element("who", HTMLElement).textContent ?? "";
     if (address !== "") {
