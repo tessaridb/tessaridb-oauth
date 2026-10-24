@@ -10,7 +10,7 @@ An OAuth 2.1 authorization server and OpenID provider written in Rust. One binar
 endpoints, the users' account portal and an embedded admin panel on its own listener; tenants, users, clients,
 codes, grants, keys and the audit trail are records in a TessariDB cluster.
 
-[![status](https://img.shields.io/badge/status-in%20development-6B5FD1?style=flat-square)](#status)
+[![release](https://img.shields.io/badge/release-0.1.0-6B5FD1?style=flat-square)](#status)
 [![licence](https://img.shields.io/badge/licence-BUSL--1.1-6B5FD1?style=flat-square)](LICENSE)
 [![rust](https://img.shields.io/badge/rust-1.98%2B-6B5FD1?style=flat-square)](#building-and-checking)
 
@@ -20,8 +20,8 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 </div>
 
 > [!NOTE]
-> **In development, no release yet.** Users sign in through it; accounts are opened by operators in the admin
-> console. Everything listed under [Status](#status) is served by the binary and covered by tests.
+> **0.1.0, the first release.** Everything listed under [Status](#status) is served by the binary and covered by
+> tests. The configuration and the HTTP surface may still change in a minor release before 1.0.
 
 ## What it is for
 
@@ -57,9 +57,8 @@ claimed until a test backs them.
 
 | | |
 |---|---|
-| Stage | in development, no release |
+| Release | 0.1.0, image `tessaridb/oauth:0.1.0` |
 | Served | per-tenant discovery and key set; authorization (with PAR), token (code, refresh, client credentials), revocation, UserInfo, RP-initiated and back-channel logout; sign-in with password, TOTP, recovery codes and passkeys; password reset, enrolment links, address verification, changes of sign-in address and sign-in notices by mail, worded per company; self-registration under company policy; consent; the account portal and its API; the admin console; signing-key rotation; per-address limits; the audit trail; regions |
-| Next | a container image |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
 ## Documentation
@@ -114,6 +113,25 @@ first, for development only.
 ```sh
 cargo run --release -p tessari-oauth-node   # the tessaridb-oauth binary
 curl http://localhost:8443/acme/.well-known/oauth-authorization-server
+```
+
+### In a container
+
+The image `tessaridb/oauth` carries the server alone, for `linux/amd64` and `linux/arm64`. It listens on 8443
+(public) and 9443 (admin console) and runs as the user `65532`, which must own the two key files and be the only one
+able to read them:
+
+```sh
+head -c 32 /dev/urandom > kek && head -c 32 /dev/urandom > pepper
+chmod 400 kek pepper && sudo chown 65532:65532 kek pepper
+docker run -d --name oauth -p 8443:8443 -p 127.0.0.1:9443:9443 \
+  -v "$PWD/kek:/keys/kek:ro" -v "$PWD/pepper:/keys/pepper:ro" \
+  -e TESSARIDB_OAUTH_KEK=/keys/kek -e TESSARIDB_OAUTH_PEPPER=/keys/pepper \
+  -e TESSARIDB_OAUTH_PUBLIC_URL=https://id.example.com -e TESSARIDB_OAUTH_ADMIN_URL=https://admin.example.com \
+  -e TESSARIDB_OAUTH_STORE=db.example.com:9080 -e TESSARIDB_OAUTH_STORE_USER=oauth \
+  -e TESSARIDB_OAUTH_STORE_PASSWORD -e TESSARIDB_OAUTH_STORE_AUTHORITY=/keys/store-ca.pem \
+  -v "$PWD/store-ca.pem:/keys/store-ca.pem:ro" \
+  -e TESSARIDB_OAUTH_REGION=eu -e TESSARIDB_OAUTH_TENANTS=acme tessaridb/oauth:0.1.0
 ```
 
 Behind a reverse proxy, the proxy holds the certificate for `PUBLIC_URL`, passes requests on in the clear, and
