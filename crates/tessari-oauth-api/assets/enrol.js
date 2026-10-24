@@ -103,7 +103,7 @@
     passwordTooLong: "That password is too long. Use 64 characters or fewer.",
     passwordNotPrintable: "That password has a character that can't be typed. Remove it and try again.",
     passwordGuessable: "That password is too easy to guess. Don't use your email address.",
-    passwordRejected: "That password can't be used. Choose a longer one that isn't your email address.",
+    passwordRejected: "That password can't be used. Choose a longer one that isn't your email address and isn't known from a breach.",
     passwordChanged: "Password changed. You were signed out on your other devices.",
     codesIssued: "New recovery codes are ready. Your old ones no longer work.",
     alreadyEnrolled: "This account already has an authenticator app.",

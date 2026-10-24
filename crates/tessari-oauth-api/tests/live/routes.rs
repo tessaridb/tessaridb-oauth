@@ -70,6 +70,7 @@ pub(crate) fn state(storage: &Storage, read_limit: Limit) -> PublicState {
         email_changes: Arc::clone(&storage.email_changes),
         mail_templates: Arc::clone(&storage.mail_templates),
         mail: true,
+        breached: None,
     }
 }
 

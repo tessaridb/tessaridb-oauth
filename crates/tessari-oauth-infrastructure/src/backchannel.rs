@@ -176,7 +176,7 @@ impl Poster {
 }
 
 /// The addresses to connect to for `url`, in the order they resolved, and the name its certificate must carry.
-async fn vetted(
+pub(crate) async fn vetted(
     url: &Url,
     port: u16,
 ) -> std::result::Result<(Vec<SocketAddr>, ServerName<'static>), Undelivered> {
@@ -210,7 +210,9 @@ async fn vetted(
 
 /// A connection to the first of `addresses` that accepts one, tried in order (RFC 8305 §5): a name whose first
 /// address refuses, as an IPv6 address in front of a service listening on IPv4 only does, is still reached.
-async fn connected(addresses: &[SocketAddr]) -> std::result::Result<TcpStream, Undelivered> {
+pub(crate) async fn connected(
+    addresses: &[SocketAddr],
+) -> std::result::Result<TcpStream, Undelivered> {
     let mut refused = Undelivered::ForbiddenAddress;
     for address in addresses {
         match TcpStream::connect(address).await {

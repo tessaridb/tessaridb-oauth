@@ -21,6 +21,7 @@ use tessari_oauth_storage::users::StoredPassword;
 use tessari_oauth_types::EnrolmentCode;
 
 use super::{body, record, send_verification};
+use crate::routes::breached::screened;
 use crate::state::PublicState;
 use crate::{Error, Result};
 
@@ -70,6 +71,7 @@ pub(in crate::routes) async fn enroll(
         &[address, local, tenant.as_str()],
     )
     .map_err(Error::PasswordRejected)?;
+    screened(&state, &accepted).await?;
     let hash = state
         .passwords
         .hash(&accepted)

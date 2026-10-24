@@ -11,11 +11,12 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tessari_oauth_api::{AdminState, PublicState, admin_router, public_router, serve, trusting};
 use tessari_oauth_constants::{
-    DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS, EMAIL_CHANGE_APPLY_INTERVAL_SECS,
-    EMAIL_CHANGE_APPLY_RUN_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS, KEY_ROTATION_RUN_TIMEOUT_SECS,
-    LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS, LOGOUT_SEND_TIMEOUT_SECS,
-    MAIL_DELIVERY_INTERVAL_SECS, MAIL_DELIVERY_RUN_TIMEOUT_SECS, MAIL_SEND_TIMEOUT_SECS,
-    PEER_DIRECTORIES_SECS, PEER_DIRECTORIES_TIMEOUT_SECS, SHUTDOWN_DRAIN_SECS,
+    BREACHED_PASSWORDS_TIMEOUT_SECS, DIRECTORY_REFRESH_SECS, DIRECTORY_REFRESH_TIMEOUT_SECS,
+    EMAIL_CHANGE_APPLY_INTERVAL_SECS, EMAIL_CHANGE_APPLY_RUN_TIMEOUT_SECS, KEY_ROTATION_CHECK_SECS,
+    KEY_ROTATION_RUN_TIMEOUT_SECS, LOGOUT_DELIVERY_INTERVAL_SECS, LOGOUT_DELIVERY_RUN_TIMEOUT_SECS,
+    LOGOUT_SEND_TIMEOUT_SECS, MAIL_DELIVERY_INTERVAL_SECS, MAIL_DELIVERY_RUN_TIMEOUT_SECS,
+    MAIL_SEND_TIMEOUT_SECS, PEER_DIRECTORIES_SECS, PEER_DIRECTORIES_TIMEOUT_SECS,
+    SHUTDOWN_DRAIN_SECS,
 };
 use tessari_oauth_core::discovery;
 use tessari_oauth_daemons::{
@@ -23,6 +24,7 @@ use tessari_oauth_daemons::{
     PeerDirectories,
 };
 use tessari_oauth_infrastructure::backchannel::Poster;
+use tessari_oauth_infrastructure::breached::BreachedPasswords;
 use tessari_oauth_infrastructure::config::NodeConfig;
 use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_infrastructure::mail::MailRelay;
@@ -41,10 +43,12 @@ mod reseal;
 
 pub(crate) type Failure = Box<dyn Error + Send + Sync>;
 
-/// Where the server reaches out: clients' back-channel endpoints always, the mail relay when one is configured.
+/// Where the server reaches out: clients' back-channel endpoints always, the mail relay when one is configured, and
+/// the breached-password list unless it is turned off.
 struct Outbound {
     poster: Poster,
     relay: Option<MailRelay>,
+    breached: Option<Arc<BreachedPasswords>>,
 }
 
 /// The TLS configuration of each listener: the public one always, the admin console's when it was given one.
@@ -133,6 +137,17 @@ fn start() -> Result<(), Failure> {
             .mail
             .as_ref()
             .map(|mail| MailRelay::load(mail, Duration::from_secs(MAIL_SEND_TIMEOUT_SECS)))
+            .transpose()?,
+        breached: config
+            .breached_passwords
+            .as_deref()
+            .map(|base| {
+                BreachedPasswords::with_native_roots(
+                    base,
+                    Duration::from_secs(BREACHED_PASSWORDS_TIMEOUT_SECS),
+                )
+                .map(Arc::new)
+            })
             .transpose()?,
     };
     let database = Database::new(store, config.store.connections.get())?;
@@ -354,6 +369,7 @@ async fn run(
         email_changes: Arc::clone(&storage.email_changes),
         mail_templates: Arc::clone(&storage.mail_templates),
         mail: mailing.is_some(),
+        breached: outbound.breached.clone(),
     };
     // Signals are taken before the listener opens, so no signal can arrive while the default action still applies.
     let mut interrupt = signal(SignalKind::interrupt())?;

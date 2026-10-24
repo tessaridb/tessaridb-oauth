@@ -10,7 +10,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use tessari_oauth_constants::{
-    PASSWORD_HASH_ITERATIONS_FLOOR, PASSWORD_HASH_MEMORY_KIB_FLOOR, PASSWORD_HASH_PARALLELISM_FLOOR,
+    BREACHED_PASSWORDS_DEFAULT_URL, PASSWORD_HASH_ITERATIONS_FLOOR, PASSWORD_HASH_MEMORY_KIB_FLOOR,
+    PASSWORD_HASH_PARALLELISM_FLOOR,
 };
 use tessari_oauth_types::{TenantId, TrustedProxies};
 use url::{Host, Url};
@@ -127,6 +128,9 @@ pub struct NodeConfig {
     pub password_cost: PasswordCost,
     /// How many password hashes or checks run at once, each holding the cost's memory.
     pub password_concurrency: NonZeroUsize,
+    /// Where new passwords are looked up among passwords seen in breaches (a range-query base URL); `None` when the
+    /// configuration turned the lookup off.
+    pub breached_passwords: Option<String>,
 }
 
 /// The environment as a lookup answers it.
@@ -426,6 +430,11 @@ impl NodeConfig {
                 NonZeroUsize::MIN.saturating_add(3),
                 "a whole number of hashes above zero",
             )?,
+            breached_passwords: match variables.optional("TESSARIDB_OAUTH_BREACHED_PASSWORDS_URL") {
+                Some(off) if off == "off" => None,
+                Some(url) => Some(url),
+                None => Some(BREACHED_PASSWORDS_DEFAULT_URL.to_owned()),
+            },
         })
     }
 }

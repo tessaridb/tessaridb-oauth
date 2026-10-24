@@ -171,6 +171,7 @@ pub(crate) fn state(server: &Server, token_limit: Limit) -> PublicState {
         email_changes: Arc::clone(&storage.email_changes),
         mail_templates: Arc::clone(&storage.mail_templates),
         mail: true,
+        breached: None,
     }
 }
 

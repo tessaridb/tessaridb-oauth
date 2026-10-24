@@ -78,6 +78,12 @@ passkeys stay, so the next sign-in still asks for them. Every session ends, ever
 change is recorded and a notice goes to the address. A link that was never issued, was used, was replaced or has
 lapsed gets `400` `code_rejected`.
 
+A new password, whether set at enrolment, by a reset link or on the account page, is refused with `400`
+`password_rejected` when it is shorter than its use requires, equals the account's address, its local part or the
+company id, or was seen in a breach. The breach lookup sends the first five hex digits of the password's SHA-1 to
+`BREACHED_PASSWORDS_URL` and matches the rest here; when the lookup does not answer within 3 seconds the password is
+judged without it and the miss is logged (`breach_check_unchecked`).
+
 An operator can send a new account its enrolment code by mail instead of handing it over. The link opens
 `<issuer>/login/enrol#code=<code>`, a page that takes the code out of the address the same way and sets the account's
 first password (`POST <issuer>/login/api/enroll`), at least 15 characters. The code is spent only when a password is
@@ -129,6 +135,6 @@ redeemed code presented again; the refresh family it started is revoked), `refre
 presented again; its family is revoked), `passkey_clone_suspected` (a passkey's counter did not move forward),
 `recovery_code_used` and `operator_reads_high` (an operator shown 1 000 accounts in an hour, once per hour).
 At `WARN`, worth an alert on a rise above the usual rate: `signin_rejected` (a rejected
-sign-in credential), `authorization_refused`, `userinfo_refused` (its `reason` `AccessTokenUnverified` covers a
+sign-in credential), `breach_check_unchecked` (a new password set without the breached-password list), `authorization_refused`, `userinfo_refused` (its `reason` `AccessTokenUnverified` covers a
 token whose signature, key or algorithm is not the issuer's), `logout_untold` and `mail_abandoned`. The server sends
 no alerts itself.

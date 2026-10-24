@@ -2,6 +2,7 @@
 //! against server-side request forgery.
 
 pub mod backchannel;
+pub mod breached;
 pub mod config;
 pub mod custody;
 mod error;

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use tessari_oauth_constants::BREACHED_PASSWORDS_DEFAULT_URL;
+
 use super::NodeConfig;
 use crate::Error;
 use crate::custody::PasswordCost;
@@ -94,6 +96,10 @@ fn a_complete_environment_is_read_with_the_documented_defaults() {
         PasswordCost::new(65_536, 3, 1).expect("the floor")
     );
     assert_eq!(config.password_concurrency.get(), 4);
+    assert_eq!(
+        config.breached_passwords.as_deref(),
+        Some(BREACHED_PASSWORDS_DEFAULT_URL)
+    );
 }
 
 #[test]
@@ -368,4 +374,22 @@ fn mail_is_off_until_a_relay_is_named_and_then_read_from_the_smtp_variables() {
             key: "TESSARIDB_OAUTH_SMTP_URL"
         })
     ));
+}
+
+#[test]
+fn the_breached_password_lookup_goes_where_it_is_told_or_is_turned_off() {
+    let mut environment = environment();
+    environment.insert(
+        "TESSARIDB_OAUTH_BREACHED_PASSWORDS_URL",
+        "https://lists.internal/range/".to_owned(),
+    );
+    assert_eq!(
+        read(&environment)
+            .expect("read")
+            .breached_passwords
+            .as_deref(),
+        Some("https://lists.internal/range/")
+    );
+    environment.insert("TESSARIDB_OAUTH_BREACHED_PASSWORDS_URL", "off".to_owned());
+    assert_eq!(read(&environment).expect("read").breached_passwords, None);
 }

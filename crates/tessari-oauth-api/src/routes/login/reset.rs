@@ -28,6 +28,7 @@ use tessari_oauth_storage::users::StoredPassword;
 use tessari_oauth_types::{EmailAddress, ResetToken, TenantId, Timestamp, UserId, base64url};
 
 use super::{body, record};
+use crate::routes::breached::screened;
 use crate::routes::mail::compose;
 use crate::routes::notice::{Change, notify};
 use crate::state::PublicState;
@@ -132,6 +133,7 @@ pub(in crate::routes) async fn complete_reset(
         &[address, local, tenant.as_str()],
     )
     .map_err(Error::PasswordRejected)?;
+    screened(&state, &accepted).await?;
     let hash = state
         .passwords
         .hash(&accepted)

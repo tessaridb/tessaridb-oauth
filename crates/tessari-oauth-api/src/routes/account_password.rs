@@ -22,6 +22,7 @@ use tessari_oauth_core::two_factor::asks_second_factor;
 use tessari_oauth_storage::users::StoredPassword;
 
 use super::account_factors::{changed, may_change};
+use super::breached::screened;
 use super::login::{body, signed_in};
 use super::notice::Change;
 use crate::state::PublicState;
@@ -73,6 +74,7 @@ pub(super) async fn change(
         &[address, local, tenant.as_str()],
     )
     .map_err(Error::PasswordRejected)?;
+    screened(&state, &accepted).await?;
     let hash = state
         .passwords
         .hash(&accepted)

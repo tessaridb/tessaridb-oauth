@@ -22,3 +22,17 @@ pub const PEPPER_MIN_BYTES: usize = 32;
 /// The version of the pepper a node holds, stored beside every password hash it writes. A node holds one pepper,
 /// so this is the only version written until a second one exists.
 pub const CURRENT_PEPPER: u32 = 1;
+
+/// Where a new password is looked up among passwords seen in breaches when the configuration names no other place:
+/// an open service answering a range query (the first five hex digits of the password's SHA-1 go out, never the
+/// password or its whole digest).
+pub const BREACHED_PASSWORDS_DEFAULT_URL: &str = "https://api.pwnedpasswords.com/range/";
+
+/// The most one breached-password lookup may take, in seconds; past it the password is judged without the list.
+pub const BREACHED_PASSWORDS_TIMEOUT_SECS: u64 = 3;
+
+/// The most an answer to one lookup may hold, in bytes; a range answers in tens of KiB.
+pub const BREACHED_PASSWORDS_MAX_ANSWER_BYTES: usize = 1_048_576;
+
+/// Hex digits of a password's SHA-1 that a lookup sends (the range query's prefix).
+pub const BREACHED_PASSWORDS_PREFIX_DIGITS: usize = 5;

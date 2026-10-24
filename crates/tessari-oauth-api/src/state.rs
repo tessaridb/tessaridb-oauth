@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use tessari_oauth_infrastructure::breached::BreachedPasswords;
 use tessari_oauth_infrastructure::custody::{Kek, Passwords};
 use tessari_oauth_storage::audit::AuditService;
 use tessari_oauth_storage::brands::BrandService;
@@ -108,6 +109,8 @@ pub struct PublicState {
     pub mail_templates: Arc<MailTemplateService>,
     /// Whether a mail relay is configured, so the flows that send mail are offered.
     pub mail: bool,
+    /// Where a new password is looked up among passwords seen in breaches; `None` when the lookup is turned off.
+    pub breached: Option<Arc<BreachedPasswords>>,
 }
 
 impl PublicState {

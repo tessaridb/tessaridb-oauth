@@ -15,6 +15,7 @@ mod account_totp;
 mod account_verify;
 mod authorize;
 mod brand;
+mod breached;
 mod browser;
 mod jwks;
 mod login;
