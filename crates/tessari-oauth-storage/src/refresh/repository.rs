@@ -38,8 +38,15 @@ pub(crate) trait RefreshRepository: Send + Sync {
         next: &TokenEntity,
     ) -> Result<()>;
 
-    /// The ids of the families `holder` names that are not revoked.
-    async fn standing(&self, place: &Place, holder: &Holder<'_>) -> Result<Vec<String>>;
+    /// Mark every family `holder` names that is not revoked as revoked at `at` for `reason`, in one transaction, and
+    /// answer how many it marked.
+    async fn revoke_standing(
+        &self,
+        place: &Place,
+        holder: &Holder<'_>,
+        at: i64,
+        reason: &str,
+    ) -> Result<u64>;
 
     /// Mark the family revoked only while it is not; refused by the store when it already is.
     async fn revoke_family(&self, place: &Place, id: &str, at: i64, reason: &str) -> Result<()>;

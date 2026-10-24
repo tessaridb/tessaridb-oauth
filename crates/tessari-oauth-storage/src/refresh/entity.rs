@@ -44,21 +44,6 @@ pub struct TokenEntity {
     pub jkt: Option<String>,
 }
 
-/// The id of one family, read without its fields.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FamilyIdEntity {
-    /// The record id as the node spells it: a text id in single quotes.
-    pub(crate) spelled: String,
-}
-
-impl FromRecord for FamilyIdEntity {
-    fn from_row(row: Row) -> Result<Self, MappingFault> {
-        Ok(Self {
-            spelled: row.id().to_owned(),
-        })
-    }
-}
-
 impl FromRecord for FamilyEntity {
     fn from_row(mut row: Row) -> Result<Self, MappingFault> {
         Ok(Self {

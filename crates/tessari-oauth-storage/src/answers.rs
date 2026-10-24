@@ -1,6 +1,6 @@
 //! Reading the store's answers into rows: the shape each statement answers in, mapped once for every domain.
 
-use tessari_oauth_infrastructure::tessaridb::{Answer, FromRecord, Row, Value};
+use tessari_oauth_infrastructure::tessaridb::{Answer, FromRecord, Number, Row, Value};
 
 use crate::{Error, Result};
 
@@ -52,6 +52,21 @@ pub(crate) fn returned<T: FromRecord>(
     }
 }
 
+/// How many records a set write changed: the count it answers with.
+pub(crate) fn count(answers: Vec<Answer>, record: &'static str) -> Result<u64> {
+    match answers.into_iter().next() {
+        Some(Answer::Value {
+            value: Value::Number(Number::Integer(count)),
+            ..
+        }) => u64::try_from(count)
+            .map_err(|_| unreadable(record, "a set write answered a negative count".to_owned())),
+        _ => Err(unreadable(
+            record,
+            "a set write answered something other than a count".to_owned(),
+        )),
+    }
+}
+
 /// The text of a record id the node spelled as `spelled`: a text id in single quotes, as every id this crate writes
 /// is.
 pub(crate) fn text_id(spelled: &str, record: &'static str) -> Result<String> {
@@ -62,3 +77,7 @@ pub(crate) fn text_id(spelled: &str, record: &'static str) -> Result<String> {
         .map(str::to_owned)
         .ok_or_else(|| unreadable(record, "an id that is not plain quoted text".to_owned()))
 }
+
+#[cfg(test)]
+#[path = "answers_tests.rs"]
+mod tests;

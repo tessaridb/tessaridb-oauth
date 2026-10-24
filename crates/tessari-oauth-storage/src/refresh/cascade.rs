@@ -4,19 +4,21 @@
 
 use tessari_oauth_types::{TenantId, Timestamp};
 
+use tessari_oauth_constants::REFRESH_ROTATE_ATTEMPTS;
+
 use super::service::seconds;
 use super::{Holder, RefreshService};
 use crate::audit::{AuditEvent, AuditKind};
-use crate::{Error, Result};
+use crate::{Error, Result, retry};
 
 impl RefreshService {
-    /// Revoke every family `holder` names in `tenant` that stands at `now`, for `reason`, record it, and answer how
-    /// many stood. A family revoked meanwhile by another request keeps the reason it was given.
+    /// Revoke every family `holder` names in `tenant` that stands at `now`, for `reason`, in one transaction, record
+    /// it, and answer how many it revoked. A family revoked meanwhile by another request keeps the reason it was
+    /// given.
     ///
     /// # Errors
     ///
-    /// When the store is unavailable, refuses for a reason other than a family being revoked already, or holds a row
-    /// this crate cannot read.
+    /// When the store is unavailable, refuses after the bounded retries, or answers something other than a count.
     pub async fn revoke_standing(
         &self,
         tenant: &TenantId,
@@ -26,11 +28,10 @@ impl RefreshService {
     ) -> Result<usize> {
         let place = self.tenancy.place(tenant)?;
         let at = seconds(now)?;
-        // The store changes many records only one by one, each by its id: read the standing ones, then end each.
-        let standing = self.repository.standing(&place, holder).await?;
-        for family_id in &standing {
-            self.end_family(&place, family_id, at, reason).await?;
-        }
+        let revoked = retry::bounded(REFRESH_ROTATE_ATTEMPTS, retry::on_store_retry, || {
+            self.repository.revoke_standing(&place, holder, at, reason)
+        })
+        .await?;
         let (user, client_id) = match holder {
             Holder::User(user) => (Some(*user), None),
             Holder::Client(client) => (None, Some(*client)),
@@ -40,13 +41,13 @@ impl RefreshService {
             client_id: client_id.cloned(),
             user: user.cloned(),
             reason: Some(reason.to_owned()),
-            families: Some(u64::try_from(standing.len()).map_err(|_| Error::Invalid {
-                record: "audit message",
-                reason: "a count beyond u64",
-            })?),
+            families: Some(revoked),
             ..AuditEvent::of(AuditKind::Cascade)
         };
         self.audit.record(tenant, &event, now).await?;
-        Ok(standing.len())
+        usize::try_from(revoked).map_err(|_| Error::Invalid {
+            record: "refresh family",
+            reason: "a count beyond usize",
+        })
     }
 }

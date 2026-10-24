@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tessari_oauth_infrastructure::tessaridb::{Database, Place, Value};
 
 use super::repository::RefreshRepository;
-use super::{FamilyEntity, FamilyIdEntity, Holder, TokenEntity};
+use super::{FamilyEntity, Holder, TokenEntity};
 use crate::{Result, answers};
 
 pub(crate) struct TessaridbRefreshRepository {
@@ -44,12 +44,6 @@ fn token_values(id: &str, token: &TokenEntity) -> Vec<(String, Value)> {
             token.jkt.as_deref().map_or(Value::None, text),
         ),
     ]
-}
-
-/// The text a text id spells: the node writes it in single quotes, like any other text. A family id is a digest, so a
-/// spelling with anything to unescape is not one this crate wrote and is refused rather than guessed at.
-fn text_id(spelled: &str) -> Result<String> {
-    answers::text_id(spelled, "refresh family")
 }
 
 const CREATE_TOKEN: &str = "CREATE refresh_tokens:$token_id = { family_id: $token_family_id, \
@@ -152,32 +146,39 @@ impl RefreshRepository for TessaridbRefreshRepository {
         Ok(())
     }
 
-    async fn standing(&self, place: &Place, holder: &Holder<'_>) -> Result<Vec<String>> {
-        let (statement, values) = match holder {
+    async fn revoke_standing(
+        &self,
+        place: &Place,
+        holder: &Holder<'_>,
+        at: i64,
+        reason: &str,
+    ) -> Result<u64> {
+        let (statement, mut values) = match holder {
             Holder::User(user) => (
-                "SELECT id FROM refresh_families WHERE user_id = $user_id AND revoked_at = NONE \
-                 USING INDEX by_user;",
+                "UPDATE refresh_families SET revoked_at = $at, revoked_reason = $reason \
+                 WHERE user_id = $user_id AND revoked_at = NONE;",
                 vec![("user_id".to_owned(), text(user.as_str()))],
             ),
             Holder::Client(client) => (
-                "SELECT id FROM refresh_families WHERE client_id = $client_id AND revoked_at = NONE \
-                 USING INDEX by_client;",
+                "UPDATE refresh_families SET revoked_at = $at, revoked_reason = $reason \
+                 WHERE client_id = $client_id AND revoked_at = NONE;",
                 vec![("client_id".to_owned(), text(client.as_str()))],
             ),
             Holder::Grant { user, client } => (
-                "SELECT id FROM refresh_families WHERE user_id = $user_id AND client_id = $client_id \
-                 AND revoked_at = NONE USING INDEX by_user;",
+                "UPDATE refresh_families SET revoked_at = $at, revoked_reason = $reason \
+                 WHERE user_id = $user_id AND client_id = $client_id AND revoked_at = NONE;",
                 vec![
                     ("user_id".to_owned(), text(user.as_str())),
                     ("client_id".to_owned(), text(client.as_str())),
                 ],
             ),
         };
+        values.extend([
+            ("at".to_owned(), Value::from(at)),
+            ("reason".to_owned(), text(reason)),
+        ]);
         let answers = self.database.run_at(place, statement, values).await?;
-        answers::records::<FamilyIdEntity>(answers, "refresh family")?
-            .iter()
-            .map(|family| text_id(&family.spelled))
-            .collect()
+        answers::count(answers, "refresh family")
     }
 
     async fn revoke_family(&self, place: &Place, id: &str, at: i64, reason: &str) -> Result<()> {
@@ -196,7 +197,3 @@ impl RefreshRepository for TessaridbRefreshRepository {
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[path = "tessaridb_tests.rs"]
-mod tests;

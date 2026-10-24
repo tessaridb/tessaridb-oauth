@@ -7,7 +7,6 @@ mod repository;
 mod service;
 mod tessaridb;
 
-pub(crate) use entity::FamilyIdEntity;
 pub use entity::{FamilyEntity, TokenEntity};
 pub use model::{Holder, RefreshGrant, Revocation, Rotation, RotationRefusal};
 pub use service::RefreshService;
