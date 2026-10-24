@@ -1,0 +1,275 @@
+//! The public router: per tenant, the server metadata, the key set, UserInfo and the sign-in and consent pages under
+//! the read limit, the authorization and logout endpoints under the authorization limit, the token, revocation and
+//! pushed-request endpoints under theirs, the sign-in steps under theirs, and the account portal's requests under
+//! theirs, every body capped. A request for a company another region serves is sent there before any of them.
+
+mod account;
+mod account_email;
+mod account_factors;
+mod account_me;
+mod account_passkeys;
+mod account_password;
+mod account_profile;
+mod account_sessions;
+mod account_totp;
+mod account_verify;
+mod authorize;
+mod brand;
+mod breached;
+mod browser;
+mod jwks;
+mod login;
+mod logout;
+pub(crate) mod mail;
+mod metadata;
+mod notice;
+mod pages;
+mod resume;
+mod token;
+mod userinfo;
+
+use axum::Router;
+use axum::extract::DefaultBodyLimit;
+use axum::routing::{get, post};
+use tessari_oauth_constants::{
+    ACCOUNT_API_PATH, AUTHORIZE_BODY_MAX_BYTES, LOGIN_API_PATH, LOGIN_BODY_MAX_BYTES, LOGOUT_PATH,
+    TOKEN_BODY_MAX_BYTES,
+};
+use tessari_oauth_core::clients::{ClientDirectory, ClientRegistration};
+use tessari_oauth_types::{ClientId, TenantId};
+
+pub(crate) use login::cookie;
+
+use crate::headers::{no_store, protect};
+use crate::home::{Homes, send_home};
+use crate::state::PublicState;
+
+/// The routes of the public listener over `state`. Unknown paths answer 404 with the same headers as every route.
+pub fn public_router(state: PublicState) -> Router {
+    // Limits sit on the matched routes only: a path that matches nothing costs no store work, so it is not counted.
+    let pages = pages::ASSETS
+        .iter()
+        .fold(Router::new(), |router, (path, _, _)| {
+            router.route(&format!("/{{tenant}}{path}"), get(pages::asset))
+        })
+        .route("/{tenant}/assets/brand.css", get(brand::css))
+        .route("/{tenant}/assets/brand.json", get(brand::json))
+        .route("/{tenant}/assets/logo.png", get(brand::logo));
+    let reads = pages
+        .route(
+            "/{tenant}/.well-known/oauth-authorization-server",
+            get(metadata::metadata),
+        )
+        .route(
+            "/{tenant}/.well-known/openid-configuration",
+            get(metadata::metadata),
+        )
+        .route("/{tenant}/oauth2/jwks", get(jwks::jwks))
+        .route(
+            "/{tenant}/oauth2/userinfo",
+            get(userinfo::userinfo).post(userinfo::userinfo),
+        )
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::throttle::reads,
+        ));
+    let authorizations = Router::new()
+        .route(
+            "/{tenant}/oauth2/authorize",
+            get(authorize::query).post(authorize::form),
+        )
+        .route("/{tenant}/oauth2/authorize/resume", get(resume::resume))
+        .route(
+            &format!("/{{tenant}}{LOGOUT_PATH}"),
+            get(logout::query).post(logout::form),
+        )
+        .layer(DefaultBodyLimit::max(AUTHORIZE_BODY_MAX_BYTES))
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::throttle::authorizations,
+        ));
+    let tokens = Router::new()
+        .route("/{tenant}/oauth2/token", post(token::token))
+        .route("/{tenant}/oauth2/revoke", post(token::revoke))
+        .route("/{tenant}/oauth2/par", post(token::par))
+        .layer(DefaultBodyLimit::max(TOKEN_BODY_MAX_BYTES))
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::throttle::tokens,
+        ));
+    let logins = Router::new()
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/begin"),
+            post(login::begin),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/identify"),
+            post(login::identify),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/password"),
+            post(login::password),
+        )
+        .route(&format!("/{{tenant}}{LOGIN_API_PATH}/totp"), post(login::totp))
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/recovery"),
+            post(login::recovery),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/passkey/options"),
+            post(login::passkey_options),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/passkey"),
+            post(login::passkey),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/enroll"),
+            post(login::enroll),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/registration"),
+            get(login::registration),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/register"),
+            post(login::register),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/reset"),
+            post(login::request_reset),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/reset/complete"),
+            post(login::complete_reset),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/verify"),
+            post(login::complete_verification),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/email/confirm"),
+            post(login::confirm_email_change),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/email/cancel"),
+            post(login::cancel_email_change),
+        )
+        .route(
+            &format!("/{{tenant}}{LOGIN_API_PATH}/consent"),
+            get(login::consent).post(login::decide),
+        )
+        .layer(DefaultBodyLimit::max(LOGIN_BODY_MAX_BYTES))
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::throttle::logins,
+        ))
+        // A step's answer, refusals and the limit's own included, belongs to one browser's sign-in.
+        .layer(axum::middleware::map_response(|response| async {
+            no_store(response)
+        }));
+    let accounts = Router::new()
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/grants"),
+            get(account::grants),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/grants/revoke"),
+            post(account::revoke),
+        )
+        .route(&format!("/{{tenant}}{ACCOUNT_API_PATH}/me"), get(account_me::me))
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/me/verify"),
+            post(account_verify::request),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/me/email"),
+            post(account_email::request),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/options"),
+            post(account_passkeys::options),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/register"),
+            post(account_passkeys::register),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/passkeys/remove"),
+            post(account_factors::remove_passkey),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/recovery-codes"),
+            post(account_factors::issue_recovery_codes),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/totp/begin"),
+            post(account_totp::begin),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/totp/confirm"),
+            post(account_totp::confirm),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/totp/remove"),
+            post(account_totp::remove),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/password"),
+            post(account_password::change),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/profile"),
+            post(account_profile::set),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions"),
+            get(account_sessions::sessions),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions/end"),
+            post(account_sessions::end),
+        )
+        .route(
+            &format!("/{{tenant}}{ACCOUNT_API_PATH}/sessions/end-all"),
+            post(account_sessions::end_all),
+        )
+        .layer(DefaultBodyLimit::max(LOGIN_BODY_MAX_BYTES))
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::throttle::accounts,
+        ))
+        // What a user's own account holds belongs to that user's browser alone.
+        .layer(axum::middleware::map_response(|response| async {
+            no_store(response)
+        }));
+    reads
+        .merge(authorizations)
+        .merge(tokens)
+        .merge(logins)
+        .merge(accounts)
+        .fallback(|| async { crate::Error::NotFound })
+        .with_state(state.clone())
+        // Before any route or limit: a company another region serves costs this node no store work.
+        .layer(axum::middleware::from_fn_with_state(
+            Homes {
+                served: state.served,
+                elsewhere: state.elsewhere,
+            },
+            send_home,
+        ))
+        .layer(axum::middleware::map_response(|response| async {
+            protect(response)
+        }))
+}
+
+/// The one registration looked up for a request, as the directory the core validates against.
+struct Found(Option<ClientRegistration>);
+
+impl ClientDirectory for Found {
+    fn find(&self, tenant: &TenantId, client_id: &ClientId) -> Option<ClientRegistration> {
+        self.0
+            .clone()
+            .filter(|found| found.tenant == *tenant && found.client_id == *client_id)
+    }
+}

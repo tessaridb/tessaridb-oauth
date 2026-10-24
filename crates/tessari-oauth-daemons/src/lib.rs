@@ -1,6 +1,22 @@
 //! Background work with graceful shutdown: expiry sweeps, signing-key rotation, back-channel logout
-//! delivery and audit shipping.
+//! delivery, mail delivery and audit shipping.
 
+mod daemon;
+mod directory_refresh;
+mod email_change_apply;
 mod error;
+mod key_rotation;
+mod logout_delivery;
+mod mail_delivery;
+mod peer_directories;
+mod runner;
 
+pub use daemon::{Daemon, DaemonFuture, DaemonReport};
+pub use directory_refresh::DirectoryRefresh;
+pub use email_change_apply::EmailChangeApply;
 pub use error::{Error, Result};
+pub use key_rotation::KeyRotation;
+pub use logout_delivery::{LogoutDelivery, LogoutSender};
+pub use mail_delivery::{MailDelivery, MailSender};
+pub use peer_directories::{Peer, PeerDirectories, PeerDirectory, PeerHomes};
+pub use runner::run;

@@ -1,2 +1,7 @@
-//! Tracing and metrics set-up for the server, and the filter that keeps tokens, codes, verifiers and
-//! personal data out of every log line.
+//! Tracing set-up for the server binary; library crates depend on `tracing` alone and never install a subscriber.
+
+mod error;
+mod tracing;
+
+pub use error::{Error, Result};
+pub use tracing::init_tracing;

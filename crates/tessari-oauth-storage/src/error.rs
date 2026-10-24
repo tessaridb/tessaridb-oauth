@@ -1,19 +1,44 @@
 //! Failures of `tessari-oauth-storage`.
-//!
-//! Nothing in this crate can fail yet, so the enum has no variants; each one arrives with the operation that
-//! produces it, mapped to its category in the workspace taxonomy.
 
 use tessari_oauth_types::ErrorCategory;
 
-/// A failure of this crate.
+/// A failure storing or reading a protocol record.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum Error {}
+pub enum Error {
+    /// The store could not be reached, or refused in a way this crate does not interpret.
+    #[error(transparent)]
+    Store(#[from] tessari_oauth_infrastructure::Error),
+    /// A record handed in breaks a rule of its kind; nothing was written.
+    #[error("an invalid {record}: {reason}")]
+    Invalid {
+        /// The kind of record.
+        record: &'static str,
+        /// The rule it breaks.
+        reason: &'static str,
+    },
+    /// A stored record does not have the shape this crate writes; nothing can currently judge it.
+    #[error("a stored {record} is unreadable: {reason}")]
+    Unreadable {
+        /// The kind of record.
+        record: &'static str,
+        /// What did not fit.
+        reason: String,
+    },
+    /// The tenant has no key the rotation rule lets sign; nothing is signed until the rotation daemon makes one.
+    #[error("the tenant has no signing key")]
+    NoSigningKey,
+}
 
 impl Error {
     /// The taxonomy category of this failure.
     #[must_use]
     pub const fn category(&self) -> ErrorCategory {
-        match *self {}
+        match self {
+            Self::Store(store) => store.category(),
+            Self::Invalid { .. } => ErrorCategory::Validation,
+            Self::Unreadable { .. } => ErrorCategory::Internal,
+            Self::NoSigningKey => ErrorCategory::Unavailable,
+        }
     }
 }
 

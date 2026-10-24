@@ -1,6 +1,6 @@
 [package]
 name = "tessari-oauth-daemons"
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -9,12 +9,31 @@ publish.workspace = true
 # Integration tests are declared one binary per crate when they exist; never one per file under `tests/`.
 autotests = false
 
+[[test]]
+name = "live"
+path = "tests/live/main.rs"
+
 [lib]
 doctest = false
 
 [dependencies]
+tessari-oauth-constants.workspace = true
+tessari-oauth-core.workspace = true
+tessari-oauth-infrastructure.workspace = true
+tessari-oauth-storage.workspace = true
+futures-util.workspace = true
+serde_json.workspace = true
 tessari-oauth-types.workspace = true
 thiserror.workspace = true
+# `rt` for the task set a run spreads its tenants over, `macros` for the runner's `select!`.
+tokio = { workspace = true, features = ["rt", "macros"] }
+tracing.workspace = true
+
+[dev-dependencies]
+rustls.workspace = true
+serde_json.workspace = true
+tessari-oauth-test-support.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "test-util"] }
 
 [lints]
 workspace = true

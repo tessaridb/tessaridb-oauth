@@ -1,0 +1,396 @@
+/*
+ * The TessariDB OAuth admin console. Loaded AFTER pages.css, whose three token tiers and controls it reads and never
+ * redefines below the component tier: the console is the same product as the sign-in pages, laid out as the house
+ * consoles are (a pinned sidebar of sections, one view beside it) and denser, because an operator repeats these tasks
+ * all day. Classes only; the page's policy allows no inline style.
+ */
+
+
+/* ─────────────────────────────────────────────────────────── 3. COMPONENT ── */
+
+:root {
+  --dial-density: 70;
+  --control-height: 2.25rem; /* denser than the sign-in pages; widened again below 48rem for touch */
+  --side-width: 15rem;
+  --side: var(--surface-sunken);
+  --view-inset: var(--s-6);
+  --view-max: 60rem;
+}
+
+@media (max-width: 48rem) {
+  :root {
+    --control-height: 2.75rem;
+    --view-inset: var(--s-4);
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────────── 4. RULES ── */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--side-width) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.side {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  block-size: 100vh;
+  padding: var(--s-5) var(--s-3);
+  border-inline-end: 1px solid var(--border);
+  background: var(--side);
+}
+
+.side .brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0 var(--s-2);
+  font-weight: 600;
+}
+
+.company {
+  margin: 0;
+  padding: 0 var(--s-2);
+  color: var(--text-muted);
+  font: var(--t-data) / 1.4 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.side nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.side nav a {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--control-height);
+  padding: 0 var(--s-3);
+  border-radius: var(--control-radius);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .side nav a:hover {
+    color: var(--text);
+    background: var(--accent-wash);
+  }
+}
+
+.side nav a:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.side nav a[aria-current="page"] {
+  color: var(--accent-text);
+  background: var(--accent-wash);
+}
+
+.side-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin-block-start: auto;
+}
+
+.side-foot .quiet {
+  justify-content: flex-start;
+  text-align: start;
+}
+
+.view {
+  min-width: 0;
+  max-width: var(--view-max);
+  padding: var(--view-inset);
+  outline: none;
+}
+
+.view-title {
+  margin: 0 0 var(--s-3);
+  font-size: var(--t-heading);
+  line-height: 1.2;
+  outline: none;
+}
+
+.view h2 {
+  margin: var(--s-5) 0 var(--s-2);
+  font-size: var(--t-body);
+}
+
+.lead {
+  margin: 0 0 var(--s-4);
+  color: var(--text-muted);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.view code {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pill {
+  white-space: nowrap;
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  font-size: var(--t-data);
+}
+
+.plain {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.places {
+  margin: 0;
+  padding-inline-start: var(--s-5);
+}
+
+.places li + li {
+  margin-block-start: var(--s-1);
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-3);
+  margin-block-end: var(--s-4);
+}
+
+.inline-form .field {
+  flex: 1 1 16rem;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-data);
+}
+
+.grid th,
+.grid td {
+  padding: var(--s-2) var(--s-3);
+  border-block-end: 1px solid var(--border);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.grid th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.mono-link {
+  font-family: var(--mono);
+  color: var(--accent-text);
+}
+
+.mono-link:focus-visible,
+.paging a:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.paging {
+  display: flex;
+  gap: var(--s-4);
+  margin: var(--s-4) 0 0;
+}
+
+.paging a {
+  color: var(--accent-text);
+}
+
+.empty {
+  margin: var(--s-4) 0;
+  color: var(--text-muted);
+}
+
+.change-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  max-width: 34rem;
+  margin-block-start: var(--s-6);
+}
+
+.change-form h2 {
+  margin: 0;
+}
+
+/* One disclosure per mail: the title and whether the wording is the company's, the form beneath it. */
+.mail-kind {
+  max-width: 34rem;
+  margin-block-start: var(--s-4);
+  border-block-end: 1px solid var(--border);
+}
+
+.mail-kind > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--control-height);
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mail-kind > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mail-kind > summary::before {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.mail-kind[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.mail-kind > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--control-radius);
+}
+
+.mail-kind .change-form {
+  margin-block: var(--s-3) var(--s-5);
+}
+
+.change-form .mono {
+  font-family: var(--mono);
+}
+
+.swatch {
+  display: inline-block;
+  inline-size: var(--s-5);
+  block-size: var(--s-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented legend {
+  inline-size: 100%;
+  margin-block-end: var(--s-1);
+  padding: 0;
+  font-weight: 500;
+}
+
+/* The radio stays in the accessibility tree and the tab order; only its pill label is drawn. */
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  inline-size: 1px;
+  block-size: 1px;
+}
+
+.segmented label {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--control-height);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.segmented input:checked + label {
+  border-color: var(--accent-text);
+  color: var(--accent-text);
+  background: var(--accent-wash);
+}
+
+.segmented input:focus-visible + label {
+  box-shadow: var(--focus-ring);
+}
+
+.segmented label:active {
+  transform: scale(0.97);
+}
+
+.console-status {
+  position: fixed;
+  inset-block-end: var(--s-4);
+  inset-inline-end: var(--s-4);
+  z-index: var(--z-toast);
+  max-width: 24rem;
+  margin: 0;
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.console-status:empty {
+  display: none;
+}
+
+@media (max-width: 48rem) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    position: static;
+    block-size: auto;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--border);
+  }
+
+  .side nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .side-foot {
+    flex-direction: row;
+    margin-block-start: 0;
+  }
+}

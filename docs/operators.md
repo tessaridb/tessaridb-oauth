@@ -1,0 +1,121 @@
+# Platform operators
+
+The emergency path for the first operator, operator roles, what to do in an incident (an exposed signing key,
+a leaked client credential, a taken account), and backup and restore.
+
+
+```sh
+tessaridb-oauth bootstrap-operator --email root@example.com
+tessaridb-oauth bootstrap-operator --company acme --email ops@acme.example
+```
+
+This is the emergency path, for the first operator after installation or for one whose access is lost. It reads
+the same environment as the server and needs only the store. It creates and activates the `system` company when
+there is none, finds or registers the account with that address there, and gives it the operator roles `companies`
+and `users`. When the account has no password yet it prints a one-time enrolment code for
+`POST <PUBLIC_URL>/system/login/api/enroll`; an account that has a password keeps it. The code is shown once and
+never logged, so run the command at a terminal rather than under a supervisor that collects its output. Every run
+is logged at `ERROR` as `break_glass` and recorded on the `system` company's audit trail.
+
+With `--company`, the same path gives a company made since its first operator: the company must exist and be served
+(an unknown, provisioning or suspended one is refused and nothing is written), the account is found or registered in
+that company, it is given `users`, `clients`, `policy`, `keys` and `audit` there (never `companies`), the code is for
+`POST <PUBLIC_URL>/<company>/login/api/enroll`, and the run is recorded on that company's audit trail.
+
+Operator roles are held per company and per task: `users`, `clients`, `policy`, `keys`, `audit`, and `companies`,
+which only users of the `system` company may hold. A grant names who gave it and why, may carry an expiry after which
+it no longer counts, and is refused when it names its own holder as the giver. Every grant and revoke is on the
+company's audit trail.
+
+## A signing key that may be exposed
+
+When a company's private signing key may have been read by someone else (a leaked backup, a host compromise, a
+departing operator who could reach the key-encryption key), withdraw it at once; there is no reason to wait:
+
+1. Find the key: `GET <ADMIN_URL>/admin/<company>/api/keys` lists each key with its `kid` and `state`; the one to
+   withdraw is usually the `signing` one.
+2. Withdraw it with an operator holding `keys`: `POST <ADMIN_URL>/admin/<company>/api/keys/<kid>/withdraw` with a
+   `reason`. The answer names the key `withdrawn` and the `replacement`, if one had to be made. When no other key
+   could sign, the replacement is made before the withdrawal and signs at once; otherwise a key already published
+   takes over. The withdrawn key leaves the key set in the same request, and the console then shows it `withdrawn`.
+3. Expect what the key signed to stop verifying. A service that fetches the key set again refuses those tokens at
+   once; one that cached it may accept them for up to five minutes, the cache lifetime the key set is served with,
+   which is also how long an access token or ID token lives. A token forged with the exposed key is bounded the same
+   way. Refresh tokens are random values the server holds only as digests, not signed, so they stay valid and need
+   no revocation for a key exposure.
+4. Tell the company's integrators which `kid` was withdrawn and when, so a service that pins keys or caches them
+   longer than five minutes can drop it.
+5. Check the company's audit trail for the `keys.withdraw` entry and for anything else done with the same access.
+
+Every key of every company is sealed with the server's key-encryption key (`TESSARIDB_OAUTH_KEK`). If that file
+itself may be exposed, withdrawing keys is not enough, because a replacement is sealed with the same file: re-seal
+under a new key-encryption key as below.
+
+## A key-encryption key that may be exposed
+
+The key-encryption key seals five kinds of value in each company's database: its signing keys, the salt its pairwise
+subjects are made from, each authenticator app's secret, each authenticator being added, and each queued mail. To
+move all of them to a new key:
+
+1. Stop every node of the region. A node still serving seals what it writes under the old key.
+2. Make the new key: 32 random bytes in a file only its owner can read (`head -c 32 /dev/urandom > new.key`,
+   `chmod 600 new.key`).
+3. With the server's environment, `TESSARIDB_OAUTH_KEK` naming the new file, run
+   `tessaridb-oauth reseal --old-kek <old file>`. It walks every company in the region's directory, seals each value
+   again under the new key, then walks them again to check that every value opens under it. Its last line counts what
+   it found: `{"companies":2,"provisioning":0,"resealed":9,"already":0,"unopened":0,"finished":true}`. It exits 0
+   only when `finished` is true.
+4. Start the nodes with the new key.
+
+A run that stops part way can be run again: a value already under the new key is counted `already` and not written.
+`unopened` counts values that open under neither key; they are left as they were, and the run does not finish
+until they are explained. A company still being provisioned is counted in `provisioning` and not read; finish its
+provisioning and run again. The command refuses when the old and the new file hold the same key.
+
+What re-sealing does not do:
+
+- Backups taken before the re-seal still open with the old key. Destroy the old file only once every such backup has
+  expired or been destroyed.
+- If a copy of the store or a backup was taken together with the exposed key, the sealed values themselves may have
+  been read. Re-sealing does not make them secret again: also withdraw every company's signing keys (above), have
+  users add their authenticator apps again, and expire every backup sealed under the old key.
+- The pairwise salt is kept, not replaced, because a new salt would change every pairwise `sub` a client knows its
+  users by.
+
+## A leaked client credential
+
+When a client's private key (or the host that holds it) may be in someone else's hands, remove the client with an
+operator holding `clients`: `POST <ADMIN_URL>/admin/<company>/api/clients/<id>/remove` with a `reason`. The key stops
+authenticating at once, every user's grant to the client and every refresh family it held are revoked, and the answer
+gives `access_tokens_end_by`, at most five minutes on, after which the access tokens it already holds stop working.
+Then register the client again with a new key; it may keep its `client_id`, and it starts with nothing: no grant and
+no refresh token from before comes back, so every user is asked again.
+
+## A taken account
+
+When an account may be used by someone other than its owner, disable it with an operator holding `users`:
+`POST <ADMIN_URL>/admin/<company>/api/users/<user>/disable` with a `reason`. Every session of the account ends at once
+(its clients are told through the back channel), every refresh family is revoked, nobody can sign in to it, and its
+access tokens stop working by the `access_tokens_end_by` the answer gives. Once the owner is reached, enable it again
+(`POST .../users/<user>/enable`, which gives back none of what was ended) and have the owner ask for a password reset
+from the sign-in page; the reset keeps the account's second factor.
+
+## Backup and restore
+
+Everything the server keeps is in its TessariDB store, so a backup is a snapshot of the node, taken while it serves:
+`TESSARIDB_PASSWORD=<owner password> tessaridb --at <store address> --user <owner> --backup <file>`. Start the node
+with `--encryption-key-file` and every snapshot it writes is sealed under that key; check each one where it was
+written, before keeping it, with `tessaridb --verify <file> --backup-key-file <key file>`, which says what the file
+holds and exits non-zero for a file cut short or a wrong key. A passing verify is not a restore: rehearse one.
+
+A snapshot does not hold the server's key-encryption key (`TESSARIDB_OAUTH_KEK`) or its password pepper
+(`TESSARIDB_OAUTH_PEPPER`): without them the restored signing keys cannot be opened and no password verifies. Keep
+both with the store's encryption key, apart from the snapshots. To restore, replay the snapshot into an empty
+directory (`tessaridb <dir> --restore <file> --encryption-key-file <key file>`), serve that directory, and start the
+server with the same key-encryption key, pepper and `TESSARIDB_OAUTH_REGION`. Users sign in with the passwords they
+had, the keys that signed are published again, and refresh tokens issued before the snapshot work. A signing key
+withdrawn after the snapshot was taken comes back as it stood, so withdraw it again before serving traffic.
+
+Nothing bounds how long snapshot files are kept; delete them on a schedule. Each one holds every account's password
+hash and every company's sealed signing keys, and an older one brings back sessions, grants and keys that have since
+ended.

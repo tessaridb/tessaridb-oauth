@@ -6,6 +6,7 @@
 //! base64url text, and a binding compared against the wrong one of the two matches nothing and reads like a client
 //! with the wrong key.
 
+use sha2::Digest as _;
 use tessari_oauth_constants::SHA256_BASE64URL_LEN;
 
 use crate::{Error, Result, base64url};
@@ -30,6 +31,34 @@ impl KeyThumbprint {
             });
         }
         Ok(Self(raw))
+    }
+
+    /// The thumbprint of an Ed25519 public key (RFC 7638 §3.2 over the members RFC 8037 §2 requires).
+    #[must_use]
+    pub fn of_ed25519(x: &[u8]) -> Self {
+        Self::of_canonical(&format!(
+            r#"{{"crv":"Ed25519","kty":"OKP","x":"{}"}}"#,
+            base64url::encode(x)
+        ))
+    }
+
+    /// The thumbprint of a P-256 public key given by its coordinates (RFC 7638 §3.2 over the members RFC 7518 §6.2.1
+    /// requires).
+    #[must_use]
+    pub fn of_p256(x: &[u8], y: &[u8]) -> Self {
+        Self::of_canonical(&format!(
+            r#"{{"crv":"P-256","kty":"EC","x":"{}","y":"{}"}}"#,
+            base64url::encode(x),
+            base64url::encode(y)
+        ))
+    }
+
+    /// The SHA-256 of a key's canonical JSON — the required members only, in lexicographic order, with no
+    /// whitespace — in unpadded base64url.
+    fn of_canonical(canonical: &str) -> Self {
+        Self(base64url::encode(&sha2::Sha256::digest(
+            canonical.as_bytes(),
+        )))
     }
 
     /// The thumbprint as written.

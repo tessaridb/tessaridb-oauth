@@ -1,0 +1,83 @@
+//! Reading the store's answers into rows: the shape each statement answers in, mapped once for every domain.
+
+use tessari_oauth_infrastructure::tessaridb::{Answer, FromRecord, Number, Row, Value};
+
+use crate::{Error, Result};
+
+fn unreadable(record: &'static str, reason: String) -> Error {
+    Error::Unreadable { record, reason }
+}
+
+/// Every record the first answer holds — the shape a `SELECT` answers in.
+pub(crate) fn records<T: FromRecord>(answers: Vec<Answer>, record: &'static str) -> Result<Vec<T>> {
+    let Some(answer) = answers.into_iter().next() else {
+        return Ok(Vec::new());
+    };
+    answer
+        .records_into::<T>()
+        .map_err(|fault| unreadable(record, fault.to_string()))
+}
+
+/// The one record a statement addressed by id answered with, if any.
+pub(crate) fn single<T: FromRecord>(
+    answers: Vec<Answer>,
+    record: &'static str,
+) -> Result<Option<T>> {
+    Ok(records(answers, record)?.pop())
+}
+
+/// The record a `RETURN BEFORE` or `RETURN AFTER` answered with: one value rather than a set of records, so it is
+/// opened as a row under the id it was addressed by. A write that reached no record answers `NONE`, which is no row.
+pub(crate) fn returned<T: FromRecord>(
+    answers: Vec<Answer>,
+    id: &str,
+    record: &'static str,
+) -> Result<Option<T>> {
+    match answers.into_iter().next() {
+        Some(Answer::Value {
+            value: Value::None, ..
+        }) => Ok(None),
+        Some(Answer::Value { value, .. }) => {
+            let row = Row::new(id.to_owned(), value)
+                .map_err(|fault| unreadable(record, fault.to_string()))?;
+            T::from_row(row)
+                .map(Some)
+                .map_err(|fault| unreadable(record, fault.to_string()))
+        }
+        Some(_) => Err(unreadable(
+            record,
+            "a write answered something other than the record it returned".to_owned(),
+        )),
+        None => Ok(None),
+    }
+}
+
+/// How many records a set write changed: the count it answers with.
+pub(crate) fn count(answers: Vec<Answer>, record: &'static str) -> Result<u64> {
+    match answers.into_iter().next() {
+        Some(Answer::Value {
+            value: Value::Number(Number::Integer(count)),
+            ..
+        }) => u64::try_from(count)
+            .map_err(|_| unreadable(record, "a set write answered a negative count".to_owned())),
+        _ => Err(unreadable(
+            record,
+            "a set write answered something other than a count".to_owned(),
+        )),
+    }
+}
+
+/// The text of a record id the node spelled as `spelled`: a text id in single quotes, as every id this crate writes
+/// is.
+pub(crate) fn text_id(spelled: &str, record: &'static str) -> Result<String> {
+    spelled
+        .strip_prefix('\'')
+        .and_then(|rest| rest.strip_suffix('\''))
+        .filter(|inner| !inner.contains(['\'', '\\']))
+        .map(str::to_owned)
+        .ok_or_else(|| unreadable(record, "an id that is not plain quoted text".to_owned()))
+}
+
+#[cfg(test)]
+#[path = "answers_tests.rs"]
+mod tests;

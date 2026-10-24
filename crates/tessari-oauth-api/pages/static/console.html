@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>TessariDB OAuth console</title>
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/pages.css">
+  <link rel="stylesheet" href="assets/console.css">
+  <script src="assets/console.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#view">Skip to content</a>
+  <div class="shell">
+    <aside class="side">
+      <p class="brand"><img src="assets/mark.svg" alt="" width="28" height="28"><span>TessariDB OAuth</span></p>
+      <p id="company" class="company"></p>
+      <nav id="sections" aria-label="Sections" hidden>
+        <a href="#/users" data-section="users">Users</a>
+        <a href="#/groups" data-section="groups">Groups</a>
+        <a href="#/clients" data-section="clients">Clients</a>
+        <a href="#/operators" data-section="operators">Operators</a>
+        <a href="#/policy" data-section="policy">Sign-in policy</a>
+        <a href="#/branding" data-section="branding">Branding</a>
+        <a href="#/mail" data-section="mail">Mail</a>
+        <a href="#/keys" data-section="keys">Signing keys</a>
+        <a href="#/audit" data-section="audit">Audit trail</a>
+        <a href="#/companies" data-section="companies">Companies</a>
+      </nav>
+      <div class="side-foot">
+        <button id="theme" type="button" class="quiet">Dark theme</button>
+        <button id="sign-out" type="button" class="quiet" hidden>Sign out</button>
+      </div>
+    </aside>
+    <main id="view" class="view" tabindex="-1">
+      <noscript><p>The console needs JavaScript; the sign-in and account pages do not.</p></noscript>
+    </main>
+  </div>
+  <p id="status" class="status console-status" role="status" aria-live="polite"></p>
+</body>
+</html>

@@ -1,0 +1,162 @@
+/// Attempts at spending one authorization code when the store answers `retry`, counting the first. A loser of a
+/// simultaneous redemption is told `retry` while the winner's commit is still landing in its group sync; asking
+/// again once that commit is readable turns the answer into the replay it is. A bound at all, so contention
+/// surfaces as a failure instead of a loop.
+pub const CODE_SPEND_ATTEMPTS: u32 = 8;
+
+/// Attempts at claiming one pushed authorization request when the store answers `retry`, counting the first — the
+/// same race as a code spend, between two arrivals of one `request_uri`.
+pub const INTERACTION_CLAIM_ATTEMPTS: u32 = 8;
+
+/// Attempts at spending one client assertion or DPoP proof. The spend is a conditional `SET` that the store already re-runs for up
+/// to a second when it loses a race; an attempt here answers the `retry` that survives that. A bound at all, as above.
+pub const REPLAY_SPEND_ATTEMPTS: u32 = 8;
+
+/// Attempts at writing one consent record, counting the first. A grant is read, merged and written back under a
+/// revision check; each refused attempt means another writer of the same record succeeded, so the bound is the
+/// number of simultaneous grants for one user and client that are still served rather than failed.
+pub const CONSENT_WRITE_ATTEMPTS: u32 = 32;
+
+/// Pause before a store write is tried again, in milliseconds; each later pause doubles up to
+/// [`STORE_RETRY_MAX_PAUSE_MS`]. The first pause is about one device sync, which is what a `retry` is waiting on.
+pub const STORE_RETRY_FIRST_PAUSE_MS: u64 = 2;
+
+/// Longest pause between two attempts at one store write, in milliseconds. Eight code-spend attempts wait at most
+/// 2 + 4 + … + 64 + 64 = 190 ms in all, inside a token request's budget.
+pub const STORE_RETRY_MAX_PAUSE_MS: u64 = 64;
+
+/// Sign-ins one connection pool runs at once. A node verifies at most 24 passwords at a time per process and answers
+/// `throttled` beyond that, so a pool opening many connections together signs them in a few at a time rather than
+/// spending the node's whole allowance — and leaves room for the other replicas sharing it.
+pub const STORE_SIGNIN_CONCURRENCY: usize = 4;
+
+/// Attempts at signing a new connection in when the node answers `throttled` (not now, as opposed to not this
+/// password), counting the first.
+pub const STORE_SIGNIN_ATTEMPTS: u32 = 6;
+
+/// Attempts at rotating one refresh token when the store answers `retry`, counting the first; as for a code
+/// spend, the losing rotation then sees the winner's and is answered as the reuse it is.
+pub const REFRESH_ROTATE_ATTEMPTS: u32 = 8;
+
+/// Attempts at writing a secret that is made once, such as a tenant's pairwise salt, when the store answers `retry`,
+/// counting the first. A `retry` means a competing first write is still landing; once it has, the refusal says the
+/// secret exists and it is read back.
+pub const SECRET_CREATE_ATTEMPTS: u32 = 8;
+
+/// Attempts at a second-factor write — enrolment, accepting a time step, issuing or spending recovery codes — when the
+/// store answers `retry`, counting the first. A lost compare-and-set is then read back and answered as what it is.
+pub const FACTOR_WRITE_ATTEMPTS: u32 = 8;
+
+/// Attempts at a passkey write — registering a credential, advancing its counter, issuing or spending a challenge — when
+/// the store answers `retry`, counting the first. A lost compare-and-set is then read back and answered as what it is.
+pub const PASSKEY_WRITE_ATTEMPTS: u32 = 8;
+
+/// Attempts at a sign-in-progress write (beginning, advancing a step, finishing) when the store answers `retry`,
+/// counting the first. A lost step is read back and answered as stale; one browser takes one step at a time.
+pub const SIGNIN_WRITE_ATTEMPTS: u32 = 8;
+
+/// Attempts at a counter write (a request or a sign-in failure counted, a hold set or cleared) when the store answers
+/// `retry`, counting the first. Simultaneous requests from one client write one counter, and each must land: a count
+/// that gave up would let the client through uncounted or answer it `503`.
+pub const THROTTLE_WRITE_ATTEMPTS: u32 = 8;
+
+/// How many owed logouts one delivery run claims per tenant.
+pub const LOGOUT_CLAIM_BATCH: u32 = 50;
+
+/// How long an owed logout a client did not acknowledge waits before its second try, in seconds; each later try waits
+/// twice as long as the one before.
+pub const LOGOUT_RETRY_FIRST_SECS: u64 = 5;
+
+/// The longest wait between two tries of an owed logout, in seconds.
+pub const LOGOUT_RETRY_MAX_SECS: u64 = 3_600;
+
+/// The most one client may take to answer a logout token, in seconds. A run tells every claimed delivery at once, so
+/// this bounds how long a run spends telling, and it is well inside the 30 s a claim holds its delivery.
+pub const LOGOUT_SEND_TIMEOUT_SECS: u64 = 5;
+
+/// How often the delivery daemon looks for owed logouts, in seconds. A client is told within about this long of the
+/// session ending, and an owed logout released for a later try is picked up within this long of being due again.
+pub const LOGOUT_DELIVERY_INTERVAL_SECS: u64 = 5;
+
+/// The most one delivery run may take, in seconds: shorter than the 30 s a claim holds its delivery, so a run that is
+/// abandoned leaves its claims to lapse rather than racing the next run for them.
+pub const LOGOUT_DELIVERY_RUN_TIMEOUT_SECS: u64 = 25;
+
+/// The longest profile name (`name`, `given_name`, `family_name`), in characters.
+pub const PROFILE_NAME_MAX_CHARS: usize = 100;
+
+/// The longest company name, in characters.
+pub const COMPANY_NAME_MAX_CHARS: usize = 100;
+
+/// The most companies one directory page holds.
+pub const COMPANY_PAGE_MAX: u32 = 100;
+
+/// How many sealed values a re-seal reads in one page, so a large table never meets the store's answer ceiling.
+pub const RESEAL_PAGE: u32 = 500;
+
+/// How often a node re-reads which companies are active, in seconds: a company created, suspended or resumed on any
+/// node is served or refused everywhere within this long.
+pub const DIRECTORY_REFRESH_SECS: u64 = 5;
+
+/// The most one directory refresh may take, in seconds.
+pub const DIRECTORY_REFRESH_TIMEOUT_SECS: u64 = 4;
+
+/// How often a node re-reads the other regions' directories, in seconds: a company another region starts or stops
+/// serving is sent there, or no longer, within this long.
+pub const PEER_DIRECTORIES_SECS: u64 = 5;
+
+/// The most one read of every other region's directory may take, in seconds.
+pub const PEER_DIRECTORIES_TIMEOUT_SECS: u64 = 4;
+
+/// The connections a node holds at most to each other region's store: the directory is read once an interval.
+pub const PEER_CONNECTIONS: usize = 2;
+
+/// The company platform operators belong to: the only one whose users may hold the `companies` role.
+pub const SYSTEM_COMPANY: &str = "system";
+
+/// The client every company registers for its own admin console, which signs operators in at the company's issuer.
+pub const ADMIN_CONSOLE_CLIENT: &str = "admin-console";
+
+/// The most accounts one page of a company's user list holds.
+pub const USER_PAGE_MAX: u32 = 100;
+
+/// How many accounts one page of a company's user list holds when the console asks for no particular number.
+pub const USER_PAGE_DEFAULT: u32 = 50;
+
+/// The most client registrations one page of a company's client list holds.
+pub const CLIENT_PAGE_MAX: u32 = 100;
+
+/// How many client registrations one page of a company's client list holds when the console asks for no particular
+/// number.
+pub const CLIENT_PAGE_DEFAULT: u32 = 50;
+
+/// The most groups, or members of one group, one page of a company's lists holds.
+pub const GROUP_PAGE_MAX: u32 = 100;
+
+/// How many groups, or members of one group, one page holds when the console asks for no particular number.
+pub const GROUP_PAGE_DEFAULT: u32 = 50;
+
+/// The most groups one user may be a member of: every group is released in one claim, so the bound is what a claim
+/// may carry, and a membership past it is refused rather than a claim cut short.
+pub const GROUPS_PER_USER_MAX: u32 = 100;
+
+/// The most roles one group carries.
+pub const GROUP_ROLES_MAX: usize = 32;
+
+/// The longest description of a group, in characters.
+pub const GROUP_DESCRIPTION_MAX_CHARS: usize = 200;
+
+/// The most operator grants one page of a company's operator list holds.
+pub const OPERATOR_PAGE_MAX: u32 = 100;
+
+/// The most messages one page of a company's audit trail holds in the console.
+pub const AUDIT_PAGE_MAX: u64 = 100;
+
+/// How many days an operator grant made in the console lasts when the operator names no other number.
+pub const OPERATOR_GRANT_DEFAULT_DAYS: u64 = 90;
+
+/// The most days an operator grant made in the console may last; no console grant is permanent.
+pub const OPERATOR_GRANT_MAX_DAYS: u64 = 365;
+
+/// How long an enrolment code enrols its user: the 72 hours the `enrolments` table keeps it.
+pub const ENROLMENT_TTL_SECS: u64 = 259_200;

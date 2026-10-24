@@ -1,0 +1,219 @@
+//! Request counters on a real node: each (group, window, client) counted apart, refused past its limit, and a
+//! counter that expires on its own.
+
+use std::num::NonZeroU64;
+
+use tessari_oauth_constants::{
+    OPERATOR_READ_WINDOW_SECS, OPERATOR_READS_NOTICED, THROTTLE_SPACE_MAX_KEYS,
+};
+use tessari_oauth_infrastructure::tessaridb::{Answer, Database, Place, Value};
+use tessari_oauth_storage::throttle::{Admission, Limit, OperatorReads};
+use tessari_oauth_storage::{Storage, Tenancy};
+use tessari_oauth_test_support::{earlier_runs_removed, plain_node, unique};
+use tessari_oauth_types::{TenantId, Timestamp, UserId};
+
+const NOW: u64 = 1_800_000_010;
+
+fn limit(requests: u64, window_secs: u64) -> Limit {
+    Limit {
+        requests: NonZeroU64::new(requests).expect("non-zero"),
+        window_secs: NonZeroU64::new(window_secs).expect("non-zero"),
+    }
+}
+
+/// Storage over a pool of `connections` for a fresh region with its counters prepared, the database handle, and the
+/// region's namespace.
+pub(crate) async fn prepared(connections: usize) -> (Storage, Database, String) {
+    let node = plain_node().expect("the plain node is named");
+    earlier_runs_removed(&node);
+    let database = Database::new(node.clone(), connections).expect("a pool");
+    let region = unique("live");
+    let tenancy = Tenancy::for_region(&region).expect("a region");
+    let storage = Storage::new(&database, &tenancy);
+    storage.throttle.prepare().await.expect("prepared");
+    (storage, database, format!("oauth_{region}"))
+}
+
+async fn admit(storage: &Storage, group: &str, client: &str) -> Admission {
+    storage
+        .throttle
+        .admit(group, client, limit(2, 60), Timestamp::from_unix_secs(NOW))
+        .await
+        .expect("answered")
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_client_is_refused_past_its_limit_while_other_clients_and_groups_are_counted_apart() {
+    let (storage, _, _) = prepared(2).await;
+    storage.throttle.prepare().await.expect("prepared again");
+    assert_eq!(
+        admit(&storage, "metadata", "203.0.113.9").await,
+        Admission::Admitted { remaining: 1 }
+    );
+    assert_eq!(
+        admit(&storage, "metadata", "203.0.113.9").await,
+        Admission::Admitted { remaining: 0 }
+    );
+    assert_eq!(
+        admit(&storage, "metadata", "203.0.113.9").await,
+        Admission::Refused {
+            retry_after_secs: 50
+        }
+    );
+    assert_eq!(
+        admit(&storage, "metadata", "198.51.100.7").await,
+        Admission::Admitted { remaining: 1 }
+    );
+    assert_eq!(
+        admit(&storage, "jwks", "203.0.113.9").await,
+        Admission::Admitted { remaining: 1 }
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_counter_expires_by_itself_after_its_window_and_one_more() {
+    let (storage, database, namespace) = prepared(2).await;
+    admit(&storage, "metadata", "203.0.113.9").await;
+    admit(&storage, "metadata", "203.0.113.9").await;
+    let place = Place::new(namespace, "throttle").expect("a place");
+    let key = format!("metadata:{}:203.0.113.9", NOW / 60);
+    let answers = database
+        .run_at(
+            &place,
+            "RETURN TTL requests:$key;",
+            vec![("key".to_owned(), Value::from(key.as_str()))],
+        )
+        .await
+        .expect("answered");
+    // 50 seconds were left in the window, plus one more window: the second `INCR` kept the first write's expiry.
+    match answers.first() {
+        Some(Answer::Value {
+            value: Value::Duration { seconds, .. },
+            ..
+        }) => assert!((100..=110).contains(seconds), "{seconds}"),
+        other => panic!("no expiry on the counter: {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn request_counters_are_held_in_the_store_nodes_memory_and_failures_on_disk() {
+    let (storage, database, namespace) = prepared(2).await;
+    admit(&storage, "metadata", "203.0.113.9").await;
+    let place = Place::new(namespace, "throttle").expect("a place");
+    let answers = database
+        .run_at(
+            &place,
+            "INFO FOR TABLE requests; INFO FOR TABLE counters;",
+            Vec::new(),
+        )
+        .await
+        .expect("answered");
+    let definitions: Vec<String> = answers
+        .iter()
+        .map(|answer| match answer {
+            Answer::Value {
+                value: Value::Object(info),
+                ..
+            } => match info.get("definition") {
+                Some(Value::String(definition)) => definition.trim().to_owned(),
+                other => panic!("no definition: {other:?}"),
+            },
+            other => panic!("not a table's description: {other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        definitions,
+        [
+            format!("DEFINE SPACE requests IN MEMORY MAX {THROTTLE_SPACE_MAX_KEYS};"),
+            format!("DEFINE SPACE counters MAX {THROTTLE_SPACE_MAX_KEYS};"),
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_operators_reads_add_up_per_hour_apart_from_other_operators_and_companies() {
+    let (storage, _, _) = prepared(2).await;
+    let acme = TenantId::parse("acme").expect("a tenant");
+    let initech = TenantId::parse("initech").expect("a tenant");
+    let anna = UserId::parse("operator-a").expect("an id");
+    let ben = UserId::parse("operator-b").expect("an id");
+    let read = |tenant: &TenantId, operator: &UserId, accounts: u64, at: u64| {
+        let storage = storage.clone();
+        let (tenant, operator) = (tenant.clone(), operator.clone());
+        async move {
+            storage
+                .throttle
+                .operator_read(&tenant, &operator, accounts, Timestamp::from_unix_secs(at))
+                .await
+                .expect("counted")
+        }
+    };
+    let below = OPERATOR_READS_NOTICED - 1;
+    assert_eq!(
+        read(&acme, &anna, below, NOW).await,
+        OperatorReads {
+            total: below,
+            noticed: false
+        }
+    );
+    assert_eq!(
+        read(&acme, &anna, 1, NOW).await,
+        OperatorReads {
+            total: OPERATOR_READS_NOTICED,
+            noticed: true
+        }
+    );
+    assert_eq!(
+        read(&acme, &anna, 5, NOW).await,
+        OperatorReads {
+            total: OPERATOR_READS_NOTICED + 5,
+            noticed: false
+        }
+    );
+    let apart = OperatorReads {
+        total: 1,
+        noticed: false,
+    };
+    assert_eq!(read(&acme, &ben, 1, NOW).await, apart);
+    assert_eq!(read(&initech, &anna, 1, NOW).await, apart);
+    assert_eq!(
+        read(&acme, &anna, 1, NOW + OPERATOR_READ_WINDOW_SECS).await,
+        apart
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn simultaneous_requests_are_each_counted_once_so_exactly_the_limit_is_admitted() {
+    // One connection per request, so the sixteen counts reach the node at once rather than two at a time.
+    let (storage, _, _) = prepared(16).await;
+    let mut requests = tokio::task::JoinSet::new();
+    for _ in 0..16 {
+        let storage = storage.clone();
+        requests.spawn(async move {
+            storage
+                .throttle
+                .admit(
+                    "metadata",
+                    "203.0.113.9",
+                    limit(10, 60),
+                    Timestamp::from_unix_secs(NOW),
+                )
+                .await
+                .expect("answered")
+        });
+    }
+    let mut admitted = 0;
+    let mut refused = 0;
+    while let Some(answer) = requests.join_next().await {
+        match answer.expect("a request task") {
+            Admission::Admitted { .. } => admitted += 1,
+            Admission::Refused { .. } => refused += 1,
+        }
+    }
+    assert_eq!((admitted, refused), (10, 6));
+}

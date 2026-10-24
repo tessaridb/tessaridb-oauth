@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Your account</title>
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/pages.css">
+  <link rel="stylesheet" href="assets/brand.css">
+  <script src="assets/account.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to your account</a>
+  <main id="main" class="page" tabindex="-1">
+    <section class="card wide" aria-labelledby="title">
+      <header class="brand">
+        <img id="brand-logo" src="assets/mark.svg" alt="" width="32" height="32">
+        <span id="brand-name">TessariDB OAuth</span>
+      </header>
+      <h1 id="title" tabindex="-1">Your account</h1>
+      <p id="status" class="status" role="status" aria-live="polite">Loading your account.</p>
+      <p id="sign-in" hidden><a href="login?return=account" class="button-link">Sign in</a></p>
+
+      <div id="account" class="sections" hidden>
+        <section aria-labelledby="who-title">
+          <h2 id="who-title">Signed in as</h2>
+          <p class="who"><strong id="email"></strong> <span id="verified" class="badge"></span></p>
+          <div class="actions">
+            <button type="button" id="verify-send" class="secondary" hidden>Send a verification link</button>
+            <button type="button" id="email-open" class="secondary">Change your sign-in address</button>
+          </div>
+          <form id="email-form" class="panel" hidden novalidate>
+            <div class="field">
+              <label for="new-email">New address</label>
+              <input id="new-email" name="email" type="email" autocomplete="email" required
+                     aria-required="true" aria-describedby="new-email-hint new-email-error">
+              <p id="new-email-hint" class="hint"></p>
+              <p id="new-email-error" class="field-error" hidden></p>
+            </div>
+            <div class="actions">
+              <button type="submit" class="primary">Send the link</button>
+              <button type="button" id="email-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section aria-labelledby="names-title">
+          <h2 id="names-title">Your name</h2>
+          <dl class="facts">
+            <dt>Full name</dt><dd id="name-full-shown"></dd>
+            <dt>Given name</dt><dd id="name-given-shown"></dd>
+            <dt>Family name</dt><dd id="name-family-shown"></dd>
+          </dl>
+          <div class="actions">
+            <button type="button" id="names-open" class="secondary">Change your name</button>
+          </div>
+          <form id="names-form" class="panel" hidden novalidate>
+            <p id="names-hint" class="hint"></p>
+            <div class="field">
+              <label for="name-full">Full name</label>
+              <input id="name-full" name="name" type="text" autocomplete="name"
+                     aria-describedby="names-hint names-error">
+            </div>
+            <div class="field">
+              <label for="name-given">Given name</label>
+              <input id="name-given" name="given-name" type="text" autocomplete="given-name"
+                     aria-describedby="names-hint names-error">
+            </div>
+            <div class="field">
+              <label for="name-family">Family name</label>
+              <input id="name-family" name="family-name" type="text" autocomplete="family-name"
+                     aria-describedby="names-hint names-error">
+            </div>
+            <p id="names-error" class="field-error" hidden></p>
+            <div class="actions">
+              <button type="submit" class="primary">Save</button>
+              <button type="button" id="names-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section aria-labelledby="methods-title">
+          <h2 id="methods-title">How you sign in</h2>
+          <p id="enrol-due" class="notice" hidden></p>
+          <dl class="facts">
+            <dt>Password</dt><dd id="method-password"></dd>
+            <dt>Authenticator app</dt><dd id="method-totp"></dd>
+            <dt>Recovery codes</dt><dd id="method-recovery"></dd>
+          </dl>
+          <div class="actions">
+            <button type="button" id="password-open" class="secondary">Change password</button>
+            <button type="button" id="codes-open" class="secondary">Get new recovery codes</button>
+            <button type="button" id="app-open" class="secondary" hidden>Set up an authenticator app</button>
+            <button type="button" id="app-off" class="secondary" hidden>Turn off the authenticator app</button>
+          </div>
+
+          <div id="app-off-confirm" class="confirm" hidden>
+            <p>Turning off the app also removes your unused recovery codes, and signs you out on your other devices.</p>
+            <div class="actions">
+              <button type="button" id="app-off-yes" class="danger">Turn off</button>
+              <button type="button" id="app-off-no" class="secondary">Cancel</button>
+            </div>
+          </div>
+
+          <form id="app-form" class="panel" hidden novalidate>
+            <p>Add this account to your authenticator app, then enter the 6-digit code it shows.
+              The key is shown only now.</p>
+            <p><a id="app-link" class="quiet-link">Open in an authenticator app</a></p>
+            <p>Or enter this key: <code id="app-secret" class="secret"></code></p>
+            <div class="field">
+              <label for="app-code">Code from the app</label>
+              <input id="app-code" name="app-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                     required aria-required="true" aria-describedby="app-code-error">
+              <p id="app-code-error" class="field-error" hidden></p>
+            </div>
+            <div class="actions">
+              <button type="submit" class="primary">Turn on</button>
+              <button type="button" id="app-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
+
+          <form id="password-form" class="panel" hidden novalidate>
+            <input id="password-username" type="email" autocomplete="username" readonly hidden>
+            <div class="field">
+              <label for="new-password">New password</label>
+              <input id="new-password" name="new-password" type="password" autocomplete="new-password" required
+                     aria-required="true" aria-describedby="new-password-hint new-password-error">
+              <p id="new-password-hint" class="hint"></p>
+              <p id="new-password-error" class="field-error" hidden></p>
+            </div>
+            <div class="actions">
+              <button type="submit" class="primary">Change password</button>
+              <button type="button" id="password-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
+
+          <div id="codes-confirm" class="confirm" hidden>
+            <p>New codes replace every code you haven't used yet, and sign you out on your other devices.</p>
+            <div class="actions">
+              <button type="button" id="codes-yes" class="primary">Get new codes</button>
+              <button type="button" id="codes-no" class="secondary">Cancel</button>
+            </div>
+          </div>
+
+          <div id="codes-shown" class="panel" hidden>
+            <p>Save these codes somewhere safe. Each one signs you in once if you lose your other ways in.
+              They won't be shown again.</p>
+            <ul id="codes" class="codes"></ul>
+            <div class="actions">
+              <button type="button" id="codes-saved" class="primary">I've saved them</button>
+            </div>
+          </div>
+          <h3 id="passkeys-title">Passkeys</h3>
+          <ul id="passkeys" class="rows" aria-labelledby="passkeys-title"></ul>
+          <div class="actions">
+            <button type="button" id="passkey-add" class="secondary" hidden>Add a passkey</button>
+          </div>
+        </section>
+
+        <section aria-labelledby="sessions-title">
+          <h2 id="sessions-title" tabindex="-1">Where you're signed in</h2>
+          <ul id="sessions" class="rows" aria-labelledby="sessions-title"></ul>
+          <div class="actions">
+            <button type="button" id="everywhere" class="secondary">Sign out everywhere</button>
+          </div>
+          <div id="everywhere-confirm" class="confirm" hidden>
+            <p id="everywhere-warning"></p>
+            <div class="actions">
+              <button type="button" id="everywhere-yes" class="danger">Sign out everywhere</button>
+              <button type="button" id="everywhere-no" class="secondary">Keep me signed in</button>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="grants-title">
+          <h2 id="grants-title" tabindex="-1">Applications with access</h2>
+          <ul id="grants" class="rows" aria-labelledby="grants-title"></ul>
+        </section>
+      </div>
+      <p id="brand-links" class="brand-links" hidden>
+        <a id="brand-support" class="quiet-link" rel="noreferrer" hidden>Help</a>
+        <a id="brand-privacy" class="quiet-link" rel="noreferrer" hidden>Privacy</a>
+      </p>
+    </section>
+  </main>
+</body>
+</html>

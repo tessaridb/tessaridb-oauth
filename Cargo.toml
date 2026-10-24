@@ -20,13 +20,62 @@ tessari-oauth-infrastructure = { path = "crates/tessari-oauth-infrastructure" }
 tessari-oauth-storage = { path = "crates/tessari-oauth-storage" }
 tessari-oauth-api = { path = "crates/tessari-oauth-api" }
 tessari-oauth-daemons = { path = "crates/tessari-oauth-daemons" }
+tessari-oauth-test-support = { path = "crates/tessari-oauth-test-support" }
 
 thiserror = "2"
 sha2 = "0.10"
 subtle = "2"
+# COSE keys and CBOR for passkeys (RFC 9052 / RFC 9053).
+coset = "=0.4.2"
+# Signature verification for client assertions and DPoP proofs. Already in the tree through the TLS stack, so it adds
+# no new supply-chain surface; it verifies in constant time and offers exactly the curves this server accepts.
+ring = "0.17"
+# Typed JOSE headers, claims and keys; never an untyped value tree.
+serde = { version = "1", features = ["derive"] }
+# Private key material is cleared from memory when its holder drops. Already in the tree.
+zeroize = "1"
+# `raw_value` keeps an embedded JWK as the slice it arrived as, parsed once by the key reader.
+serde_json = { version = "1", features = ["raw_value"] }
 # Redirect URIs are parsed by the WHATWG URL parser, and a registered value must already be in the form it
 # serialises to, so the server never normalises an incoming value into a match.
 url = "2"
+png = "0.18.1"
+# A password is compared and hashed in Unicode Normalization Form C (NIST SP 800-63B-4 §3.1.1.2), so the same
+# characters typed on two keyboards are one password.
+unicode-normalization = "0.1"
+# Passwords are stored as Argon2id (RFC 9106) PHC strings. Pinned: the 0.5 line shares `blake2`/`digest` 0.10 with
+# `sha2`, where 0.6 would bring a second hashing stack. Salt and HMAC come from `ring`, so no random-number feature.
+argon2 = { version = "=0.5.3", default-features = false, features = ["alloc", "password-hash", "zeroize"] }
+# Reads a `.env` file into the environment for local development; a missing file is the production case.
+dotenvy = "0.15"
+# The database client is the family's own SDK; it does not publish to a registry, so it arrives pinned by tag.
+tessaridb-client = { git = "https://github.com/tessaridb/tessaridb-sdk-rust.git", tag = "v0.12.0" }
+tokio = { version = "1", default-features = false, features = ["net", "sync", "time"] }
+async-trait = "0.1"
+# Telling many back-channel endpoints at once from one task: `join_all` over borrowed futures.
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+# The HTTP surface, as the family's other servers build it: axum over hyper's HTTP/1 connection builder, with tower
+# layers; no default features, so nothing unused is compiled.
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json", "query", "form"] }
+tower = { version = "0.5", features = ["util"] }
+hyper-util = { version = "0.1", features = ["server-auto", "server-graceful", "tokio", "service"] }
+# The back-channel logout poster: one HTTP/1 request per connection, no pool and no redirect handling.
+hyper = { version = "1", default-features = false, features = ["client", "http1"] }
+http-body = "1"
+# Listener TLS on the provider the database client already uses.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+# The roots outbound TLS trusts: the operating system's own store.
+rustls-native-certs = "0.8"
+# Mail submission to the operator's relay (RFC 5321/6409 over RFC 8314 implicit TLS or RFC 3207 STARTTLS), on the
+# same tokio and rustls with ring the rest of the server uses.
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-native-certs", "builder", "hostname"] }
+# Self-signed certificates for the listener tests; a dev-dependency only.
+rcgen = "0.13"
+tracing = "0.1"
+# The binary's subscriber: JSON events, a filter from `RUST_LOG`, and a writer on its own thread.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "json", "fmt", "std"] }
+tracing-appender = "0.2"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
