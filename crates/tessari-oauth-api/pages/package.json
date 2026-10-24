@@ -1,6 +1,6 @@
 {
   "name": "tessaridb-oauth-pages",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "boogvar",
   "private": true,
   "description": "Source for the sign-in and consent pages TessariDB OAuth serves on its public listener. The build's output is committed to ../assets/ and embedded by include_str!, so nothing here is needed to build or run the server.",
