@@ -30,6 +30,7 @@ pub mod replay;
 pub mod resets;
 mod retry;
 pub mod sealed;
+pub mod service_credentials;
 pub mod sessions;
 pub mod signins;
 mod storage;

@@ -17,6 +17,7 @@ mod mail;
 mod operator;
 mod operators;
 mod policy;
+mod services;
 mod session;
 mod signin;
 mod users;
@@ -45,7 +46,10 @@ use tessari_oauth_storage::operators::OperatorService;
 use tessari_oauth_storage::outbox::OutboxService;
 use tessari_oauth_storage::policies::PolicyService;
 use tessari_oauth_storage::refresh::RefreshService;
+use tessari_oauth_storage::replay::ReplayService;
+use tessari_oauth_storage::service_credentials::ServiceCredentialService;
 use tessari_oauth_storage::sessions::SessionService;
+use tessari_oauth_storage::subjects::SubjectService;
 use tessari_oauth_storage::tenants::TenantService;
 use tessari_oauth_storage::throttle::{Limit, ThrottleService};
 use tessari_oauth_storage::users::UserService;
@@ -73,6 +77,12 @@ pub struct AdminState {
     pub consents: Arc<ConsentService>,
     /// Operator grants: a sign-in without one opens nothing.
     pub operators: Arc<OperatorService>,
+    /// Programs the companies registered to call their admin API.
+    pub services: Arc<ServiceCredentialService>,
+    /// Spent service assertions.
+    pub replay: Arc<ReplayService>,
+    /// Pairwise subjects, to find the account a sector's subject stands for.
+    pub subjects: Arc<SubjectService>,
     /// The audit trail.
     pub audit: Arc<AuditService>,
     /// Issuer sessions: a console session ends with the one it came from.
@@ -208,7 +218,19 @@ pub fn admin_router(state: AdminState) -> Router {
             "/admin/{company}/api/users",
             get(users_read::list).post(users::create),
         )
+        .route(
+            "/admin/{company}/api/users/by-subject",
+            get(users_read::by_subject),
+        )
         .route("/admin/{company}/api/users/{user}", get(users_read::one))
+        .route(
+            "/admin/{company}/api/services",
+            get(services::list).post(services::register),
+        )
+        .route(
+            "/admin/{company}/api/services/{service}/remove",
+            post(services::remove),
+        )
         .route("/admin/{company}/api/audit", get(audit::trail))
         .route(
             "/admin/{company}/api/companies",

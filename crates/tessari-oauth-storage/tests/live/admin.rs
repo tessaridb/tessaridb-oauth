@@ -6,7 +6,7 @@ use tessari_oauth_constants::{ADMIN_SESSION_ABSOLUTE_SECS, ADMIN_SESSION_IDLE_SE
 use tessari_oauth_core::authentication::Method;
 use tessari_oauth_storage::admin::Claim;
 use tessari_oauth_types::{
-    IdempotencyKey, SessionSecret, SigninBinding, TenantId, Timestamp, UserId,
+    Actor, IdempotencyKey, SessionSecret, SigninBinding, TenantId, Timestamp, UserId,
 };
 
 use crate::fresh;
@@ -17,6 +17,10 @@ fn acme() -> TenantId {
 
 fn operator() -> UserId {
     UserId::parse("user-1").expect("a user id")
+}
+
+fn actor() -> Actor {
+    Actor::Operator(operator())
 }
 
 const METHODS: [Method; 2] = [Method::Password, Method::Totp];
@@ -187,7 +191,7 @@ async fn a_change_is_claimed_once_and_answered_the_same_when_sent_again() {
     let storage = fresh(&acme(), 2).await;
     let at = Timestamp::from_unix_secs(1);
     let first = key("change-0123456789-a");
-    let claim = |operator: UserId, key: IdempotencyKey, request: &'static str| {
+    let claim = |operator: Actor, key: IdempotencyKey, request: &'static str| {
         let admin = std::sync::Arc::clone(&storage.admin);
         async move {
             admin
@@ -196,35 +200,32 @@ async fn a_change_is_claimed_once_and_answered_the_same_when_sent_again() {
                 .expect("an answer")
         }
     };
+    assert_eq!(claim(actor(), first.clone(), "body-1").await, Claim::Fresh);
     assert_eq!(
-        claim(operator(), first.clone(), "body-1").await,
-        Claim::Fresh
-    );
-    assert_eq!(
-        claim(operator(), first.clone(), "body-1").await,
+        claim(actor(), first.clone(), "body-1").await,
         Claim::InFlight,
         "a repeat while the first is being made"
     );
     storage
         .admin
-        .finish(&acme(), &operator(), &first, 200, "{\"disabled\":true}")
+        .finish(&acme(), &actor(), &first, 200, "{\"disabled\":true}")
         .await
         .expect("finished");
     assert_eq!(
-        claim(operator(), first.clone(), "body-1").await,
+        claim(actor(), first.clone(), "body-1").await,
         Claim::Answered {
             status: 200,
             answer: "{\"disabled\":true}".to_owned()
         }
     );
     assert_eq!(
-        claim(operator(), first.clone(), "body-2").await,
+        claim(actor(), first.clone(), "body-2").await,
         Claim::Reused,
         "the same key for another change"
     );
     let colleague = UserId::parse("user-2").expect("a user id");
     assert_eq!(
-        claim(colleague, first.clone(), "body-1").await,
+        claim(Actor::Operator(colleague), first.clone(), "body-1").await,
         Claim::Fresh,
         "another operator's key is their own"
     );
@@ -239,18 +240,18 @@ async fn a_change_that_did_not_happen_releases_its_key() {
     let admin = &storage.admin;
     assert_eq!(
         admin
-            .claim(&acme(), &operator(), &failed, "user.disable", "body-1", at)
+            .claim(&acme(), &actor(), &failed, "user.disable", "body-1", at)
             .await
             .expect("an answer"),
         Claim::Fresh
     );
     admin
-        .release(&acme(), &operator(), &failed)
+        .release(&acme(), &actor(), &failed)
         .await
         .expect("released");
     assert_eq!(
         admin
-            .claim(&acme(), &operator(), &failed, "user.disable", "body-1", at)
+            .claim(&acme(), &actor(), &failed, "user.disable", "body-1", at)
             .await
             .expect("an answer"),
         Claim::Fresh,

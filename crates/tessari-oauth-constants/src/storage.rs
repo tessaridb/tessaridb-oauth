@@ -149,6 +149,10 @@ pub const GROUP_DESCRIPTION_MAX_CHARS: usize = 200;
 /// The most operator grants one page of a company's operator list holds.
 pub const OPERATOR_PAGE_MAX: u32 = 100;
 
+/// Most services a company may register. A company calls its admin API from a handful of programs; the bound keeps
+/// the whole set readable in one answer, so no registered credential is ever out of an operator's sight.
+pub const SERVICES_MAX: u32 = 20;
+
 /// The most messages one page of a company's audit trail holds in the console.
 pub const AUDIT_PAGE_MAX: u64 = 100;
 

@@ -10,7 +10,7 @@ use tessari_oauth_infrastructure::tessaridb::{Answer, Database, Place, Value};
 use tessari_oauth_storage::throttle::{Admission, Limit, OperatorReads};
 use tessari_oauth_storage::{Storage, Tenancy};
 use tessari_oauth_test_support::{earlier_runs_removed, plain_node, unique};
-use tessari_oauth_types::{TenantId, Timestamp, UserId};
+use tessari_oauth_types::{Actor, TenantId, Timestamp, UserId};
 
 const NOW: u64 = 1_800_000_010;
 
@@ -139,9 +139,9 @@ async fn an_operators_reads_add_up_per_hour_apart_from_other_operators_and_compa
     let (storage, _, _) = prepared(2).await;
     let acme = TenantId::parse("acme").expect("a tenant");
     let initech = TenantId::parse("initech").expect("a tenant");
-    let anna = UserId::parse("operator-a").expect("an id");
-    let ben = UserId::parse("operator-b").expect("an id");
-    let read = |tenant: &TenantId, operator: &UserId, accounts: u64, at: u64| {
+    let anna = Actor::Operator(UserId::parse("operator-a").expect("an id"));
+    let ben = Actor::Operator(UserId::parse("operator-b").expect("an id"));
+    let read = |tenant: &TenantId, operator: &Actor, accounts: u64, at: u64| {
         let storage = storage.clone();
         let (tenant, operator) = (tenant.clone(), operator.clone());
         async move {

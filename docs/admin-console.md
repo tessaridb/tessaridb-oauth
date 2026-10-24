@@ -166,6 +166,21 @@ channel, revokes every refresh family (recorded as `user_disabled`), and with th
 of its own; its access tokens stop working by the `access_tokens_end_by` the answer gives. A disabled account cannot
 sign in. Enabling gives back only that: nothing ended comes back.
 
+Services (role `users`, console only): a program the company runs can call this API without a console session.
+`POST <ADMIN_URL>/admin/<company>/api/services` with `{"service_id", "jwk", "roles", "reason"}` registers one with
+its Ed25519 public key and the role `users` (the only role a service may hold); `GET .../api/services` lists them (at
+most 20 a company) and `POST .../api/services/<id>/remove` with `{"reason"}` removes one, after which its assertions
+are refused. Only an operator signed in to the console may do these three, so a service never mints another.
+
+A service sends each request with `Authorization: TessariService <assertion>`: a JWT it signs with that key, of type
+`tessari-admin+jwt`, `alg` `EdDSA`, with `iss` and `sub` its service id, `aud` exactly `<ADMIN_URL
+origin>/admin/<company>`, an `exp` at most 60 seconds ahead, and a `jti` used once. Anything else is `401
+service_refused`; the audit trail names the check that failed. A service is held to its role like an operator, is not
+held to the console's origin (it carries no cookie a page could ride on), and still sends an `Idempotency-Key` and a
+`reason` with every change, recorded as `service:<id>`. Granting operator roles, revealing an address and `api/me` are
+`403 console_only` for a service. `GET .../api/users/by-subject?sector=&sub=` (role `users`) reads the account a
+client sector's pairwise subject stands for, masked as `GET .../api/users/<user>` shows it, or `404 user_not_found`.
+
 ## The audit trail
 
 Every outcome at the token and revocation endpoints, and every refusal at the authorization and UserInfo endpoints,

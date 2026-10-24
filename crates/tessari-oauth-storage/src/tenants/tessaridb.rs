@@ -37,7 +37,8 @@ use crate::Result;
 /// newer request replace it and `by_cancel` finds it from the old address's link.
 /// `enrolments` holds a user's one live enrolment code under its digest for 72 hours, found by `by_user` when a new code
 /// replaces it. `operator_grants` holds each role a user may administer the company with under `<user id>.<role>`,
-/// with who gave it, why and until when, found for its holder by `by_user`. `admin_signins` holds a sign-in to the
+/// with who gave it, why and until when, found for its holder by `by_user`. `services` holds each program registered
+/// to call the admin API under its service id, with the Ed25519 public key its assertions verify under and its roles. `admin_signins` holds a sign-in to the
 /// admin console under the digest of its sign-in cookie for the ten minutes (`ADMIN_SIGNIN_TTL_SECS`) a trip to the
 /// issuer may take; `admin_sessions` holds an admin console session under the digest of its cookie for at most the
 /// eight hours (`ADMIN_SESSION_ABSOLUTE_SECS`) it lasts; `admin_actions` holds an operator's change under its operator
@@ -152,6 +153,9 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      reason string REQUIRED); \
      DEFINE FIELD IF NOT EXISTS expires_at ON operator_grants TYPE int; \
      DEFINE INDEX IF NOT EXISTS by_user ON operator_grants FIELDS user_id; \
+     DEFINE TABLE IF NOT EXISTS services (\
+     service_id string REQUIRED, public_jwk string REQUIRED, roles array REQUIRED, registered_by string REQUIRED, \
+     registered_at int REQUIRED, reason string REQUIRED); \
      DEFINE TABLE IF NOT EXISTS admin_signins (\
      state string REQUIRED, verifier string REQUIRED, nonce string REQUIRED, created_at int REQUIRED) \
      EXPIRE AFTER 10m; \

@@ -2,6 +2,7 @@
 //! two of them is a compile error: PKCE challenges, key thumbprints, redirect URIs, tenant and client ids, and
 //! the error taxonomy every crate maps its failures into.
 
+mod actor;
 mod algorithm;
 mod authorization_code;
 pub mod base64url;
@@ -21,6 +22,7 @@ mod reset_token;
 mod resource;
 mod scope;
 mod sector;
+mod service_id;
 mod session_secret;
 mod signin_binding;
 mod tenant_id;
@@ -30,6 +32,7 @@ mod trusted_proxies;
 mod user_id;
 mod verify_token;
 
+pub use actor::Actor;
 pub use algorithm::Algorithm;
 pub use authorization_code::AuthorizationCode;
 pub use browser_binding::BrowserBinding;
@@ -48,6 +51,7 @@ pub use reset_token::ResetToken;
 pub use resource::Resource;
 pub use scope::ScopeSet;
 pub use sector::Sector;
+pub use service_id::ServiceId;
 pub use session_secret::SessionSecret;
 pub use signin_binding::SigninBinding;
 pub use tenant_id::TenantId;

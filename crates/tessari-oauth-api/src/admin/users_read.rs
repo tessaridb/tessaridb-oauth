@@ -10,10 +10,11 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use tessari_oauth_constants::{USER_PAGE_DEFAULT, USER_PAGE_MAX};
+use tessari_oauth_core::subject::SubjectSector;
 use tessari_oauth_storage::audit::{AuditEvent, AuditKind};
 use tessari_oauth_storage::operators::OperatorRole;
 use tessari_oauth_storage::users::UserAccount;
-use tessari_oauth_types::{EmailAddress, UserId};
+use tessari_oauth_types::{EmailAddress, Sector, UserId};
 
 use super::AdminState;
 use super::change::{Reasoned, Refusal, reason_of};
@@ -118,6 +119,50 @@ pub(super) async fn list(
     Ok(Json(Page { users, next }).into_response())
 }
 
+/// A pairwise subject as a client of a sector knows a person.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Subject {
+    sector: String,
+    sub: String,
+}
+
+/// The company's account that the subject `sub` stands for in `sector`, shown as [`one`] shows it: how a program
+/// that knows a person only by the subject its sector's clients were given finds the account to act on.
+pub(super) async fn by_subject(
+    State(state): State<AdminState>,
+    Path(company): Path<String>,
+    headers: HeaderMap,
+    asked: std::result::Result<Query<Subject>, QueryRejection>,
+) -> Result<Response> {
+    let operator = signed_in(&state, &company, &headers).await?;
+    operator.require(&state, OperatorRole::Users, READ).await?;
+    let Query(asked) = asked.map_err(|_| Error::Invalid)?;
+    let sector = Sector::parse(asked.sector).map_err(|_| Error::Invalid)?;
+    // A pairwise subject is 43 base64url characters; anything far longer is not one, and is not looked up.
+    if asked.sub.is_empty() || asked.sub.len() > 128 {
+        return Err(Error::Invalid);
+    }
+    let user = state
+        .subjects
+        .user_of(&operator.tenant, &SubjectSector::Named(sector), &asked.sub)
+        .await
+        .map_err(Error::Store)?;
+    let found = match user {
+        Some(user) => state
+            .users
+            .find(&operator.tenant, &user)
+            .await
+            .map_err(Error::Store)?,
+        None => None,
+    };
+    let Some(account) = found else {
+        return Ok(missing());
+    };
+    shown_to(&state, &operator, 1).await?;
+    Ok(Json(shown(&account)).into_response())
+}
+
 /// The company's account `user`.
 pub(super) async fn one(
     State(state): State<AdminState>,
@@ -153,6 +198,8 @@ pub(super) async fn reveal(
     operator
         .require(&state, OperatorRole::Users, REVEAL)
         .await?;
+    // A service never sees what the console masks: it acts on accounts, not on the people behind them.
+    operator.in_console(&state, REVEAL).await?;
     let sent: Reveal = serde_json::from_slice(&body).map_err(|_| Error::Invalid)?;
     let reason = reason_of(&sent)?;
     let found = match UserId::parse(user) {
@@ -168,7 +215,7 @@ pub(super) async fn reveal(
     };
     // The record is the control: an address nobody could later see revealed is not shown.
     let event = AuditEvent {
-        actor: Some(operator.user.as_str().to_owned()),
+        actor: Some(operator.actor.name()),
         user: Some(account.user.clone()),
         role: Some(OperatorRole::Users),
         action: Some(REVEAL.to_owned()),
@@ -197,14 +244,14 @@ async fn shown_to(state: &AdminState, operator: &Operator, accounts: usize) -> R
     let accounts = u64::try_from(accounts).map_err(|_| Error::Internal)?;
     let reads = state
         .throttle
-        .operator_read(&operator.tenant, &operator.user, accounts, (state.clock)())
+        .operator_read(&operator.tenant, &operator.actor, accounts, (state.clock)())
         .await
         .map_err(Error::Store)?;
     if reads.noticed {
         tracing::warn!(
             event = "operator_reads_high",
             tenant = operator.tenant.as_str(),
-            operator = operator.user.as_str(),
+            operator = operator.actor.name(),
             accounts = reads.total,
             "an operator was shown more accounts this hour than is usual"
         );

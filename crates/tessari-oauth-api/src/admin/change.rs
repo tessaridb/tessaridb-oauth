@@ -15,7 +15,7 @@ use tessari_oauth_storage::operators::OperatorRole;
 use tessari_oauth_types::{IdempotencyKey, UserId, request_digest};
 
 use super::AdminState;
-use super::operator::{Operator, from_console, signed_in};
+use super::operator::{Operator, from_console, from_service, signed_in};
 use crate::{Error, Result};
 
 /// A change's request body, which carries the operator's reason.
@@ -53,7 +53,11 @@ where
     F: FnOnce(Operator, T) -> Fut,
     Fut: Future<Output = Result<Made>>,
 {
-    from_console(state, headers)?;
+    // A page can ride on the console's cookie, never on a service's signed header, so only a cookie caller is held
+    // to the console's origin.
+    if !from_service(headers) {
+        from_console(state, headers)?;
+    }
     let operator = signed_in(state, company, headers).await?;
     operator.require(state, role, action).await?;
     let sent: T = serde_json::from_slice(body).map_err(|_| Error::Invalid)?;
@@ -63,7 +67,7 @@ where
         .and_then(|key| key.to_str().ok())
         .and_then(|key| IdempotencyKey::parse(key).ok())
         .ok_or(Error::IdempotencyKeyRequired)?;
-    let (tenant, actor) = (operator.tenant.clone(), operator.user.clone());
+    let (tenant, actor) = (operator.tenant.clone(), operator.actor.clone());
     let now = (state.clock)();
     match state
         .admin
@@ -111,7 +115,7 @@ where
         .record(
             &tenant,
             &AuditEvent {
-                actor: Some(actor.as_str().to_owned()),
+                actor: Some(actor.name()),
                 user: made.user,
                 role: Some(role),
                 action: Some(action.to_owned()),

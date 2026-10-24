@@ -29,6 +29,7 @@ use crate::refresh::{RefreshService, TessaridbRefreshRepository};
 use crate::replay::{ReplayService, TessaridbReplayRepository};
 use crate::resets::{ResetService, TessaridbResetRepository};
 use crate::sealed::{SealedService, TessaridbSealedRepository};
+use crate::service_credentials::{ServiceCredentialService, TessaridbServiceRepository};
 use crate::sessions::{SessionService, TessaridbSessionRepository};
 use crate::signins::{SigninService, TessaridbSigninRepository};
 use crate::subjects::{SubjectService, TessaridbSecretRepository};
@@ -96,6 +97,8 @@ pub struct Storage {
     pub mail_templates: Arc<MailTemplateService>,
     /// Which users of each company may administer it, and for which tasks.
     pub operators: Arc<OperatorService>,
+    /// Programs each company registered to call its admin API.
+    pub services: Arc<ServiceCredentialService>,
     /// Admin console sign-ins and sessions.
     pub admin: Arc<AdminService>,
     /// The audit trail.
@@ -141,6 +144,7 @@ impl Storage {
         let email_change_repository =
             Arc::new(TessaridbEmailChangeRepository::new(database.clone()));
         let operator_repository = Arc::new(TessaridbOperatorRepository::new(database.clone()));
+        let service_repository = Arc::new(TessaridbServiceRepository::new(database.clone()));
         let admin_repository = Arc::new(TessaridbAdminRepository::new(database.clone()));
         let audit = Arc::new(AuditService::new(audit_repository, tenancy.clone()));
         let clients = Arc::new(ClientService::new(client_repository, tenancy.clone()));
@@ -198,6 +202,10 @@ impl Storage {
                 operator_repository,
                 tenancy.clone(),
                 Arc::clone(&audit),
+            )),
+            services: Arc::new(ServiceCredentialService::new(
+                service_repository,
+                tenancy.clone(),
             )),
             admin: Arc::new(AdminService::new(admin_repository, tenancy.clone())),
             audit,

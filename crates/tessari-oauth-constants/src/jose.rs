@@ -2,6 +2,14 @@
 /// legitimate needs longer, and the bound is also how long its `jti` must be remembered to refuse a replay.
 pub const CLIENT_ASSERTION_MAX_TTL_SECS: u64 = 300;
 
+/// Longest a service's admin assertion may be valid, in seconds from now. A service signs one per admin request and
+/// holds the authority to disable accounts, so a captured one is useful for one minute at most.
+pub const SERVICE_ASSERTION_MAX_TTL_SECS: u64 = 60;
+
+/// The `typ` a service's admin assertion carries, and must: neither a client assertion nor any token the issuer
+/// mints carries it, so none of them can be presented in its place.
+pub const SERVICE_ASSERTION_TYPE: &str = "tessari-admin+jwt";
+
 /// How long an access token is valid, in seconds. A signed token cannot be recalled, so this is also the stated
 /// revocation latency: a revoked grant stops working at most this long after the refresh that would renew it fails.
 pub const ACCESS_TOKEN_TTL_SECS: u64 = 300;

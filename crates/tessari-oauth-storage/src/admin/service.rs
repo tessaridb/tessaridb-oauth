@@ -14,7 +14,7 @@ use tessari_oauth_constants::{
 };
 use tessari_oauth_core::authentication::{Method, assess};
 use tessari_oauth_types::{
-    ErrorCategory, IdempotencyKey, SessionSecret, SigninBinding, TenantId, Timestamp, UserId,
+    Actor, ErrorCategory, IdempotencyKey, SessionSecret, SigninBinding, TenantId, Timestamp, UserId,
 };
 
 use super::repository::AdminRepository;
@@ -220,7 +220,7 @@ impl AdminService {
     pub async fn claim(
         &self,
         tenant: &TenantId,
-        operator: &UserId,
+        operator: &Actor,
         key: &IdempotencyKey,
         action: &str,
         request: &str,
@@ -229,7 +229,7 @@ impl AdminService {
         let place = self.tenancy.place(tenant)?;
         let id = key.record_id(operator);
         let claimed = AdminActionEntity {
-            operator: operator.as_str().to_owned(),
+            operator: operator.name(),
             action: action.to_owned(),
             request: request.to_owned(),
             status: None,
@@ -266,7 +266,7 @@ impl AdminService {
     pub async fn finish(
         &self,
         tenant: &TenantId,
-        operator: &UserId,
+        operator: &Actor,
         key: &IdempotencyKey,
         status: u16,
         answer: &str,
@@ -285,7 +285,7 @@ impl AdminService {
     pub async fn release(
         &self,
         tenant: &TenantId,
-        operator: &UserId,
+        operator: &Actor,
         key: &IdempotencyKey,
     ) -> Result<()> {
         let place = self.tenancy.place(tenant)?;

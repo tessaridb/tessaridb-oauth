@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - Client sectors: clients registered with the same `sector` see a person as one subject; a client without one keeps
   its own.
+- Service credentials for the admin API: an operator registers a program with an Ed25519 key and the `users` role; it
+  signs one short assertion per request. `GET .../api/users/by-subject` finds the account a sector's subject names.
 
 ## [0.1.0] - 2026-10-24
 
