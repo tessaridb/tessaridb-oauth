@@ -12,7 +12,7 @@ use tessari_oauth_constants::CLIENT_PAGE_MAX;
 use tessari_oauth_core::clients::{AuthMethod, ClientRegistration, GrantType};
 use tessari_oauth_core::jose::VerifyingKey;
 use tessari_oauth_types::{
-    Algorithm, ClientId, RedirectUri, Resource, ScopeSet, TenantId, Timestamp,
+    Algorithm, ClientId, RedirectUri, Resource, ScopeSet, Sector, TenantId, Timestamp,
 };
 
 use super::repository::ClientRepository;
@@ -100,6 +100,11 @@ fn registration(tenant: &TenantId, entity: ClientEntity) -> Result<ClientRegistr
         .map(RedirectUri::parse)
         .transpose()
         .map_err(|fault| unreadable(fault.to_string()))?;
+    let sector = entity
+        .sector
+        .map(Sector::parse)
+        .transpose()
+        .map_err(|fault| unreadable(fault.to_string()))?;
     Ok(ClientRegistration {
         tenant: tenant.clone(),
         client_id: ClientId::parse(entity.client_id)
@@ -120,6 +125,7 @@ fn registration(tenant: &TenantId, entity: ClientEntity) -> Result<ClientRegistr
         dpop_bound_access_tokens: entity.dpop_bound_access_tokens,
         post_logout_redirect_uris,
         backchannel_logout_uri,
+        sector,
     })
 }
 
@@ -194,6 +200,10 @@ impl ClientService {
                 .backchannel_logout_uri
                 .as_ref()
                 .map(|uri| uri.as_str().to_owned()),
+            sector: client
+                .sector
+                .as_ref()
+                .map(|sector| sector.as_str().to_owned()),
         };
         let place = self.tenancy.place(tenant)?;
         self.repository.create(&place, &entity).await?;

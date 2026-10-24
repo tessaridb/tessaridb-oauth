@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
-use tessari_oauth_types::{ClientId, RedirectUri, Resource, ScopeSet};
+use tessari_oauth_types::{ClientId, RedirectUri, Resource, ScopeSet, Sector};
 
 /// A client to register.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,4 +28,6 @@ pub struct NewClient {
     pub post_logout_redirect_uris: Vec<RedirectUri>,
     /// Where it is told that a session it holds ended.
     pub backchannel_logout_uri: Option<RedirectUri>,
+    /// The sector it shares subjects under; none means its own.
+    pub sector: Option<Sector>,
 }

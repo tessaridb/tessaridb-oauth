@@ -4,15 +4,16 @@
 //! key-encryption key for this tenant and purpose, and never made again — a second salt would give every user a new
 //! identifier at every client, orphaning every account a client has linked. Two first requests can both find no salt;
 //! the store accepts one of their writes, and the other reads back the salt that won. Each subject derived is recorded
-//! once with the client and user it was derived from, which is the only way back from a subject to its user.
+//! once with the sector and user it was derived from, which is the only way back from a subject to its user. A
+//! sector is a client alone, or a named sector several clients of one product share.
 
 use std::ops::Deref;
 use std::sync::Arc;
 
 use tessari_oauth_constants::SECRET_CREATE_ATTEMPTS;
-use tessari_oauth_core::subject;
+use tessari_oauth_core::subject::{self, SubjectSector};
 use tessari_oauth_infrastructure::custody::{Kek, random_secret};
-use tessari_oauth_types::{ClientId, ErrorCategory, TenantId, Timestamp, UserId, base64url};
+use tessari_oauth_types::{ErrorCategory, TenantId, Timestamp, UserId, base64url};
 
 use super::repository::SecretRepository;
 use super::{SecretEntity, SubjectEntity};
@@ -43,7 +44,7 @@ impl SubjectService {
         }
     }
 
-    /// The subject `client` knows `user` of `tenant` by, making the tenant's salt under `kek` at `now` the first time.
+    /// The subject `sector` knows `user` of `tenant` by, making the tenant's salt under `kek` at `now` the first time.
     ///
     /// # Errors
     ///
@@ -52,17 +53,17 @@ impl SubjectService {
         &self,
         tenant: &TenantId,
         kek: &Kek,
-        client: &ClientId,
+        sector: &SubjectSector,
         user: &UserId,
         now: Timestamp,
     ) -> Result<String> {
         let salt = self.salt(tenant, kek, now).await?;
-        let subject = subject::pairwise(&salt, client, user);
-        self.record(tenant, &subject, client, user).await?;
+        let subject = subject::pairwise(&salt, sector, user);
+        self.record(tenant, &subject, sector, user).await?;
         Ok(subject)
     }
 
-    /// The user `subject` stands for at `client` in `tenant`, when the subject was derived for that client.
+    /// The user `subject` stands for in `sector` of `tenant`, when the subject was derived for that sector.
     ///
     /// # Errors
     ///
@@ -70,14 +71,14 @@ impl SubjectService {
     pub async fn user_of(
         &self,
         tenant: &TenantId,
-        client: &ClientId,
+        sector: &SubjectSector,
         subject: &str,
     ) -> Result<Option<UserId>> {
         let place = self.tenancy.place(tenant)?;
         let Some(found) = self.repository.find_subject(&place, subject).await? else {
             return Ok(None);
         };
-        if found.client_id != client.as_str() {
+        if found.client_id != sector.key() {
             return Ok(None);
         }
         UserId::parse(found.user_id)
@@ -90,7 +91,7 @@ impl SubjectService {
         &self,
         tenant: &TenantId,
         subject: &str,
-        client: &ClientId,
+        sector: &SubjectSector,
         user: &UserId,
     ) -> Result<()> {
         let place = self.tenancy.place(tenant)?;
@@ -103,7 +104,7 @@ impl SubjectService {
             return Ok(());
         }
         let entity = SubjectEntity {
-            client_id: client.as_str().to_owned(),
+            client_id: sector.key(),
             user_id: user.as_str().to_owned(),
         };
         match self

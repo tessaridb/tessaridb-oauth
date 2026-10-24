@@ -32,6 +32,7 @@ fn userinfo() -> String {
 /// `reader`: a public client of `acme` that may address UserInfo and the API.
 async fn register_reader(server: &Server) {
     let reader = NewClient {
+        sector: None,
         client_id: ClientId::parse("reader").expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
         scope_ceiling: ScopeSet::parse("openid profile api:read groups").expect("scopes"),

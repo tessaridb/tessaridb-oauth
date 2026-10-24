@@ -85,11 +85,13 @@ order, at most 100 messages a page, `next` naming the position to read after; ea
 
 Clients (role `clients`): `GET <ADMIN_URL>/admin/<company>/api/clients?limit=&after=` lists the company's client
 registrations in id order (at most 100 a page, cursor = the last id) and `GET .../api/clients/<id>` reads one, each
-with its kind, method, redirect URIs, scope ceiling, resources, grants and key count, and the one read also with
+with its kind, method, redirect URIs, scope ceiling, resources, grants, key count and sector, and the one read also with
 `holders`, how many users hold a grant to it; the console's own client is listed and marked.
 `POST .../api/clients` with `{"client_id", "redirect_uris", "scope_ceiling", "resources",
 "auth_method", "assertion_alg", "jwks", "grant_types", "dpop_bound_access_tokens", "post_logout_redirect_uris",
-"backchannel_logout_uri", "reason"}` registers one through the same rules as every registration. Only `none` (a
+"backchannel_logout_uri", "sector", "reason"}` registers one through the same rules as every registration; `sector`
+(optional, 1 to 64 lowercase letters, digits, hyphens and underscores) gives the clients of one product one subject
+per person, and is fixed once registered. Only `none` (a
 public client, always with PKCE) and `private_key_jwt` (with `EdDSA` or `ES256` and its public key) are offered, so no
 shared secret is ever made; `admin-console` is refused as `client_reserved` and a taken id as `client_taken`.
 `POST .../api/clients/<id>/remove` with `{"reason"}` deletes the registration and ends what it held: every user's

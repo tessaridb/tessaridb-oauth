@@ -26,6 +26,7 @@ async fn a_client_assertion_authenticates_once() {
     let server = server(2).await;
     let (key, _) = SigningKey::generate(Algorithm::Es256).expect("a key");
     let backend = NewClient {
+        sector: None,
         client_id: ClientId::parse("backend").expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
         scope_ceiling: ScopeSet::parse("api:read").expect("scopes"),

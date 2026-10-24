@@ -23,7 +23,7 @@ impl FromRecord for SecretEntity {
 /// A `pairwise_subjects` row exactly as stored: whom one derived subject stands for, under the subject itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubjectEntity {
-    /// The client the subject was derived for.
+    /// The sector key the subject was derived for: a client id, or a named sector after its mark.
     pub client_id: String,
     /// The user it stands for.
     pub user_id: String,

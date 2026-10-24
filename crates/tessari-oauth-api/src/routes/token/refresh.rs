@@ -60,7 +60,7 @@ pub(super) async fn refresh(
         .pairwise(
             tenant,
             &state.kek,
-            &redemption.client_id,
+            &client.subject_sector(),
             &redemption.user,
             endpoint.now,
         )

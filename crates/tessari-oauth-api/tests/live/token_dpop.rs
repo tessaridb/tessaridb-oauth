@@ -63,6 +63,7 @@ async fn register(server: &Server, client: NewClient) {
 
 fn client(id: &str, auth_method: AuthMethod, jwks: Vec<String>, bound: bool) -> NewClient {
     NewClient {
+        sector: None,
         client_id: ClientId::parse(id).expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
         scope_ceiling: ScopeSet::parse("api:read").expect("scopes"),

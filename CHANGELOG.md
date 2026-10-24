@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Client sectors: clients registered with the same `sector` see a person as one subject; a client without one keeps
+  its own.
+
 ## [0.1.0] - 2026-10-24
 
 The first release. It needs TessariDB 0.38.2 or later.

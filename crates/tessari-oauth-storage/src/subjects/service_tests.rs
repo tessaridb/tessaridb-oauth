@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
-use tessari_oauth_core::subject::pairwise;
+use tessari_oauth_core::subject::{SubjectSector, pairwise};
 use tessari_oauth_infrastructure::custody::Kek;
 use tessari_oauth_infrastructure::tessaridb::{Place, RefusalClass};
 use tessari_oauth_test_support::fresh_kek;
@@ -69,7 +69,7 @@ async fn a_request_that_loses_the_first_write_uses_the_salt_that_won() {
         Tenancy::for_region("eu").expect("plain region"),
     );
     let (client, user) = (
-        ClientId::parse("svc-1").expect("a client id"),
+        SubjectSector::Client(ClientId::parse("svc-1").expect("a client id")),
         UserId::parse("user-7").expect("a user id"),
     );
     let subject = service

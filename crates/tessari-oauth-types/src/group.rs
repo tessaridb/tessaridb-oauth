@@ -8,12 +8,12 @@ use tessari_oauth_constants::GROUP_NAME_MAX_LEN;
 
 use crate::{Error, Result};
 
-/// What either name must be, as a refusal says it.
-const GRAMMAR: &str =
+/// What either name must be, as a refusal says it; a client sector shares it.
+pub(crate) const GRAMMAR: &str =
     "1 to 64 lowercase letters, digits, hyphens and underscores, starting with a letter or digit";
 
 /// Whether `raw` is inside the grammar both names share.
-fn named(raw: &str) -> bool {
+pub(crate) fn named(raw: &str) -> bool {
     let bytes = raw.as_bytes();
     let within_length = (1..=GROUP_NAME_MAX_LEN).contains(&bytes.len());
     let first = bytes

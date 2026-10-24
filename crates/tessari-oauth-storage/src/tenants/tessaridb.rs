@@ -80,6 +80,7 @@ const TABLES: &str = "DEFINE TABLE IF NOT EXISTS codes (\
      registered_at int REQUIRED); \
      DEFINE FIELD IF NOT EXISTS post_logout_redirect_uris ON clients TYPE array; \
      DEFINE FIELD IF NOT EXISTS backchannel_logout_uri ON clients TYPE string; \
+     DEFINE FIELD IF NOT EXISTS sector ON clients TYPE string; \
      DEFINE FIELD IF NOT EXISTS dpop_jkt ON interactions TYPE string; \
      DEFINE FIELD IF NOT EXISTS dpop_jkt ON codes TYPE string; \
      DEFINE TABLE IF NOT EXISTS secrets (sealed string REQUIRED, created_at int REQUIRED); \

@@ -93,6 +93,7 @@ pub(crate) async fn server(connections: usize) -> Server {
             ("kiosk", vec![GrantType::AuthorizationCode]),
         ] {
             let registration = NewClient {
+                sector: None,
                 client_id: ClientId::parse(client).expect("a client id"),
                 redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
                 scope_ceiling: ScopeSet::parse("api:read api:write").expect("scopes"),

@@ -46,6 +46,7 @@ pub(crate) fn client(tenant: TenantId, id: &str, redirects: &[&str]) -> ClientRe
         dpop_bound_access_tokens: false,
         post_logout_redirect_uris: Vec::new(),
         backchannel_logout_uri: None,
+        sector: None,
     }
 }
 

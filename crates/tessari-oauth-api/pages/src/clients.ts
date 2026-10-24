@@ -27,6 +27,7 @@ const WRONG: Record<FormField, string> = {
   redirects: "A client using the code flow needs at least one redirect URI.",
   scopes: "Give the scopes as words separated by spaces.",
   grants: "Choose at least one grant; only a confidential client may act as itself.",
+  sector: "Give the sector as 1 to 64 lowercase letters, digits, hyphens and underscores.",
 };
 
 /** A labelled text area whose value is one entry per line. */
@@ -89,6 +90,10 @@ function registerForm(screen: Screen, registered: (message: string) => void): HT
   const resources = area("client-resources", "Resources its tokens may go to, one per line (optional)");
   const grants = toggles("Grants", "client-grant", GRANTS, ["authorization_code"]);
   const dpop = toggles("Token binding", "client-dpop", ["DPoP-bound tokens"], []);
+  const sector = make("input", "mono");
+  sector.type = "text";
+  sector.autocomplete = "off";
+  sector.spellcheck = false;
   const reason = reasonField("client-reason");
   const said = notice();
   const submit = make("button", "primary", "Register the client");
@@ -100,6 +105,7 @@ function registerForm(screen: Screen, registered: (message: string) => void): HT
     redirects: redirects.input,
     scopes,
     grants: grants.group,
+    sector,
   };
   const form = make(
     "form",
@@ -113,6 +119,7 @@ function registerForm(screen: Screen, registered: (message: string) => void): HT
     resources.row,
     grants.group,
     dpop.group,
+    labelled("client-sector", "Sector, for clients of one product that see a person as one (optional)", sector),
     reason.row,
     said,
     submit,
@@ -133,6 +140,7 @@ function registerForm(screen: Screen, registered: (message: string) => void): HT
       resources: resources.input.value,
       grants: grants.chosen(),
       dpop: dpop.chosen().length > 0,
+      sector: sector.value,
     });
     if ("wrong" in made) {
       said.textContent = WRONG[made.wrong];
@@ -201,6 +209,9 @@ function clientsTable(clients: readonly Client[], remove: (client: Client) => vo
     const name = make("td", "", make("code", "", client.id));
     if (client.console) {
       name.append(make("div", "", make("span", "pill", "this console")));
+    }
+    if (client.sector !== null) {
+      name.append(make("div", "", "sector ", make("code", "", client.sector)));
     }
     const signs = client.assertionAlg === null ? kind : make("span", "", kind, ` ${client.assertionAlg}`);
     body.append(

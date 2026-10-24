@@ -7,6 +7,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
+use tessari_oauth_core::subject::SubjectSector;
 
 use tokio::sync::Barrier;
 
@@ -101,6 +102,7 @@ async fn provisioned(storage: &Storage, kek: &Kek) -> String {
             dpop_bound_access_tokens: false,
             post_logout_redirect_uris: Vec::new(),
             backchannel_logout_uri: Some(RedirectUri::parse(uri).expect("a URI")),
+            sector: None,
         };
         storage
             .clients
@@ -185,7 +187,7 @@ async fn each_client_is_told_by_its_own_token_and_an_untold_one_is_kept() {
             .pairwise(
                 &acme(),
                 &kek,
-                &client(name),
+                &SubjectSector::Client(client(name)),
                 &user,
                 Timestamp::from_unix_secs(NOW),
             )

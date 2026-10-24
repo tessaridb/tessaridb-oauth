@@ -45,6 +45,7 @@ pub(super) struct Shown {
     grant_types: Vec<&'static str>,
     dpop_bound_access_tokens: bool,
     keys: usize,
+    sector: Option<String>,
     console: bool,
 }
 
@@ -179,6 +180,10 @@ pub(super) fn shown(client: &ClientRegistration) -> Shown {
             .collect(),
         dpop_bound_access_tokens: client.dpop_bound_access_tokens,
         keys: client.keys.len(),
+        sector: client
+            .sector
+            .as_ref()
+            .map(|sector| sector.as_str().to_owned()),
         console: client.client_id.as_str() == ADMIN_CONSOLE_CLIENT,
     }
 }

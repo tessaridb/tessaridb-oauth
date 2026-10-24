@@ -213,13 +213,16 @@ impl LogoutDelivery {
             .find(tenant, client)
             .await
             .map_err(|failure| store(&failure))?;
-        let Some(uri) = registration.and_then(|found| found.backchannel_logout_uri) else {
+        let Some((uri, sector)) = registration.and_then(|found| {
+            let sector = found.subject_sector();
+            found.backchannel_logout_uri.map(|uri| (uri, sector))
+        }) else {
             return Ok(true);
         };
         let now: Timestamp = (self.clock)();
         let subject = self
             .subjects
-            .pairwise(tenant, &self.kek, client, &delivery.user, now)
+            .pairwise(tenant, &self.kek, &sector, &delivery.user, now)
             .await
             .map_err(|failure| store(&failure))?;
         let signer = self

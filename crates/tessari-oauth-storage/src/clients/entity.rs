@@ -32,6 +32,8 @@ pub struct ClientEntity {
     pub post_logout_redirect_uris: Option<Vec<String>>,
     /// Its back-channel logout URI, when it registered one.
     pub backchannel_logout_uri: Option<String>,
+    /// The sector it shares subjects under, when it registered one.
+    pub sector: Option<String>,
 }
 
 impl FromRecord for ClientEntity {
@@ -50,6 +52,7 @@ impl FromRecord for ClientEntity {
             registered_at: row.take("registered_at")?,
             post_logout_redirect_uris: row.take("post_logout_redirect_uris")?,
             backchannel_logout_uri: row.take("backchannel_logout_uri")?,
+            sector: row.take("sector")?,
         })
     }
 }

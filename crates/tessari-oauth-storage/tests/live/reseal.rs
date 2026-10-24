@@ -2,6 +2,7 @@
 //! enrolled and pending authenticator secrets and queued mail all open under the new key afterwards, a second run
 //! writes nothing, and a value that opens under neither key is counted and left as it was.
 
+use tessari_oauth_core::subject::SubjectSector;
 use tessari_oauth_storage::outbox::NewMail;
 use tessari_oauth_storage::sealed::Resealed;
 use tessari_oauth_test_support::{fresh_kek, kek_of};
@@ -40,7 +41,13 @@ async fn every_sealed_value_opens_under_the_new_key_and_a_second_run_writes_noth
         .expect("a signing key");
     let subject = storage
         .subjects
-        .pairwise(&acme(), &old, &client, &user, now())
+        .pairwise(
+            &acme(),
+            &old,
+            &SubjectSector::Client(client.clone()),
+            &user,
+            now(),
+        )
         .await
         .expect("a pairwise subject");
     storage
@@ -105,7 +112,13 @@ async fn every_sealed_value_opens_under_the_new_key_and_a_second_run_writes_noth
     assert_eq!(
         storage
             .subjects
-            .pairwise(&acme(), &new, &client, &user, now())
+            .pairwise(
+                &acme(),
+                &new,
+                &SubjectSector::Client(client.clone()),
+                &user,
+                now()
+            )
             .await
             .expect("the salt opens under the new KEK"),
         subject,

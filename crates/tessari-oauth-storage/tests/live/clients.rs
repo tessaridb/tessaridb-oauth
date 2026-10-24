@@ -33,6 +33,7 @@ fn service_client(id: &str, jwks: Vec<String>) -> NewClient {
         dpop_bound_access_tokens: false,
         post_logout_redirect_uris: Vec::new(),
         backchannel_logout_uri: None,
+        sector: None,
     }
 }
 
