@@ -16,7 +16,8 @@ use tessari_oauth_constants::CODE_SPEND_ATTEMPTS;
 use tessari_oauth_core::authentication::Method;
 use tessari_oauth_core::codes::{CodeAuthentication, IssuedCode};
 use tessari_oauth_types::{
-    AuthorizationCode, Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp, UserId,
+    AuthorizationCode, Challenge, ClientId, KeyThumbprint, Resource, ScopeSet, TenantId, Timestamp,
+    UserId,
 };
 
 use tessari_oauth_infrastructure::tessaridb::Place;
@@ -75,6 +76,7 @@ fn to_entity(code: &IssuedCode) -> Result<CodeEntity> {
             .collect(),
         sid: code.authentication.sid.clone(),
         nonce: code.nonce.clone(),
+        dpop_jkt: code.dpop_jkt.as_ref().map(|jkt| jkt.as_str().to_owned()),
         redeemed_at: None,
     })
 }
@@ -107,6 +109,11 @@ fn to_model(row: CodeEntity) -> Result<IssuedCode> {
             sid: row.sid,
         },
         nonce: row.nonce,
+        dpop_jkt: row
+            .dpop_jkt
+            .map(KeyThumbprint::parse)
+            .transpose()
+            .map_err(|_| unreadable("dpop_jkt"))?,
     })
 }
 

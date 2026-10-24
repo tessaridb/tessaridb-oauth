@@ -6,7 +6,7 @@ use tessari_oauth_core::access_token::{self, Grant, TYPE};
 use tessari_oauth_core::authentication::assess;
 use tessari_oauth_core::clients::{AuthMethod, ClientRegistration, GrantType};
 use tessari_oauth_core::codes::IssuedCode;
-use tessari_oauth_core::dpop::ProofUse;
+use tessari_oauth_core::dpop::{self, ProofUse};
 use tessari_oauth_core::id_token::{self, Authenticated};
 use tessari_oauth_core::token::{self, Endpoint, Redemption};
 use tessari_oauth_core::{Params, Reason};
@@ -64,6 +64,8 @@ pub(super) async fn redeem(
         }
     };
     let redemption = token::redeem_code(tenant, client, params, &issued, endpoint.now)?;
+    // A code bound to a key (RFC 9449 §10) redeems only with a proof made by that key.
+    dpop::holds_bound_key(issued.dpop_jkt.as_ref(), proof)?;
     let subject = state
         .subjects
         .pairwise(

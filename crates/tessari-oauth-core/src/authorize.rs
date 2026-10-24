@@ -9,7 +9,9 @@
 use std::collections::BTreeSet;
 
 use tessari_oauth_constants::REQUEST_URI_PREFIX;
-use tessari_oauth_types::{Challenge, ClientId, ErrorCode, Resource, ScopeSet, TenantId};
+use tessari_oauth_types::{
+    Challenge, ClientId, ErrorCode, KeyThumbprint, Resource, ScopeSet, TenantId,
+};
 
 use crate::clients::{ClientDirectory, ClientRegistration};
 use crate::{Params, Reason, token};
@@ -47,6 +49,8 @@ pub struct AuthorizationRequest {
     /// The longest a sign-in may be past for this request, in seconds (`max_age`); `prompt=login` asks for a sign-in
     /// now and is kept as `0`, and with both the stricter holds.
     pub max_age: Option<u64>,
+    /// The key the code is bound to (`dpop_jkt`, RFC 9449 §10): it redeems only with a DPoP proof made by that key.
+    pub dpop_jkt: Option<KeyThumbprint>,
 }
 
 /// Why an authorization request was refused, and where the answer may go.
@@ -117,6 +121,8 @@ where
         reject_prompt_none_combined(&params).map_err(|(error, reason)| redirect(error, reason))?;
     let max_age =
         reject_max_age_not_seconds(&params).map_err(|(error, reason)| redirect(error, reason))?;
+    let dpop_jkt =
+        reject_malformed_dpop_jkt(&params).map_err(|(error, reason)| redirect(error, reason))?;
 
     Ok(AuthorizationRequest {
         client_id: client.client_id,
@@ -128,6 +134,7 @@ where
         nonce: params.get("nonce").map(str::to_owned),
         silent,
         max_age,
+        dpop_jkt,
     })
 }
 
@@ -255,6 +262,19 @@ fn reject_prompt_none_combined(params: &Params) -> Result<bool, (ErrorCode, Reas
         return Err((ErrorCode::InvalidRequest, Reason::PromptNoneCombined));
     }
     Ok(true)
+}
+
+/// Step 9: the key a DPoP-bound client names for the code (`dpop_jkt`, RFC 9449 §10), when it names one.
+fn reject_malformed_dpop_jkt(
+    params: &Params,
+) -> Result<Option<KeyThumbprint>, (ErrorCode, Reason)> {
+    params
+        .get("dpop_jkt")
+        .map(|jkt| {
+            KeyThumbprint::parse(jkt)
+                .map_err(|_| (ErrorCode::InvalidRequest, Reason::DpopJktMalformed))
+        })
+        .transpose()
 }
 
 /// Step 8: how long past a sign-in may be (`max_age`, a whole number of seconds), `0` when `prompt` names `login`

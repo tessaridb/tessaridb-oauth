@@ -287,6 +287,7 @@ pub(super) async fn issued(
             sid: session.sid,
         },
         nonce: request.nonce,
+        dpop_jkt: request.dpop_jkt,
     };
     state
         .codes

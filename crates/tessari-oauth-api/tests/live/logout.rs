@@ -50,6 +50,7 @@ async fn id_token(
             sid: sid.to_owned(),
         },
         nonce: None,
+        dpop_jkt: None,
     };
     server
         .storage
@@ -322,6 +323,7 @@ async fn a_session_remembers_each_client_it_issued_an_id_token_to_and_no_other()
             sid: sid.clone(),
         },
         nonce: None,
+        dpop_jkt: None,
     };
     server
         .storage

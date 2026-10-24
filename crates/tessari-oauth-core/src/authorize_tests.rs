@@ -301,3 +301,20 @@ fn a_nonce_is_carried_unchanged_and_is_absent_when_not_sent() {
         Some("n-0S6_WzA2Mj")
     );
 }
+
+#[test]
+fn a_dpop_jkt_is_carried_as_the_key_the_code_is_bound_to_and_a_malformed_one_is_refused() {
+    const JKT: &str = "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I";
+    assert_eq!(run(valid()).expect("valid").dpop_jkt, None);
+    assert_eq!(
+        run(with("dpop_jkt", JKT))
+            .expect("valid")
+            .dpop_jkt
+            .map(|jkt| jkt.as_str().to_owned()),
+        Some(JKT.to_owned())
+    );
+    assert_eq!(
+        redirected(with("dpop_jkt", "not-a-thumbprint")),
+        (ErrorCode::InvalidRequest, Reason::DpopJktMalformed)
+    );
+}

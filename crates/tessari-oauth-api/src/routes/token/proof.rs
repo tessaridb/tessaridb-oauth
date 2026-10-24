@@ -3,7 +3,7 @@
 //! buys a second request.
 
 use axum::http::HeaderMap;
-use tessari_oauth_constants::TOKEN_PATH;
+use tessari_oauth_constants::{PAR_PATH, TOKEN_PATH};
 use tessari_oauth_core::Reason;
 use tessari_oauth_core::clients::ClientRegistration;
 use tessari_oauth_core::dpop::{self, ProofUse};
@@ -34,6 +34,25 @@ pub(super) fn read(
         (Some(proof), None) => {
             let proof = proof.to_str().map_err(|_| invalid(Reason::DpopProof))?;
             let target = format!("{}{TOKEN_PATH}", endpoint.issuer);
+            dpop::verify_proof(proof, "POST", &target, endpoint.now).map(Some)
+        }
+    }
+}
+
+/// The proof a pushed request came with, verified for a POST to this tenant's PAR endpoint (RFC 9449 §10.1); `None`
+/// when it carries none, which a pushed request may.
+pub(super) fn read_pushed(
+    headers: &HeaderMap,
+    endpoint: &Endpoint,
+) -> Result<Option<ProofUse>, Refusal> {
+    let invalid = |reason| refusal(ErrorCode::InvalidDpopProof, reason);
+    let mut proofs = headers.get_all(DPOP).iter();
+    match (proofs.next(), proofs.next()) {
+        (None, _) => Ok(None),
+        (Some(_), Some(_)) => Err(invalid(Reason::DpopSeveralProofs)),
+        (Some(proof), None) => {
+            let proof = proof.to_str().map_err(|_| invalid(Reason::DpopProof))?;
+            let target = format!("{}{PAR_PATH}", endpoint.issuer);
             dpop::verify_proof(proof, "POST", &target, endpoint.now).map(Some)
         }
     }

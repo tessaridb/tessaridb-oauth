@@ -14,9 +14,10 @@ pub const ID_TOKEN_TTL_SECS: u64 = 300;
 /// bounds how long a copy of it could be presented again (Back-Channel Logout 1.0 §2.4 recommends two minutes).
 pub const LOGOUT_TOKEN_TTL_SECS: u64 = 120;
 
-/// Clock difference tolerated between this server and a client, in seconds. Seconds, not minutes: a wider allowance
-/// only hides unsynchronised hosts and lengthens every replay window by the same amount.
-pub const CLOCK_SKEW_SECS: u64 = 5;
+/// Clock difference tolerated between this server and a client, in seconds: a client's `iat` or `nbf` up to this far
+/// ahead is accepted, as FAPI 2.0 Security Profile §5.3.2.1 requires (0 to 10 seconds). Seconds, not minutes: a wider
+/// allowance only hides unsynchronised hosts and lengthens every replay window by the same amount.
+pub const CLOCK_SKEW_SECS: u64 = 10;
 
 /// Longest `jti` accepted, in characters. A bound at all, so a stranger cannot make the replay store hold an
 /// unbounded key.

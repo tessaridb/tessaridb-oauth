@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use tessari_oauth_constants::{INTERACTION_TTL_SECS, PUSHED_REQUEST_TTL_SECS};
 use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_types::{
-    BrowserBinding, Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp,
+    BrowserBinding, Challenge, ClientId, KeyThumbprint, Resource, ScopeSet, TenantId, Timestamp,
 };
 
 use crate::fresh;
@@ -39,6 +39,10 @@ fn request(state: Option<&str>, nonce: Option<&str>) -> AuthorizationRequest {
             Resource::parse("https://api.example.com/").expect("a resource")
         ]),
         nonce: nonce.map(str::to_owned),
+        dpop_jkt: Some(
+            KeyThumbprint::parse("0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I")
+                .expect("a thumbprint"),
+        ),
         silent: false,
         max_age: Some(300),
     }

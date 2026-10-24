@@ -94,3 +94,30 @@ fn an_at_hash_for_an_algorithm_without_a_known_digest_is_refused() {
         .is_err()
     );
 }
+
+#[test]
+fn the_claim_names_are_every_claim_a_full_id_token_writes() {
+    let client = client();
+    let amr = ["pwd"];
+    let authenticated = Authenticated {
+        issuer: "https://id.example.com/acme",
+        subject: "pairwise-sub",
+        client_id: &client,
+        auth_time: Timestamp::from_unix_secs(ISSUED_AT),
+        nonce: Some("n"),
+        acr: Some("urn:example:mfa"),
+        amr: &amr,
+        session_id: "session-1",
+    };
+    let written = written(&authenticated, Some((TOKEN, Algorithm::Es256)));
+    let mut keys: Vec<&str> = written
+        .as_object()
+        .expect("an object")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    let mut names = super::CLAIM_NAMES.to_vec();
+    keys.sort_unstable();
+    names.sort_unstable();
+    assert_eq!(keys, names);
+}

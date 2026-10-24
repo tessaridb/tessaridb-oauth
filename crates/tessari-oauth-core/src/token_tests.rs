@@ -37,6 +37,7 @@ fn issued() -> IssuedCode {
             sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
         },
         nonce: None,
+        dpop_jkt: None,
     }
 }
 

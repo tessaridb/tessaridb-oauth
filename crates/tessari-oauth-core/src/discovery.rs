@@ -7,15 +7,17 @@
 
 use serde::Serialize;
 use tessari_oauth_constants::{
-    AUTHORIZATION_PATH, JWKS_PATH, LOGOUT_PATH, PAR_PATH, REVOCATION_PATH, TOKEN_PATH,
-    USERINFO_PATH,
+    AUTHORIZATION_PATH, JWKS_PATH, LOGOUT_PATH, OPENID_SCOPE, PAR_PATH, REVOCATION_PATH,
+    TOKEN_PATH, USERINFO_PATH,
 };
 use tessari_oauth_types::Algorithm;
 use url::Url;
 
 use crate::authorize::{CHALLENGE_METHOD_S256, RESPONSE_TYPE_CODE};
+use crate::claims_policy::POLICY;
 use crate::clients::GrantType;
 use crate::dpop;
+use crate::id_token::CLAIM_NAMES;
 use crate::subject::SUBJECT_TYPE_PAIRWISE;
 use crate::token::VERIFIED_AUTH_METHODS;
 
@@ -47,6 +49,8 @@ pub struct Metadata {
     require_pushed_authorization_requests: bool,
     subject_types_supported: [&'static str; 1],
     id_token_signing_alg_values_supported: [&'static str; 1],
+    scopes_supported: Vec<&'static str>,
+    claims_supported: Vec<&'static str>,
 }
 
 /// The `issuer` exactly as given, when it is a valid issuer identifier.
@@ -65,6 +69,17 @@ fn checked(issuer: &str) -> Result<&str, IssuerRefused> {
     } else {
         Err(IssuerRefused)
     }
+}
+
+/// `openid` and each scope the claims policy releases by, once each in the policy's order.
+fn scope_names() -> Vec<&'static str> {
+    let mut scopes = vec![OPENID_SCOPE];
+    for rule in &POLICY {
+        if !scopes.contains(&rule.scope) {
+            scopes.push(rule.scope);
+        }
+    }
+    scopes
 }
 
 fn algorithm_names(algorithms: &[Algorithm]) -> Vec<&'static str> {
@@ -105,6 +120,13 @@ pub fn metadata(issuer: &str, id_token_algorithm: Algorithm) -> Result<Metadata,
         // Every client knows a user by a pairwise identifier (OpenID Connect Core §8.1).
         subject_types_supported: [SUBJECT_TYPE_PAIRWISE],
         id_token_signing_alg_values_supported: [id_token_algorithm.name()],
+        // The scopes this server gives a meaning to; a client's resource scopes are its own registration's.
+        scopes_supported: scope_names(),
+        claims_supported: CLAIM_NAMES
+            .iter()
+            .copied()
+            .chain(POLICY.iter().map(|rule| rule.claim))
+            .collect(),
     })
 }
 

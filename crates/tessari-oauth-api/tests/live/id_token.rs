@@ -37,6 +37,7 @@ async fn issue(server: &Server, secret: &str, scopes: &str, nonce: Option<&str>)
             sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
         },
         nonce: nonce.map(str::to_owned),
+        dpop_jkt: None,
     };
     server
         .storage

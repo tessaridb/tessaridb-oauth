@@ -16,7 +16,7 @@ use tessari_oauth_constants::{
 use tessari_oauth_core::authorize::AuthorizationRequest;
 use tessari_oauth_infrastructure::custody::token_id;
 use tessari_oauth_types::{
-    BrowserBinding, Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp,
+    BrowserBinding, Challenge, ClientId, KeyThumbprint, Resource, ScopeSet, TenantId, Timestamp,
 };
 
 use super::InteractionEntity;
@@ -69,6 +69,11 @@ fn to_request(entity: InteractionEntity) -> Result<AuthorizationRequest> {
             .map(|resource| Resource::parse(resource).map_err(|_| unreadable("resources")))
             .collect::<Result<BTreeSet<Resource>>>()?,
         nonce: entity.nonce,
+        dpop_jkt: entity
+            .dpop_jkt
+            .map(KeyThumbprint::parse)
+            .transpose()
+            .map_err(|_| unreadable("dpop_jkt"))?,
         silent: entity.silent,
         max_age: entity
             .max_age
@@ -221,6 +226,7 @@ impl InteractionService {
                 .map(|resource| resource.as_str().to_owned())
                 .collect(),
             nonce: request.nonce.clone(),
+            dpop_jkt: request.dpop_jkt.as_ref().map(|jkt| jkt.as_str().to_owned()),
             silent: request.silent,
             max_age: request
                 .max_age

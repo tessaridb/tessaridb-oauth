@@ -210,6 +210,7 @@ pub(crate) async fn issue_scoped(
             sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
         },
         nonce: None,
+        dpop_jkt: None,
     };
     server
         .storage

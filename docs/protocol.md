@@ -11,8 +11,11 @@ assertion is accepted once: its `jti` is recorded in a TessariDB space until it 
 second presentation is refused as a replay. A client redeems only the grant types it registered.
 
 DPoP proofs (RFC 9449) are checked the same way: typed `dpop+jwt`, signed by the public key they carry under the
-server's algorithms, bound to this method and URI, at most a minute old, and accepted once per key; the token they
-accompany is bound to that key's RFC 7638 thumbprint.
+server's algorithms, bound to this method and URI, at most a minute old and at most ten seconds ahead of the server's
+clock, and accepted once per key; the token they accompany is bound to that key's RFC 7638 thumbprint. An
+authorization request may name the key its code is bound to as `dpop_jkt`, and a pushed request sent with a proof is
+bound to the proof's key, which a `dpop_jkt` beside it must name; such a code is redeemed only with a proof made by that
+key (RFC 9449 §10).
 
 ## Authorization — `GET|POST <issuer>/oauth2/authorize`
 

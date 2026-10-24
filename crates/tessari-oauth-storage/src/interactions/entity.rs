@@ -21,6 +21,8 @@ pub struct InteractionEntity {
     pub resources: Vec<String>,
     /// The client's `nonce`.
     pub nonce: Option<String>,
+    /// The key thumbprint the code will be bound to (RFC 9449 §10).
+    pub dpop_jkt: Option<String>,
     /// Whether the client asked that no page be shown.
     pub silent: bool,
     /// The longest the sign-in may be past, in seconds; absent when the request set no bound.
@@ -44,6 +46,7 @@ impl FromRecord for InteractionEntity {
             state: row.take("state")?,
             resources: row.take("resources")?,
             nonce: row.take("nonce")?,
+            dpop_jkt: row.take("dpop_jkt")?,
             silent: row.take("silent")?,
             max_age: row.take("max_age")?,
             created_at: row.take("created_at")?,

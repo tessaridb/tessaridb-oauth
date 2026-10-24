@@ -95,6 +95,7 @@ async fn pending(server: &Server) -> String {
         state: None,
         resources: BTreeSet::from([Resource::parse(API).expect("a resource")]),
         nonce: None,
+        dpop_jkt: None,
         silent: false,
         max_age: None,
     };

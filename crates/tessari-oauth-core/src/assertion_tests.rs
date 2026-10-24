@@ -146,8 +146,8 @@ fn time_bounds_allow_seconds_of_skew_and_no_more() {
     let aud = format!("{ACME_ISSUER:?}");
     for (exp, extra) in [
         (NOW + 300, ""),
-        (NOW - 4, ""),
-        (NOW + 60, &format!(r#","nbf":{}"#, NOW + 5)),
+        (NOW - 9, ""),
+        (NOW + 60, &format!(r#","nbf":{}"#, NOW + 10)),
     ] {
         assert!(
             check(&signed(HEADER, &claims(&aud, exp, extra))).is_ok(),
@@ -155,9 +155,9 @@ fn time_bounds_allow_seconds_of_skew_and_no_more() {
         );
     }
     for (exp, extra) in [
-        (NOW - 5, String::new()),
-        (NOW + 306, String::new()),
-        (NOW + 60, format!(r#","nbf":{}"#, NOW + 6)),
+        (NOW - 10, String::new()),
+        (NOW + 311, String::new()),
+        (NOW + 60, format!(r#","nbf":{}"#, NOW + 11)),
     ] {
         assert_eq!(
             check(&signed(HEADER, &claims(&aud, exp, &extra))),

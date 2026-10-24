@@ -36,7 +36,8 @@ impl CodeRepository for TessaridbCodeRepository {
                 place,
                 "CREATE codes:$id = { tenant: $tenant, client_id: $client_id, user_id: $user_id, \
                  redirect_uri: $redirect_uri, challenge: $challenge, scopes: $scopes, resources: $resources, \
-                 expires_at: $expires_at, auth_time: $auth_time, methods: $methods, sid: $sid, nonce: $nonce };",
+                 expires_at: $expires_at, auth_time: $auth_time, methods: $methods, sid: $sid, nonce: $nonce, \
+                 dpop_jkt: $dpop_jkt };",
                 vec![
                     ("id".to_owned(), text(digest)),
                     ("tenant".to_owned(), text(&code.tenant)),
@@ -54,6 +55,10 @@ impl CodeRepository for TessaridbCodeRepository {
                     ),
                     ("sid".to_owned(), text(&code.sid)),
                     ("nonce".to_owned(), code.nonce.as_deref().map_or(Value::None, text)),
+                    (
+                        "dpop_jkt".to_owned(),
+                        code.dpop_jkt.as_deref().map_or(Value::None, text),
+                    ),
                 ],
             )
             .await?;

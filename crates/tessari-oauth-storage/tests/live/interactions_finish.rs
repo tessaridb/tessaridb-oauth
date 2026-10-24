@@ -41,6 +41,7 @@ fn request() -> AuthorizationRequest {
             Resource::parse("https://api.example.com/").expect("a resource")
         ]),
         nonce: Some("n-0S6_WzA2Mj".to_owned()),
+        dpop_jkt: None,
         silent: false,
         max_age: None,
     }

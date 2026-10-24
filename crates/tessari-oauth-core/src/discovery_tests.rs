@@ -202,10 +202,19 @@ fn rp_initiated_logout_is_advertised_under_the_issuer() {
 }
 
 #[test]
-fn nothing_the_server_does_not_enforce_yet_is_advertised() {
-    let document = document();
-    // The ID token's subject type and algorithm are advertised now that ID tokens are issued; scopes are not yet.
-    assert!(document.get("scopes_supported").is_none());
+fn the_scopes_advertised_are_openid_and_the_scopes_the_claims_policy_releases_by() {
+    // A client's own resource scopes are its registration's ceiling, not the server's, so they are not listed.
+    assert_eq!(
+        names(&document(), "scopes_supported"),
+        ["openid", "groups", "profile"]
+    );
+}
+
+#[test]
+fn the_claims_advertised_are_every_id_token_claim_and_every_claim_the_policy_releases() {
+    let mut expected: Vec<&str> = crate::id_token::CLAIM_NAMES.to_vec();
+    expected.extend(crate::claims_policy::POLICY.iter().map(|rule| rule.claim));
+    assert_eq!(names(&document(), "claims_supported"), expected);
 }
 
 #[test]

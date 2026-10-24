@@ -27,6 +27,7 @@ fn spent_row() -> CodeEntity {
         methods: vec!["pwd".to_owned()],
         sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
         nonce: None,
+        dpop_jkt: None,
         redeemed_at: Some(1_800_000_000),
     }
 }

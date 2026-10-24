@@ -35,6 +35,21 @@ pub struct Authenticated<'a> {
     pub session_id: &'a str,
 }
 
+/// Every claim an ID token can carry, in the order [`Claims`] writes them: the `claims_supported` the metadata lists.
+pub(crate) const CLAIM_NAMES: [&str; 11] = [
+    "iss",
+    "sub",
+    "aud",
+    "exp",
+    "iat",
+    "auth_time",
+    "nonce",
+    "acr",
+    "amr",
+    "sid",
+    "at_hash",
+];
+
 /// The claims, in the order they are written.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Claims<'a> {

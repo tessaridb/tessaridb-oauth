@@ -141,6 +141,44 @@ fn fresh_until(iat: u64, now: Timestamp) -> Result<Timestamp, Refusal> {
 }
 
 /// An `invalid_dpop_proof` refusal for `reason`.
+/// The key a pushed request binds its code to (RFC 9449 §10.1): the `dpop_jkt` it names and the key of the proof it
+/// came with must be one key, and either alone names it.
+///
+/// # Errors
+///
+/// `invalid_dpop_proof` with [`Reason::DpopKeyNotBound`] when the proof was made by another key than `dpop_jkt`.
+pub fn bound_key(
+    dpop_jkt: Option<&KeyThumbprint>,
+    proof: Option<&ProofUse>,
+) -> Result<Option<KeyThumbprint>, Refusal> {
+    match (dpop_jkt, proof) {
+        (Some(named), Some(proof)) if *named != proof.thumbprint => {
+            Err(refuse(Reason::DpopKeyNotBound))
+        }
+        (Some(named), _) => Ok(Some(named.clone())),
+        (None, Some(proof)) => Ok(Some(proof.thumbprint.clone())),
+        (None, None) => Ok(None),
+    }
+}
+
+/// A code bound to a key redeems only with a proof made by that key (RFC 9449 §10).
+///
+/// # Errors
+///
+/// `invalid_dpop_proof` with [`Reason::DpopMissing`] when no proof came, or [`Reason::DpopKeyNotBound`] when it was
+/// made by another key.
+pub fn holds_bound_key(
+    bound: Option<&KeyThumbprint>,
+    proof: Option<&ProofUse>,
+) -> Result<(), Refusal> {
+    match (bound, proof) {
+        (None, _) => Ok(()),
+        (Some(_), None) => Err(refuse(Reason::DpopMissing)),
+        (Some(bound), Some(proof)) if *bound == proof.thumbprint => Ok(()),
+        (Some(_), Some(_)) => Err(refuse(Reason::DpopKeyNotBound)),
+    }
+}
+
 const fn refuse(reason: Reason) -> Refusal {
     Refusal {
         error: ErrorCode::InvalidDpopProof,

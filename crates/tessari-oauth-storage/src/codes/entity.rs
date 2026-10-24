@@ -29,6 +29,8 @@ pub struct CodeEntity {
     pub sid: String,
     /// The authorization request's `nonce`, when it carried one.
     pub nonce: Option<String>,
+    /// The key thumbprint the code is bound to (RFC 9449 §10), when it is.
+    pub dpop_jkt: Option<String>,
     /// Unix seconds of the redemption; absent while the code is unspent.
     pub redeemed_at: Option<i64>,
 }
@@ -48,6 +50,7 @@ impl FromRecord for CodeEntity {
             methods: row.take("methods")?,
             sid: row.take("sid")?,
             nonce: row.take("nonce")?,
+            dpop_jkt: row.take("dpop_jkt")?,
             redeemed_at: row.take("redeemed_at")?,
         })
     }

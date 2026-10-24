@@ -87,6 +87,7 @@ async fn issue_to(server: &Server, code: &str, user: &UserId, scopes: &str, reso
             sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
         },
         nonce: None,
+        dpop_jkt: None,
     };
     server
         .storage

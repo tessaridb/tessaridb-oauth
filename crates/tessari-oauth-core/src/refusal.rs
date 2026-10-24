@@ -73,6 +73,10 @@ pub enum Reason {
     DpopMissing,
     /// A DPoP proof had been presented before.
     DpopReplayed,
+    /// A `dpop_jkt` is not a key thumbprint (RFC 9449 §10).
+    DpopJktMalformed,
+    /// A DPoP proof was made by another key than the one the request or the code is bound to (RFC 9449 §10).
+    DpopKeyNotBound,
     /// A request to a resource carried no access token under a scheme it accepts.
     AccessTokenMissing,
     /// An access token is not a JWS signed under the configured algorithm by one of the tenant's published keys.

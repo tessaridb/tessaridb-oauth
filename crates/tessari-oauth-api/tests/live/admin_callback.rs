@@ -126,6 +126,7 @@ async fn issue(
             sid: SID.to_owned(),
         },
         nonce: Some(nonce.to_owned()),
+        dpop_jkt: None,
     };
     server
         .storage

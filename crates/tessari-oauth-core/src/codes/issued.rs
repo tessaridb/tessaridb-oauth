@@ -2,7 +2,9 @@
 
 use std::collections::BTreeSet;
 
-use tessari_oauth_types::{Challenge, ClientId, Resource, ScopeSet, TenantId, Timestamp, UserId};
+use tessari_oauth_types::{
+    Challenge, ClientId, KeyThumbprint, Resource, ScopeSet, TenantId, Timestamp, UserId,
+};
 
 use crate::authentication::Method;
 
@@ -29,6 +31,8 @@ pub struct IssuedCode {
     pub authentication: CodeAuthentication,
     /// The authorization request's `nonce`, echoed unchanged in the ID token.
     pub nonce: Option<String>,
+    /// The key the code is bound to (RFC 9449 §10): it redeems only with a DPoP proof made by that key.
+    pub dpop_jkt: Option<KeyThumbprint>,
 }
 
 /// The sign-in behind a code: when it happened, the methods it verified (from which its `acr` and `amr` are derived

@@ -33,7 +33,7 @@ impl InteractionRepository for TessaridbInteractionRepository {
                 place,
                 "CREATE interactions:$id = { tenant: $tenant, client_id: $client_id, redirect_uri: $redirect_uri, \
                  scopes: $scopes, challenge: $challenge, state: $state, resources: $resources, nonce: $nonce, \
-                 silent: $silent, max_age: $max_age, created_at: $created_at, claimed_at: $claimed_at, \
+                 dpop_jkt: $dpop_jkt,                  silent: $silent, max_age: $max_age, created_at: $created_at, claimed_at: $claimed_at, \
                  browser: $browser };",
                 vec![
                     ("id".to_owned(), text(id)),
@@ -50,6 +50,10 @@ impl InteractionRepository for TessaridbInteractionRepository {
                     (
                         "nonce".to_owned(),
                         interaction.nonce.as_deref().map_or(Value::None, text),
+                    ),
+                    (
+                        "dpop_jkt".to_owned(),
+                        interaction.dpop_jkt.as_deref().map_or(Value::None, text),
                     ),
                     ("silent".to_owned(), Value::from(interaction.silent)),
                     (

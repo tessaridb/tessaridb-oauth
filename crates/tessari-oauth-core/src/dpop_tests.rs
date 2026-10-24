@@ -115,7 +115,7 @@ fn the_target_is_compared_normalised_and_without_query_or_fragment() {
 
 #[test]
 fn a_proof_is_fresh_for_a_minute_and_may_lead_the_clock_by_seconds() {
-    for now in [RFC_IAT - 5, RFC_IAT, RFC_IAT + 60] {
+    for now in [RFC_IAT - 10, RFC_IAT, RFC_IAT + 60] {
         assert!(
             verify_proof(
                 RFC_PROOF,
@@ -127,7 +127,7 @@ fn a_proof_is_fresh_for_a_minute_and_may_lead_the_clock_by_seconds() {
             "{now}"
         );
     }
-    for now in [RFC_IAT - 6, RFC_IAT + 61] {
+    for now in [RFC_IAT - 11, RFC_IAT + 61] {
         assert_eq!(
             verify_proof(
                 RFC_PROOF,
@@ -214,4 +214,47 @@ fn a_proof_at_a_resource_carries_the_hash_of_the_token_it_accompanies() {
             "{extra}"
         );
     }
+}
+
+#[test]
+fn a_pushed_request_is_bound_to_the_proof_key_and_a_different_dpop_jkt_is_refused() {
+    let proof = check(&signed(&header(), &claims(""))).expect("a proof");
+    let named = proof.thumbprint.clone();
+    assert_eq!(
+        super::bound_key(None, Some(&proof)),
+        Ok(Some(named.clone()))
+    );
+    assert_eq!(
+        super::bound_key(Some(&named), Some(&proof)),
+        Ok(Some(named.clone()))
+    );
+    assert_eq!(super::bound_key(Some(&named), None), Ok(Some(named)));
+    assert_eq!(super::bound_key(None, None), Ok(None));
+    let other =
+        tessari_oauth_types::KeyThumbprint::parse("0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I")
+            .expect("a thumbprint");
+    assert_eq!(
+        super::bound_key(Some(&other), Some(&proof)).map_err(|refused| refused.reason),
+        Err(Reason::DpopKeyNotBound)
+    );
+}
+
+#[test]
+fn a_code_bound_to_a_key_redeems_only_with_a_proof_by_that_key() {
+    let proof = check(&signed(&header(), &claims(""))).expect("a proof");
+    let bound = proof.thumbprint.clone();
+    assert_eq!(super::holds_bound_key(None, None), Ok(()));
+    assert_eq!(super::holds_bound_key(None, Some(&proof)), Ok(()));
+    assert_eq!(super::holds_bound_key(Some(&bound), Some(&proof)), Ok(()));
+    assert_eq!(
+        super::holds_bound_key(Some(&bound), None).map_err(|refused| refused.reason),
+        Err(Reason::DpopMissing)
+    );
+    let other =
+        tessari_oauth_types::KeyThumbprint::parse("0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I")
+            .expect("a thumbprint");
+    assert_eq!(
+        super::holds_bound_key(Some(&other), Some(&proof)).map_err(|refused| refused.reason),
+        Err(Reason::DpopKeyNotBound)
+    );
 }

@@ -7,8 +7,8 @@ use tessari_oauth_core::authentication::Method;
 use tessari_oauth_core::codes::{CodeAuthentication, IssuedCode};
 use tessari_oauth_storage::codes::Consumed;
 use tessari_oauth_types::{
-    AuthorizationCode, Challenge, ClientId, ErrorCategory, Resource, ScopeSet, TenantId, Timestamp,
-    UserId,
+    AuthorizationCode, Challenge, ClientId, ErrorCategory, KeyThumbprint, Resource, ScopeSet,
+    TenantId, Timestamp, UserId,
 };
 use tokio::sync::Barrier;
 
@@ -48,6 +48,10 @@ pub(crate) fn issued() -> IssuedCode {
             sid: "c2Vzc2lvbi1wdWJsaWMtaWQ".to_owned(),
         },
         nonce: Some("n-0S6_WzA2Mj".to_owned()),
+        dpop_jkt: Some(
+            KeyThumbprint::parse("0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I")
+                .expect("a thumbprint"),
+        ),
     }
 }
 

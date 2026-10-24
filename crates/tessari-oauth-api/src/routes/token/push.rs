@@ -9,12 +9,13 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use tessari_oauth_constants::{PUSHED_REQUEST_TTL_SECS, REQUEST_URI_PREFIX};
 use tessari_oauth_core::authorize::{self, Refusal as AuthorizeRefusal};
+use tessari_oauth_core::dpop;
 use tessari_oauth_core::token::Endpoint;
 use tessari_oauth_core::{Params, Reason};
 use tessari_oauth_types::{ClientId, ErrorCode};
 
 use super::super::Found;
-use super::{Failure, authenticate, refusal};
+use super::{Failure, authenticate, proof, refusal};
 use crate::Error;
 use crate::state::PublicState;
 
@@ -37,7 +38,7 @@ pub(super) async fn push(
     if params.get("request_uri").is_some() {
         return Err(refusal(ErrorCode::InvalidRequest, Reason::RequestUriInPush).into());
     }
-    let request = authorize::validate(
+    let mut request = authorize::validate(
         &endpoint.tenant,
         &endpoint.issuer,
         &Found(Some(client)),
@@ -48,6 +49,10 @@ pub(super) async fn push(
         | AuthorizeRefusal::RedirectToClient { error, reason, .. }) = refused;
         refusal(error, reason)
     })?;
+    // A proof sent with the push binds the code to its key, which a `dpop_jkt` beside it must name (RFC 9449 §10.1).
+    let proof = proof::read_pushed(headers, endpoint)?;
+    request.dpop_jkt = dpop::bound_key(request.dpop_jkt.as_ref(), proof.as_ref())?;
+    proof::spend(state, endpoint, proof.as_ref()).await?;
     let id = state
         .interactions
         .push(&endpoint.tenant, &request, endpoint.now)
