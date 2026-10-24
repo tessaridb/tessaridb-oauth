@@ -48,7 +48,7 @@ origin, stores the passkey and signs out the other sessions.
 and with the same sign-outs. It must be at least fifteen characters, or eight when the account has an authenticator app
 its company's policy asks for (a sign-in then always asks for its code), and must not be the account's own address, its
 local part or the tenant's name; otherwise `400 password_rejected` with the rule it broke. The value is never echoed,
-logged or recorded. Screening against a list of compromised passwords is not done yet.
+logged or recorded. A password seen in a breach is refused the same way (see [the server guide](server.md)).
 
 ## Your profile: `<issuer>/account/api/profile`
 
