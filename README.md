@@ -14,8 +14,8 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 [![licence](https://img.shields.io/badge/licence-BUSL--1.1-6B5FD1?style=flat-square)](LICENSE)
 [![rust](https://img.shields.io/badge/rust-1.98%2B-6B5FD1?style=flat-square)](#building-and-checking)
 
-[tessaridb.com](https://tessaridb.com) · [TessariDB](https://github.com/tessaridb/tessaridb) ·
-[docs](https://docs.tessaridb.com)
+[oauth.tessaridb.com](https://oauth.tessaridb.com) · [docs](https://docs.tessaridb.com/oauth) ·
+[tessaridb.com](https://tessaridb.com) · [TessariDB](https://github.com/tessaridb/tessaridb)
 
 </div>
 
@@ -83,7 +83,7 @@ first, for development only.
 |---|---|---|
 | `PUBLIC_URL` | the https base URL; tenant `acme`'s issuer is `<PUBLIC_URL>/acme`; its host is the passkey relying party, so changing the host retires every enrolled passkey | required |
 | `PUBLIC_ADDRESS` | where the public listener binds | `0.0.0.0:8443` |
-| `ADMIN_URL` | the admin console's base URL, at an origin other than `PUBLIC_URL`'s: https, or http on `127.0.0.1` or `[::1]` only; company `acme`'s console is `<ADMIN_URL>/admin/acme` | required |
+| `ADMIN_URL` | the admin console's base URL, at an origin other than `PUBLIC_URL`'s: https, or http on `127.0.0.1` or `[::1]` only; company `acme`'s console is `<ADMIN_URL>/admin/acme/` | required |
 | `ADMIN_ADDRESS` | where the admin console's listener binds | `0.0.0.0:9443` |
 | `ADMIN_TLS_CERT`, `ADMIN_TLS_KEY` | the admin console over TLS: its certificate chain and private key, PEM, both or neither. Without them the console is served in the clear, so keep it on a loopback address or behind a TLS terminator | unset (plain) |
 | `TLS_CERT`, `TLS_KEY` | the public listener over TLS: its certificate chain and private key, PEM, both or neither. Without them it is served in the clear for a TLS terminator in front of it, which answers at the https `PUBLIC_URL` | unset (plain) |
