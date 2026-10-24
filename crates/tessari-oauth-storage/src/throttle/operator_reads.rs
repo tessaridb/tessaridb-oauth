@@ -9,7 +9,7 @@ use std::num::NonZeroU64;
 use tessari_oauth_constants::{
     OPERATOR_READ_WINDOW_SECS, OPERATOR_READS_NOTICED, THROTTLE_WRITE_ATTEMPTS,
 };
-use tessari_oauth_types::{TenantId, Timestamp, UserId};
+use tessari_oauth_types::{Actor, TenantId, Timestamp};
 
 use super::model::Counters;
 use super::service::{counter_key, noticed, window};
@@ -34,7 +34,7 @@ impl ThrottleService {
     pub async fn operator_read(
         &self,
         tenant: &TenantId,
-        operator: &UserId,
+        operator: &Actor,
         accounts: u64,
         now: Timestamp,
     ) -> Result<OperatorReads> {
@@ -52,7 +52,7 @@ impl ThrottleService {
         let key = counter_key(
             "operator-reads",
             index,
-            &format!("{}:{}", tenant.as_str(), operator.as_str()),
+            &format!("{}:{}", tenant.as_str(), operator.name()),
         );
         let total = retry::bounded(THROTTLE_WRITE_ATTEMPTS, retry::on_store_retry, || {
             self.repository.count(

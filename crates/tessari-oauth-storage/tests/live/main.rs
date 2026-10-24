@@ -40,6 +40,7 @@ mod refresh_revoke;
 mod replay;
 mod reseal;
 mod resets;
+mod services;
 mod sessions;
 mod signer;
 mod signin_throttle;

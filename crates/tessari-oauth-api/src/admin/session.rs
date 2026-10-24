@@ -28,8 +28,9 @@ pub(super) async fn me(
     headers: HeaderMap,
 ) -> Result<Response> {
     let operator = signed_in(&state, &company, &headers).await?;
+    let user = operator.in_console(&state, "me").await?;
     Ok(Json(Me {
-        user: operator.user.as_str().to_owned(),
+        user: user.as_str().to_owned(),
         roles: operator.roles.iter().map(|role| role.name()).collect(),
     })
     .into_response())

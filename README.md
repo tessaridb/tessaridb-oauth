@@ -10,17 +10,17 @@ An OAuth 2.1 authorization server and OpenID provider written in Rust. One binar
 endpoints, the users' account portal and an embedded admin panel on its own listener; tenants, users, clients,
 codes, grants, keys and the audit trail are records in a TessariDB cluster.
 
-[![release](https://img.shields.io/badge/release-0.1.0-6B5FD1?style=flat-square)](#status)
+[![release](https://img.shields.io/badge/release-0.2.0-6B5FD1?style=flat-square)](#status)
 [![licence](https://img.shields.io/badge/licence-BUSL--1.1-6B5FD1?style=flat-square)](LICENSE)
 [![rust](https://img.shields.io/badge/rust-1.98%2B-6B5FD1?style=flat-square)](#building-and-checking)
 
-[tessaridb.com](https://tessaridb.com) · [TessariDB](https://github.com/tessaridb/tessaridb) ·
-[docs](https://docs.tessaridb.com)
+[oauth.tessaridb.com](https://oauth.tessaridb.com) · [docs](https://docs.tessaridb.com/oauth) ·
+[tessaridb.com](https://tessaridb.com) · [TessariDB](https://github.com/tessaridb/tessaridb)
 
 </div>
 
 > [!NOTE]
-> **0.1.0, the first release.** Everything listed under [Status](#status) is served by the binary and covered by
+> **0.2.0.** Everything listed under [Status](#status) is served by the binary and covered by
 > tests. The configuration and the HTTP surface may still change in a minor release before 1.0.
 
 ## What it is for
@@ -57,8 +57,8 @@ claimed until a test backs them.
 
 | | |
 |---|---|
-| Release | 0.1.0, image `tessaridb/oauth:0.1.0` |
-| Served | per-tenant discovery and key set; authorization (with PAR), token (code, refresh, client credentials), revocation, UserInfo, RP-initiated and back-channel logout; sign-in with password, TOTP, recovery codes and passkeys; password reset, enrolment links, address verification, changes of sign-in address and sign-in notices by mail, worded per company; self-registration under company policy; consent; the account portal and its API; the admin console; signing-key rotation; per-address limits; the audit trail; regions |
+| Release | 0.2.0, image `tessaridb/oauth:0.2.0` |
+| Served | per-tenant discovery and key set; authorization (with PAR), token (code, refresh, client credentials), revocation, UserInfo, RP-initiated and back-channel logout; sign-in with password, TOTP, recovery codes and passkeys; password reset, enrolment links, address verification, changes of sign-in address and sign-in notices by mail, worded per company; self-registration under company policy; consent; the account portal and its API; the admin console, with service credentials for programs; client sectors; signing-key rotation; per-address limits; the audit trail; regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
 ## Documentation
@@ -83,7 +83,7 @@ first, for development only.
 |---|---|---|
 | `PUBLIC_URL` | the https base URL; tenant `acme`'s issuer is `<PUBLIC_URL>/acme`; its host is the passkey relying party, so changing the host retires every enrolled passkey | required |
 | `PUBLIC_ADDRESS` | where the public listener binds | `0.0.0.0:8443` |
-| `ADMIN_URL` | the admin console's base URL, at an origin other than `PUBLIC_URL`'s: https, or http on `127.0.0.1` or `[::1]` only; company `acme`'s console is `<ADMIN_URL>/admin/acme` | required |
+| `ADMIN_URL` | the admin console's base URL, at an origin other than `PUBLIC_URL`'s: https, or http on `127.0.0.1` or `[::1]` only; company `acme`'s console is `<ADMIN_URL>/admin/acme/` | required |
 | `ADMIN_ADDRESS` | where the admin console's listener binds | `0.0.0.0:9443` |
 | `ADMIN_TLS_CERT`, `ADMIN_TLS_KEY` | the admin console over TLS: its certificate chain and private key, PEM, both or neither. Without them the console is served in the clear, so keep it on a loopback address or behind a TLS terminator | unset (plain) |
 | `TLS_CERT`, `TLS_KEY` | the public listener over TLS: its certificate chain and private key, PEM, both or neither. Without them it is served in the clear for a TLS terminator in front of it, which answers at the https `PUBLIC_URL` | unset (plain) |
@@ -131,7 +131,7 @@ docker run -d --name oauth -p 8443:8443 -p 127.0.0.1:9443:9443 \
   -e TESSARIDB_OAUTH_STORE=db.example.com:9080 -e TESSARIDB_OAUTH_STORE_USER=oauth \
   -e TESSARIDB_OAUTH_STORE_PASSWORD -e TESSARIDB_OAUTH_STORE_AUTHORITY=/keys/store-ca.pem \
   -v "$PWD/store-ca.pem:/keys/store-ca.pem:ro" \
-  -e TESSARIDB_OAUTH_REGION=eu -e TESSARIDB_OAUTH_TENANTS=acme tessaridb/oauth:0.1.0
+  -e TESSARIDB_OAUTH_REGION=eu -e TESSARIDB_OAUTH_TENANTS=acme tessaridb/oauth:0.2.0
 ```
 
 Behind a reverse proxy, the proxy holds the certificate for `PUBLIC_URL`, passes requests on in the clear, and

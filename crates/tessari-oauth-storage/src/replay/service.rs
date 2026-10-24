@@ -1,4 +1,4 @@
-//! The replay service: spend a client assertion or a DPoP proof once.
+//! The replay service: spend a client assertion, a service admin assertion or a DPoP proof once.
 //!
 //! Single use is a concurrency property, so a spend is one conditional write that answers who won; nothing is read
 //! first. A `retry` from the store is answered by asking again a bounded number of times. Should the first attempt
@@ -6,14 +6,15 @@
 //! signs a new one, and nothing is ever accepted twice. A store that does not answer is an error, never a spend, so
 //! the caller refuses the request: the record fails closed.
 //!
-//! Both kinds share one space, so each key names its kind first. An assertion is keyed by its client — length first,
-//! because a client id may contain the separator — and a proof by its key's thumbprint, which never does.
+//! Every kind shares one space, so each key names its kind first. An assertion is keyed by its client or service,
+//! length first because a client id may contain the separator, and a proof by its key's thumbprint, which never does.
 
 use std::sync::Arc;
 
 use tessari_oauth_constants::{CLOCK_SKEW_SECS, REPLAY_SPEND_ATTEMPTS};
 use tessari_oauth_core::assertion::AssertionUse;
 use tessari_oauth_core::dpop::ProofUse;
+use tessari_oauth_core::service_assertion::ServiceAssertionUse;
 use tessari_oauth_types::{TenantId, Timestamp};
 
 use super::repository::ReplayRepository;
@@ -39,6 +40,12 @@ pub struct ReplayService {
 fn assertion_key(assertion: &AssertionUse) -> String {
     let client = assertion.client_id.as_str();
     format!("a:{}:{client}:{}", client.len(), assertion.jti)
+}
+
+/// The record's key for a service's admin assertion.
+fn service_key(assertion: &ServiceAssertionUse) -> String {
+    let service = assertion.service.as_str();
+    format!("s:{}:{service}:{}", service.len(), assertion.jti)
 }
 
 /// The record's key for a DPoP proof.
@@ -78,6 +85,25 @@ impl ReplayService {
         self.spend(
             tenant,
             &assertion_key(assertion),
+            remember_for(assertion.expires_at, now),
+        )
+        .await
+    }
+
+    /// Spend a service's admin `assertion` in `tenant` at `now`.
+    ///
+    /// # Errors
+    ///
+    /// When the store is unavailable, refuses, or answers in a shape this crate cannot read.
+    pub async fn spend_service_assertion(
+        &self,
+        tenant: &TenantId,
+        assertion: &ServiceAssertionUse,
+        now: Timestamp,
+    ) -> Result<Spent> {
+        self.spend(
+            tenant,
+            &service_key(assertion),
             remember_for(assertion.expires_at, now),
         )
         .await

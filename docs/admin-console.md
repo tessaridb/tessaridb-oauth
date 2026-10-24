@@ -85,11 +85,13 @@ order, at most 100 messages a page, `next` naming the position to read after; ea
 
 Clients (role `clients`): `GET <ADMIN_URL>/admin/<company>/api/clients?limit=&after=` lists the company's client
 registrations in id order (at most 100 a page, cursor = the last id) and `GET .../api/clients/<id>` reads one, each
-with its kind, method, redirect URIs, scope ceiling, resources, grants and key count, and the one read also with
+with its kind, method, redirect URIs, scope ceiling, resources, grants, key count and sector, and the one read also with
 `holders`, how many users hold a grant to it; the console's own client is listed and marked.
 `POST .../api/clients` with `{"client_id", "redirect_uris", "scope_ceiling", "resources",
 "auth_method", "assertion_alg", "jwks", "grant_types", "dpop_bound_access_tokens", "post_logout_redirect_uris",
-"backchannel_logout_uri", "reason"}` registers one through the same rules as every registration. Only `none` (a
+"backchannel_logout_uri", "sector", "reason"}` registers one through the same rules as every registration; `sector`
+(optional, 1 to 64 lowercase letters, digits, hyphens and underscores) gives the clients of one product one subject
+per person, and is fixed once registered. Only `none` (a
 public client, always with PKCE) and `private_key_jwt` (with `EdDSA` or `ES256` and its public key) are offered, so no
 shared secret is ever made; `admin-console` is refused as `client_reserved` and a taken id as `client_taken`.
 `POST .../api/clients/<id>/remove` with `{"reason"}` deletes the registration and ends what it held: every user's
@@ -163,6 +165,21 @@ the company does not have). Disabling ends every session of the account, telling
 channel, revokes every refresh family (recorded as `user_disabled`), and with the sessions ends any console session
 of its own; its access tokens stop working by the `access_tokens_end_by` the answer gives. A disabled account cannot
 sign in. Enabling gives back only that: nothing ended comes back.
+
+Services (role `users`, console only): a program the company runs can call this API without a console session.
+`POST <ADMIN_URL>/admin/<company>/api/services` with `{"service_id", "jwk", "roles", "reason"}` registers one with
+its Ed25519 public key and the role `users` (the only role a service may hold); `GET .../api/services` lists them (at
+most 20 a company) and `POST .../api/services/<id>/remove` with `{"reason"}` removes one, after which its assertions
+are refused. Only an operator signed in to the console may do these three, so a service never mints another.
+
+A service sends each request with `Authorization: TessariService <assertion>`: a JWT it signs with that key, of type
+`tessari-admin+jwt`, `alg` `EdDSA`, with `iss` and `sub` its service id, `aud` exactly `<ADMIN_URL
+origin>/admin/<company>`, an `exp` at most 60 seconds ahead, and a `jti` used once. Anything else is `401
+service_refused`; the audit trail names the check that failed. A service is held to its role like an operator, is not
+held to the console's origin (it carries no cookie a page could ride on), and still sends an `Idempotency-Key` and a
+`reason` with every change, recorded as `service:<id>`. Granting operator roles, revealing an address and `api/me` are
+`403 console_only` for a service. `GET .../api/users/by-subject?sector=&sub=` (role `users`) reads the account a
+client sector's pairwise subject stands for, masked as `GET .../api/users/<user>` shows it, or `404 user_not_found`.
 
 ## The audit trail
 

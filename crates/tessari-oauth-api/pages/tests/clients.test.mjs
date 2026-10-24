@@ -29,6 +29,7 @@ const portal = {
   grant_types: ["authorization_code", "refresh_token"],
   dpop_bound_access_tokens: false,
   keys: 0,
+  sector: null,
   console: false,
 };
 
@@ -46,6 +47,7 @@ test("a registrations page is read whole with its cursor, and any part of anothe
         grantTypes: ["authorization_code", "refresh_token"],
         dpop: false,
         keys: 0,
+        sector: null,
         console: false,
       },
     ],
@@ -53,6 +55,8 @@ test("a registrations page is read whole with its cursor, and any part of anothe
   });
   assert.equal(readClientsPage({ clients: [{ ...portal, kind: "secret" }], next: null }), null);
   assert.equal(readClientsPage({ clients: [{ ...portal, keys: -1 }], next: null }), null);
+  assert.equal(readClientsPage({ clients: [{ ...portal, sector: "cloud" }], next: null })?.clients[0]?.sector, "cloud");
+  assert.equal(readClientsPage({ clients: [{ ...portal, sector: 3 }], next: null }), null);
   const unlisted = { ...portal, redirect_uris: "https://app.example/cb" };
   assert.equal(readClientsPage({ clients: [unlisted], next: null }), null);
   assert.equal(readClientsPage({ clients: [], next: 3 }), null);
@@ -83,6 +87,7 @@ const form = {
   resources: "",
   grants: ["authorization_code", "refresh_token"],
   dpop: false,
+  sector: "",
 };
 
 test("a public client is described with no keys and no algorithm", () => {
@@ -117,6 +122,11 @@ test("a confidential client carries its algorithm and its public key as an objec
   });
 });
 
+test("a sector, when given, travels with the registration", () => {
+  const made = registrationOf({ ...form, sector: " tessaridb-cloud " });
+  assert.equal("body" in made && made.body.sector, "tessaridb-cloud");
+});
+
 test("a form outside the rules names the field to fix", () => {
   const wrong = (changed) => {
     const made = registrationOf({ ...form, ...changed });
@@ -130,6 +140,8 @@ test("a form outside the rules names the field to fix", () => {
   assert.equal(wrong({ confidential: true, jwk: "" }), "jwk");
   assert.equal(wrong({ confidential: true, jwk: "[1]" }), "jwk");
   assert.equal(wrong({ confidential: true, jwk: '{"kty":"OKP"}', algorithm: "HS256" }), "algorithm");
+  assert.equal(wrong({ sector: "Cloud Site" }), "sector");
+  assert.equal(wrong({ sector: "-cloud" }), "sector");
 });
 
 test("each refused registration says what to do next", () => {

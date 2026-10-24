@@ -6,7 +6,7 @@
 use sha2::Digest as _;
 use tessari_oauth_constants::{IDEMPOTENCY_KEY_MAX_LEN, IDEMPOTENCY_KEY_MIN_LEN};
 
-use crate::{Error, Result, UserId, base64url};
+use crate::{Actor, Error, Result, base64url};
 
 /// An idempotency key: 16 to 128 characters of `A-Z`, `a-z`, `0-9`, `-` and `_`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,11 +35,11 @@ impl IdempotencyKey {
         Ok(Self(raw))
     }
 
-    /// The identity of the record `operator`'s change under this key is kept under: unpadded base64url of the SHA-256
-    /// of the operator's id, a line break and the key.
+    /// The identity of the record `actor`'s change under this key is kept under: unpadded base64url of the SHA-256
+    /// of the actor's name, a line break and the key.
     #[must_use]
-    pub fn record_id(&self, operator: &UserId) -> String {
-        let named = format!("{}\n{}", operator.as_str(), self.0);
+    pub fn record_id(&self, actor: &Actor) -> String {
+        let named = format!("{}\n{}", actor.name(), self.0);
         base64url::encode(&sha2::Sha256::digest(named.as_bytes()))
     }
 }

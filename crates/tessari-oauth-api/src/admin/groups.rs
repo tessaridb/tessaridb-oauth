@@ -257,7 +257,7 @@ pub(super) async fn add_member(
             let now = (moving.clock)();
             match moving
                 .groups
-                .join(tenant, &group, &user, operator.user.as_str(), now)
+                .join(tenant, &group, &user, &operator.actor.name(), now)
                 .await
                 .map_err(Error::Store)?
             {

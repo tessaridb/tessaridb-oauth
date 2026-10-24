@@ -120,7 +120,7 @@ pub(super) async fn create(
             let now = (creating.clock)();
             let made = creating
                 .companies
-                .create(&id, &sent.name, operator.user.as_str(), now)
+                .create(&id, &sent.name, &operator.actor.name(), now)
                 .await
                 .map_err(|failure| match failure {
                     tessari_oauth_storage::Error::Invalid { .. } => Error::Invalid,

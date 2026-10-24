@@ -51,7 +51,8 @@ outcome; a code presented again is refused and revokes the refresh family it sta
 
 The access token is an RFC 9068 JWT addressed to one resource, carrying only `iss`, `aud`, `sub`, `client_id`,
 `scope`, `iat`, `exp` and `jti`, valid for five minutes — the time a revoked grant can still be used — with `sub` a
-pairwise identifier per client.
+pairwise identifier per client. Clients registered with the same `sector` share one: the clients of one product see a
+person as the same subject, and a client registered without a sector keeps the subject it always had.
 
 A code granted `openid` also redeems for an ID token (OpenID Connect Core §3.1.3.3), a JWT of type `JWT` signed by
 the same key and addressed to the client alone. It states how the user signed in, as the code recorded it when it

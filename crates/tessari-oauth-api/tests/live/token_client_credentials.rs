@@ -20,6 +20,7 @@ const FILES: &str = "https://files.example.com/";
 pub(crate) async fn machine(server: &Server) -> SigningKey {
     let (key, _) = SigningKey::generate(Algorithm::Es256).expect("a key");
     let client = NewClient {
+        sector: None,
         client_id: ClientId::parse("machine").expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
         scope_ceiling: ScopeSet::parse("api:read api:write").expect("scopes"),

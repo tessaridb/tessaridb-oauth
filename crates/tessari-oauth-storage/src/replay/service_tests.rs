@@ -1,9 +1,10 @@
 use tessari_oauth_constants::CLOCK_SKEW_SECS;
 use tessari_oauth_core::assertion::AssertionUse;
 use tessari_oauth_core::dpop::ProofUse;
-use tessari_oauth_types::{ClientId, KeyThumbprint, Timestamp};
+use tessari_oauth_core::service_assertion::ServiceAssertionUse;
+use tessari_oauth_types::{ClientId, KeyThumbprint, ServiceId, Timestamp};
 
-use super::{assertion_key, proof_key, remember_for};
+use super::{assertion_key, proof_key, remember_for, service_key};
 
 const KEY: &str = "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I";
 
@@ -23,9 +24,23 @@ fn proof(jti: &str) -> ProofUse {
     }
 }
 
+fn service(id: &str, jti: &str) -> ServiceAssertionUse {
+    ServiceAssertionUse {
+        service: ServiceId::parse(id).expect("a service id"),
+        jti: jti.to_owned(),
+        expires_at: Timestamp::from_unix_secs(0),
+    }
+}
+
 #[test]
 fn keys_name_their_kind_and_their_owner_unambiguously() {
     assert_eq!(assertion_key(&assertion("svc", "a-1")), "a:3:svc:a-1");
+    assert_eq!(service_key(&service("svc", "a-1")), "s:3:svc:a-1");
+    assert_ne!(
+        service_key(&service("svc", "a-1")),
+        assertion_key(&assertion("svc", "a-1")),
+        "a client and a service of one name never spend each other's jti"
+    );
     assert_eq!(proof_key(&proof("p-1")), format!("p:{KEY}:p-1"));
     assert_ne!(
         assertion_key(&assertion("a b", "c")),

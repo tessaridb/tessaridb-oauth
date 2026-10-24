@@ -1,10 +1,10 @@
 use tessari_oauth_constants::{IDEMPOTENCY_KEY_MAX_LEN, IDEMPOTENCY_KEY_MIN_LEN};
 
 use super::{IdempotencyKey, request_digest};
-use crate::{Error, UserId};
+use crate::{Actor, Error, ServiceId, UserId};
 
-fn operator(name: &str) -> UserId {
-    UserId::parse(name).expect("a user id")
+fn operator(name: &str) -> Actor {
+    Actor::Operator(UserId::parse(name).expect("a user id"))
 }
 
 #[test]
@@ -51,6 +51,12 @@ fn the_record_is_the_operators_own() {
     assert_ne!(mine, key.record_id(&operator("operator-2")), "per operator");
     let other = IdempotencyKey::parse("0f8fad5b-d9cb-469e").expect("a key");
     assert_ne!(mine, other.record_id(&operator("operator-1")), "per key");
+    let service = Actor::Service(ServiceId::parse("operator-1").expect("a service id"));
+    assert_ne!(
+        mine,
+        key.record_id(&service),
+        "a service never shares an operator's record"
+    );
     assert_eq!(mine.len(), 43, "an unpadded base64url SHA-256");
 }
 

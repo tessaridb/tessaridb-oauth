@@ -2020,11 +2020,25 @@
     const grantTypes = strings(field(value, "grant_types"));
     const dpop = field(value, "dpop_bound_access_tokens");
     const keys2 = field(value, "keys");
+    const sector = field(value, "sector");
     const console = field(value, "console");
-    if (typeof id !== "string" || id === "" || kind !== "public" && kind !== "confidential" || typeof authMethod !== "string" || assertionAlg !== null && typeof assertionAlg !== "string" || redirectUris === null || scopeCeiling === null || resources === null || grantTypes === null || typeof dpop !== "boolean" || typeof keys2 !== "number" || !Number.isSafeInteger(keys2) || keys2 < 0 || typeof console !== "boolean") {
+    if (typeof id !== "string" || id === "" || kind !== "public" && kind !== "confidential" || typeof authMethod !== "string" || assertionAlg !== null && typeof assertionAlg !== "string" || redirectUris === null || scopeCeiling === null || resources === null || grantTypes === null || typeof dpop !== "boolean" || typeof keys2 !== "number" || !Number.isSafeInteger(keys2) || keys2 < 0 || sector !== null && typeof sector !== "string" || typeof console !== "boolean") {
       return null;
     }
-    return { id, kind, authMethod, assertionAlg, redirectUris, scopeCeiling, resources, grantTypes, dpop, keys: keys2, console };
+    return {
+      id,
+      kind,
+      authMethod,
+      assertionAlg,
+      redirectUris,
+      scopeCeiling,
+      resources,
+      grantTypes,
+      dpop,
+      keys: keys2,
+      sector,
+      console
+    };
   }
   function readClientsPage(body) {
     const listed = field(body, "clients");
@@ -2074,6 +2088,9 @@
   function clientIdOf(id) {
     return id.length >= 1 && id.length <= 255 && /^[\x20-\x7e]+$/.test(id);
   }
+  function sectorOf(sector) {
+    return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(sector);
+  }
   function jwkOf(text2) {
     try {
       const parsed = JSON.parse(text2);
@@ -2095,11 +2112,16 @@
     if (grants.includes("authorization_code") && redirects.length === 0) {
       return { wrong: "redirects" };
     }
+    const sector = form.sector.trim();
+    if (sector !== "" && !sectorOf(sector)) {
+      return { wrong: "sector" };
+    }
     const shared = {
       client_id: id,
       redirect_uris: redirects,
       scope_ceiling: listOf(form.scopes),
-      resources: listOf(form.resources)
+      resources: listOf(form.resources),
+      ...sector === "" ? {} : { sector }
     };
     if (!form.confidential) {
       return {
@@ -2212,7 +2234,8 @@
     algorithm: "Choose the algorithm the client signs with.",
     redirects: "A client using the code flow needs at least one redirect URI.",
     scopes: "Give the scopes as words separated by spaces.",
-    grants: "Choose at least one grant; only a confidential client may act as itself."
+    grants: "Choose at least one grant; only a confidential client may act as itself.",
+    sector: "Give the sector as 1 to 64 lowercase letters, digits, hyphens and underscores."
   };
   function area(id, text2) {
     const input2 = make("textarea", "mono");
@@ -2265,6 +2288,10 @@
     const resources = area("client-resources", "Resources its tokens may go to, one per line (optional)");
     const grants = toggles("Grants", "client-grant", GRANTS, ["authorization_code"]);
     const dpop = toggles("Token binding", "client-dpop", ["DPoP-bound tokens"], []);
+    const sector = make("input", "mono");
+    sector.type = "text";
+    sector.autocomplete = "off";
+    sector.spellcheck = false;
     const reason = reasonField("client-reason");
     const said = notice();
     const submit = make("button", "primary", "Register the client");
@@ -2275,7 +2302,8 @@
       algorithm: algorithm.group,
       redirects: redirects.input,
       scopes,
-      grants: grants.group
+      grants: grants.group,
+      sector
     };
     const form = make(
       "form",
@@ -2289,6 +2317,7 @@
       resources.row,
       grants.group,
       dpop.group,
+      labelled("client-sector", "Sector, for clients of one product that see a person as one (optional)", sector),
       reason.row,
       said,
       submit
@@ -2308,7 +2337,8 @@
         scopes: scopes.value,
         resources: resources.input.value,
         grants: grants.chosen(),
-        dpop: dpop.chosen().length > 0
+        dpop: dpop.chosen().length > 0,
+        sector: sector.value
       });
       if ("wrong" in made) {
         said.textContent = WRONG2[made.wrong];
@@ -2371,6 +2401,9 @@
       const name2 = make("td", "", make("code", "", client.id));
       if (client.console) {
         name2.append(make("div", "", make("span", "pill", "this console")));
+      }
+      if (client.sector !== null) {
+        name2.append(make("div", "", "sector ", make("code", "", client.sector)));
       }
       const signs = client.assertionAlg === null ? kind : make("span", "", kind, ` ${client.assertionAlg}`);
       body.append(

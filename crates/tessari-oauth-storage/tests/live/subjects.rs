@@ -3,8 +3,9 @@
 
 use std::sync::Arc;
 
+use tessari_oauth_core::subject::SubjectSector;
 use tessari_oauth_test_support::fresh_kek;
-use tessari_oauth_types::{ClientId, TenantId, Timestamp, UserId};
+use tessari_oauth_types::{ClientId, Sector, TenantId, Timestamp, UserId};
 use tokio::sync::Barrier;
 
 use crate::fresh;
@@ -13,8 +14,12 @@ fn tenant(name: &str) -> TenantId {
     TenantId::parse(name).expect("a tenant id")
 }
 
-fn client(id: &str) -> ClientId {
-    ClientId::parse(id).expect("a client id")
+fn client(id: &str) -> SubjectSector {
+    SubjectSector::Client(ClientId::parse(id).expect("a client id"))
+}
+
+fn sector(name: &str) -> SubjectSector {
+    SubjectSector::Named(Sector::parse(name).expect("a sector"))
 }
 
 const NOW: Timestamp = Timestamp::from_unix_secs(1_800_000_000);
@@ -179,5 +184,44 @@ async fn a_derived_subject_leads_back_to_its_user_at_its_own_client_only() {
             .await
             .expect("answered"),
         None
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_named_sector_is_one_subject_and_leads_back_to_its_user() {
+    let storage = fresh(&tenant("acme"), 1).await;
+    let kek = fresh_kek().expect("a key-encryption key");
+    let subject = storage
+        .subjects
+        .pairwise(&tenant("acme"), &kek, &sector("cloud"), &user(), NOW)
+        .await
+        .expect("a subject");
+    assert_eq!(
+        storage
+            .subjects
+            .user_of(&tenant("acme"), &sector("cloud"), &subject)
+            .await
+            .expect("answered"),
+        Some(user()),
+        "found again in its sector"
+    );
+    assert_eq!(
+        storage
+            .subjects
+            .user_of(&tenant("acme"), &client("cloud"), &subject)
+            .await
+            .expect("answered"),
+        None,
+        "a client named like the sector does not reach it"
+    );
+    assert_ne!(
+        subject,
+        storage
+            .subjects
+            .pairwise(&tenant("acme"), &kek, &client("cloud"), &user(), NOW)
+            .await
+            .expect("a subject"),
+        "nor shares its subject"
     );
 }

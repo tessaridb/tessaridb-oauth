@@ -1239,7 +1239,7 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "http-body",
@@ -1267,11 +1267,11 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-constants"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "tessari-oauth-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "coset",
  "png",
@@ -1289,7 +1289,7 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-daemons"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "futures-util",
  "rustls",
@@ -1307,7 +1307,7 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-infrastructure"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "argon2",
  "dotenvy",
@@ -1335,7 +1335,7 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-node"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "rustls",
  "tessari-oauth-api",
@@ -1352,7 +1352,7 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-observability"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "thiserror",
  "tracing-appender",
@@ -1361,7 +1361,7 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-storage"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "png",
@@ -1379,7 +1379,7 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-test-support"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tessari-oauth-infrastructure",
  "tessari-oauth-storage",
@@ -1389,7 +1389,7 @@ dependencies = [
 
 [[package]]
 name = "tessari-oauth-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "sha2",
  "subtle",

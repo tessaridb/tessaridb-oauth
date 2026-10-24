@@ -203,7 +203,7 @@ pub(super) async fn set(
                     &operator.tenant,
                     (kind, sent.revision),
                     &template,
-                    operator.user.as_str(),
+                    &operator.actor.name(),
                     now,
                 )
                 .await

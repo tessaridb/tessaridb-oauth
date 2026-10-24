@@ -111,6 +111,7 @@ async fn a_refresh_token_presented_again_revokes_its_family() {
 async fn a_refused_refresh_leaves_the_token_as_it_was() {
     let server = server(2).await;
     let studio = NewClient {
+        sector: None,
         client_id: ClientId::parse("studio").expect("a client id"),
         redirect_uris: vec![RedirectUri::parse(REDIRECT).expect("a redirect URI")],
         scope_ceiling: ScopeSet::parse("api:read").expect("scopes"),

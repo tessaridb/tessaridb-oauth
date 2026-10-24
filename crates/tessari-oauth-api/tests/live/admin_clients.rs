@@ -59,6 +59,7 @@ async fn the_company_clients_are_read_a_page_at_a_time_and_one_by_id() {
         .await
         .expect("provisioned");
     let elsewhere = NewClient {
+        sector: None,
         client_id: ClientId::parse("only-initech").expect("a client id"),
         redirect_uris: vec![RedirectUri::parse("https://initech.example/cb").expect("a URI")],
         scope_ceiling: ScopeSet::parse("openid").expect("scopes"),
@@ -124,6 +125,10 @@ async fn the_company_clients_are_read_a_page_at_a_time_and_one_by_id() {
         serde_json::json!(["api:read", "api:write"])
     );
     assert_eq!(portal.body["keys"], 0);
+    assert!(
+        portal.body["sector"].is_null(),
+        "a client with no sector is its own"
+    );
     assert_eq!(portal.body["console"], false);
 
     let foreign = read(
@@ -265,7 +270,8 @@ async fn an_operator_registers_a_client_once_through_the_registration_rules() {
 
     let signed = format!(
         r#"{{"client_id":"svc","redirect_uris":[],"scope_ceiling":["orders:read"],"auth_method":"private_key_jwt",
-"assertion_alg":"EdDSA","jwks":[{}],"grant_types":["client_credentials"],"reason":"billing job"}}"#,
+"assertion_alg":"EdDSA","jwks":[{}],"grant_types":["client_credentials"],"sector":"billing",
+"reason":"billing job"}}"#,
         ED25519_JWK
     );
     let confidential = send(
@@ -282,6 +288,7 @@ async fn an_operator_registers_a_client_once_through_the_registration_rules() {
     assert_eq!(confidential.body["kind"], "confidential");
     assert_eq!(confidential.body["assertion_alg"], "EdDSA");
     assert_eq!(confidential.body["keys"], 1);
+    assert_eq!(confidential.body["sector"], "billing");
 }
 
 #[tokio::test]
@@ -325,6 +332,11 @@ async fn a_registration_outside_the_rules_is_refused_and_nothing_is_written() {
         SHOP.replace(r#"["authorization_code","refresh_token"]"#, "[]"),
         // a grant this server does not know
         SHOP.replace(r#""refresh_token""#, r#""password""#),
+        // a sector that is not a name
+        SHOP.replace(
+            r#""client_id":"shop""#,
+            r#""client_id":"shop","sector":"Shop Family""#,
+        ),
         // a field outside the allow-list, such as another company
         SHOP.replace(
             r#""client_id":"shop""#,

@@ -47,6 +47,7 @@ fn admin_console(company: &TenantId, public: &str, console: &str) -> Result<NewC
         dpop_bound_access_tokens: false,
         post_logout_redirect_uris: Vec::new(),
         backchannel_logout_uri: None,
+        sector: None,
     })
 }
 

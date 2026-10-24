@@ -18,7 +18,9 @@ use tessari_oauth_constants::{ACCESS_TOKEN_TTL_SECS, ADMIN_CONSOLE_CLIENT};
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
 use tessari_oauth_storage::clients::NewClient;
 use tessari_oauth_storage::operators::OperatorRole;
-use tessari_oauth_types::{Algorithm, ClientId, ErrorCategory, RedirectUri, Resource, ScopeSet};
+use tessari_oauth_types::{
+    Algorithm, ClientId, ErrorCategory, RedirectUri, Resource, ScopeSet, Sector,
+};
 
 use super::AdminState;
 use super::change::{Made, Reasoned, Refusal, apply};
@@ -49,6 +51,7 @@ pub(super) struct Registering {
     #[serde(default)]
     post_logout_redirect_uris: Vec<String>,
     backchannel_logout_uri: Option<String>,
+    sector: Option<String>,
     reason: String,
 }
 
@@ -151,6 +154,10 @@ fn registration(sent: Registering) -> Result<NewClient> {
         backchannel_logout_uri: sent
             .backchannel_logout_uri
             .map(|uri| RedirectUri::parse(uri).map_err(|_| Error::Invalid))
+            .transpose()?,
+        sector: sent
+            .sector
+            .map(|sector| Sector::parse(sector).map_err(|_| Error::Invalid))
             .transpose()?,
     })
 }

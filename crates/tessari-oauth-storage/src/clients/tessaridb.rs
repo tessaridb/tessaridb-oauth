@@ -39,7 +39,7 @@ impl ClientRepository for TessaridbClientRepository {
                  assertion_alg: $assertion_alg, \
                  grant_types: $grant_types, jwks: $jwks, dpop_bound_access_tokens: $dpop_bound_access_tokens, \
                  registered_at: $registered_at, post_logout_redirect_uris: $post_logout_redirect_uris, \
-                 backchannel_logout_uri: $backchannel_logout_uri };",
+                 backchannel_logout_uri: $backchannel_logout_uri, sector: $sector };",
                 vec![
                     ("id".to_owned(), Value::from(client.client_id.as_str())),
                     ("tenant".to_owned(), Value::from(client.tenant.as_str())),
@@ -74,6 +74,10 @@ impl ClientRepository for TessaridbClientRepository {
                             .backchannel_logout_uri
                             .as_deref()
                             .map_or(Value::None, Value::from),
+                    ),
+                    (
+                        "sector".to_owned(),
+                        client.sector.as_deref().map_or(Value::None, Value::from),
                     ),
                 ],
             )

@@ -98,7 +98,7 @@ pub(super) async fn enrol(
                     tenant,
                     &code,
                     &user,
-                    operator.user.as_str(),
+                    &operator.actor.name(),
                     (issuing.clock)(),
                 )
                 .await

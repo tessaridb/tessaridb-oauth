@@ -137,6 +137,7 @@ pub(super) async fn grant(
         (&company, &headers, &body),
         (role, GRANT),
         |operator, sent: Granting| async move {
+            operator.in_console(&granting, GRANT).await?;
             let days = sent.valid_days.unwrap_or(OPERATOR_GRANT_DEFAULT_DAYS);
             if !(1..=OPERATOR_GRANT_MAX_DAYS).contains(&days) {
                 return Err(Error::Invalid);
@@ -164,7 +165,7 @@ pub(super) async fn grant(
             let grant = OperatorGrant {
                 user: account.user,
                 role,
-                granted_by: operator.user.as_str().to_owned(),
+                granted_by: operator.actor.name(),
                 granted_at: now,
                 reason: reason_of(&sent)?,
                 expires_at: Some(expires_at),
@@ -206,6 +207,7 @@ pub(super) async fn revoke(
         (&company, &headers, &body),
         (role, REVOKE),
         |operator, sent: Revoking| async move {
+            operator.in_console(&revoking, REVOKE).await?;
             let Ok(user) = UserId::parse(user) else {
                 return refused(StatusCode::CONFLICT, "not_granted", None);
             };
@@ -216,7 +218,7 @@ pub(super) async fn revoke(
                     &operator.tenant,
                     &user,
                     role,
-                    operator.user.as_str(),
+                    &operator.actor.name(),
                     &reason,
                     (revoking.clock)(),
                 )

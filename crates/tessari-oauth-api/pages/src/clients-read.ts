@@ -22,6 +22,7 @@ export interface Client {
   grantTypes: string[];
   dpop: boolean;
   keys: number;
+  sector: string | null;
   console: boolean;
 }
 
@@ -42,10 +43,11 @@ export interface ClientForm {
   resources: string;
   grants: readonly string[];
   dpop: boolean;
+  sector: string;
 }
 
 /** The form field a refusal points at. */
-export type FormField = "id" | "jwk" | "algorithm" | "redirects" | "scopes" | "grants";
+export type FormField = "id" | "jwk" | "algorithm" | "redirects" | "scopes" | "grants" | "sector";
 
 /** The address of the registrations page after the cursor `after`. */
 export function clientsPath(after: string | null): string {
@@ -63,17 +65,20 @@ function readClient(value: unknown): Client | null {
   const grantTypes = strings(field(value, "grant_types"));
   const dpop = field(value, "dpop_bound_access_tokens");
   const keys = field(value, "keys");
+  const sector = field(value, "sector");
   const console = field(value, "console");
   if (
     typeof id !== "string" || id === "" || (kind !== "public" && kind !== "confidential")
     || typeof authMethod !== "string" || (assertionAlg !== null && typeof assertionAlg !== "string")
     || redirectUris === null || scopeCeiling === null || resources === null || grantTypes === null
     || typeof dpop !== "boolean" || typeof keys !== "number" || !Number.isSafeInteger(keys) || keys < 0
-    || typeof console !== "boolean"
+    || (sector !== null && typeof sector !== "string") || typeof console !== "boolean"
   ) {
     return null;
   }
-  return { id, kind, authMethod, assertionAlg, redirectUris, scopeCeiling, resources, grantTypes, dpop, keys, console };
+  return {
+    id, kind, authMethod, assertionAlg, redirectUris, scopeCeiling, resources, grantTypes, dpop, keys, sector, console,
+  };
 }
 
 /** `GET api/clients`'s answer, or null when any part of it is not the shape the console knows. */
@@ -145,6 +150,11 @@ function clientIdOf(id: string): boolean {
   return id.length >= 1 && id.length <= 255 && /^[\x20-\x7e]+$/.test(id);
 }
 
+/** Whether `sector` is a name the server takes: lowercase letters, digits, hyphens and underscores, 1 to 64. */
+function sectorOf(sector: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(sector);
+}
+
 /** The JWK `text` holds when it is one JSON object, else null. */
 function jwkOf(text: string): object | null {
   try {
@@ -171,11 +181,16 @@ export function registrationOf(form: ClientForm): { body: Record<string, unknown
   if (grants.includes("authorization_code") && redirects.length === 0) {
     return { wrong: "redirects" };
   }
+  const sector = form.sector.trim();
+  if (sector !== "" && !sectorOf(sector)) {
+    return { wrong: "sector" };
+  }
   const shared = {
     client_id: id,
     redirect_uris: redirects,
     scope_ceiling: listOf(form.scopes),
     resources: listOf(form.resources),
+    ...(sector === "" ? {} : { sector }),
   };
   if (!form.confidential) {
     return {

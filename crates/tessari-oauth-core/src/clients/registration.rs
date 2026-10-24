@@ -2,9 +2,10 @@
 
 use std::collections::BTreeSet;
 
-use tessari_oauth_types::{ClientId, RedirectUri, Resource, ScopeSet, TenantId};
+use tessari_oauth_types::{ClientId, RedirectUri, Resource, ScopeSet, Sector, TenantId};
 
 use crate::jose::{Algorithm, VerifyingKey};
+use crate::subject::SubjectSector;
 
 /// How a client authenticates at the token endpoint. Exactly one is pinned per client; a request using another
 /// method is refused even when that other method would be acceptable, so a client cannot be downgraded.
@@ -88,6 +89,19 @@ pub struct ClientRegistration {
     pub post_logout_redirect_uris: Vec<RedirectUri>,
     /// Where this client is told, server to server, that a session it holds ended; none means it is not told.
     pub backchannel_logout_uri: Option<RedirectUri>,
+    /// The sector whose subjects this client shares with the other clients of one product; none means its own.
+    pub sector: Option<Sector>,
+}
+
+impl ClientRegistration {
+    /// Whose pairwise subjects this client is given.
+    #[must_use]
+    pub fn subject_sector(&self) -> SubjectSector {
+        self.sector.clone().map_or_else(
+            || SubjectSector::Client(self.client_id.clone()),
+            SubjectSector::Named,
+        )
+    }
 }
 
 /// Finds a tenant's client registrations; the storage layer implements it.

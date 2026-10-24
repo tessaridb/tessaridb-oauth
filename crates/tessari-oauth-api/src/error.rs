@@ -90,6 +90,12 @@ pub enum Error {
     /// The console operator does not hold the role the request needs.
     #[error("a role is required")]
     RoleRequired,
+    /// A registered service asked for what only an operator in the console may do.
+    #[error("only a console operator may do this")]
+    ConsoleOnly,
+    /// An admin request carried a service assertion that was not accepted; the audit trail names the check.
+    #[error("the service assertion was not accepted")]
+    ServiceRefused,
     /// A console change came without the operator's reason, or with one too long.
     #[error("a reason is required")]
     ReasonRequired,
@@ -128,9 +134,10 @@ impl Error {
             | Self::ProfileRejected
             | Self::EmailRejected
             | Self::AddressNotAccepted => ErrorCategory::Validation,
-            Self::ConsoleRefused | Self::CrossOrigin | Self::RoleRequired => {
+            Self::ConsoleRefused | Self::CrossOrigin | Self::RoleRequired | Self::ConsoleOnly => {
                 ErrorCategory::Forbidden
             }
+            Self::ServiceRefused => ErrorCategory::Unauthorized,
             Self::ReasonRequired | Self::IdempotencyKeyRequired => ErrorCategory::Validation,
             Self::IdempotencyKeyReused | Self::ChangeInProgress => ErrorCategory::Conflict,
             Self::MailUnavailable => ErrorCategory::Unavailable,
@@ -262,6 +269,16 @@ impl IntoResponse for Error {
                 StatusCode::FORBIDDEN,
                 "role_required",
                 "your operator roles do not include this",
+            ),
+            (Self::ConsoleOnly, _) => (
+                StatusCode::FORBIDDEN,
+                "console_only",
+                "only an operator signed in to the console may do this",
+            ),
+            (Self::ServiceRefused, _) => (
+                StatusCode::UNAUTHORIZED,
+                "service_refused",
+                "the service assertion was not accepted; sign a new one",
             ),
             (Self::ReasonRequired, _) => (
                 StatusCode::BAD_REQUEST,

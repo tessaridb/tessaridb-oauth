@@ -149,9 +149,18 @@ async fn user_of(
         return Ok(None);
     }
     let client = ClientId::parse(access.client_id.as_str()).map_err(|_| Error::Internal)?;
+    // The subject was derived in the client's sector; a client removed since stands for nobody.
+    let Some(registration) = state
+        .clients
+        .find(tenant, &client)
+        .await
+        .map_err(Error::Store)?
+    else {
+        return Ok(None);
+    };
     state
         .subjects
-        .user_of(tenant, &client, &access.subject)
+        .user_of(tenant, &registration.subject_sector(), &access.subject)
         .await
         .map_err(Error::Store)
 }
