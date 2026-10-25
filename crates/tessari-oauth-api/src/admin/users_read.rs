@@ -237,7 +237,11 @@ pub(super) async fn reveal(
 
 /// Count `accounts` shown to `operator` before they are answered, and log the read that takes the operator's count for
 /// the hour to the number worth noticing (admin console reads are personal data).
-async fn shown_to(state: &AdminState, operator: &Operator, accounts: usize) -> Result<()> {
+pub(super) async fn shown_to(
+    state: &AdminState,
+    operator: &Operator,
+    accounts: usize,
+) -> Result<()> {
     if accounts == 0 {
         return Ok(());
     }
@@ -260,7 +264,7 @@ async fn shown_to(state: &AdminState, operator: &Operator, accounts: usize) -> R
 }
 
 /// The answer for an account the company does not have.
-fn missing() -> Response {
+pub(super) fn missing() -> Response {
     (
         StatusCode::NOT_FOUND,
         Json(Refusal {

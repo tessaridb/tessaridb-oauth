@@ -180,6 +180,9 @@ held to the console's origin (it carries no cookie a page could ride on), and st
 `reason` with every change, recorded as `service:<id>`. Granting operator roles, revealing an address and `api/me` are
 `403 console_only` for a service. `GET .../api/users/by-subject?sector=&sub=` (role `users`) reads the account a
 client sector's pairwise subject stands for, masked as `GET .../api/users/<user>` shows it, or `404 user_not_found`.
+`GET .../api/users/<user>/subject?sector=` (role `users`) answers `{user, sector, subject}`, the subject that
+sector's clients know the account by; it is derived and never recorded, so it cannot be looked up in reverse until a
+client of the sector is actually given it.
 
 ## The audit trail
 

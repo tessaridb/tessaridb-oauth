@@ -22,6 +22,7 @@ mod session;
 mod signin;
 mod users;
 mod users_read;
+mod users_subject;
 
 use std::sync::Arc;
 
@@ -223,6 +224,10 @@ pub fn admin_router(state: AdminState) -> Router {
             get(users_read::by_subject),
         )
         .route("/admin/{company}/api/users/{user}", get(users_read::one))
+        .route(
+            "/admin/{company}/api/users/{user}/subject",
+            get(users_subject::subject),
+        )
         .route(
             "/admin/{company}/api/services",
             get(services::list).post(services::register),

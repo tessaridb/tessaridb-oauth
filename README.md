@@ -10,7 +10,7 @@ An OAuth 2.1 authorization server and OpenID provider written in Rust. One binar
 endpoints, the users' account portal and an embedded admin panel on its own listener; tenants, users, clients,
 codes, grants, keys and the audit trail are records in a TessariDB cluster.
 
-[![release](https://img.shields.io/badge/release-0.2.0-6B5FD1?style=flat-square)](#status)
+[![release](https://img.shields.io/badge/release-0.3.0-6B5FD1?style=flat-square)](#status)
 [![licence](https://img.shields.io/badge/licence-BUSL--1.1-6B5FD1?style=flat-square)](LICENSE)
 [![rust](https://img.shields.io/badge/rust-1.98%2B-6B5FD1?style=flat-square)](#building-and-checking)
 
@@ -20,7 +20,7 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 </div>
 
 > [!NOTE]
-> **0.2.0.** Everything listed under [Status](#status) is served by the binary and covered by
+> **0.3.0.** Everything listed under [Status](#status) is served by the binary and covered by
 > tests. The configuration and the HTTP surface may still change in a minor release before 1.0.
 
 ## What it is for
@@ -57,7 +57,7 @@ claimed until a test backs them.
 
 | | |
 |---|---|
-| Release | 0.2.0, image `tessaridb/oauth:0.2.0` |
+| Release | 0.3.0, image `tessaridb/oauth:0.3.0` |
 | Served | per-tenant discovery and key set; authorization (with PAR), token (code, refresh, client credentials), revocation, UserInfo, RP-initiated and back-channel logout; sign-in with password, TOTP, recovery codes and passkeys; password reset, enrolment links, address verification, changes of sign-in address and sign-in notices by mail, worded per company; self-registration under company policy; consent; the account portal and its API; the admin console, with service credentials for programs; client sectors; signing-key rotation; per-address limits; the audit trail; regions |
 | Licence | BUSL-1.1 (see [Licence](#licence)) |
 
@@ -131,7 +131,7 @@ docker run -d --name oauth -p 8443:8443 -p 127.0.0.1:9443:9443 \
   -e TESSARIDB_OAUTH_STORE=db.example.com:9080 -e TESSARIDB_OAUTH_STORE_USER=oauth \
   -e TESSARIDB_OAUTH_STORE_PASSWORD -e TESSARIDB_OAUTH_STORE_AUTHORITY=/keys/store-ca.pem \
   -v "$PWD/store-ca.pem:/keys/store-ca.pem:ro" \
-  -e TESSARIDB_OAUTH_REGION=eu -e TESSARIDB_OAUTH_TENANTS=acme tessaridb/oauth:0.2.0
+  -e TESSARIDB_OAUTH_REGION=eu -e TESSARIDB_OAUTH_TENANTS=acme tessaridb/oauth:0.3.0
 ```
 
 Behind a reverse proxy, the proxy holds the certificate for `PUBLIC_URL`, passes requests on in the clear, and
