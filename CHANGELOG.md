@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-25
+
 ### Added
 
 - `GET .../api/users/<user>/subject?sector=` answers the subject a sector's clients know an account by, so a
