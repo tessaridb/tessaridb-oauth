@@ -17,7 +17,7 @@ const WHY: &str = r#"{"reason":"matrix probe"}"#;
 
 /// Every route behind a session: its method, its path under `/admin/{company}`, and whether a role refuses an
 /// operator holding only `audit` there.
-const ROUTES: [(&str, &str, bool); 43] = [
+const ROUTES: [(&str, &str, bool); 44] = [
     ("GET", "api/me", false),
     ("GET", "api/policy/two-factor", true),
     ("PUT", "api/policy/two-factor", true),
@@ -36,6 +36,11 @@ const ROUTES: [(&str, &str, bool); 43] = [
     ("GET", "api/users", true),
     ("POST", "api/users", true),
     ("GET", "api/users/user-nobody", true),
+    (
+        "GET",
+        "api/users/user-nobody/subject?sector=tessaridb-cloud",
+        true,
+    ),
     ("GET", "api/audit", false),
     ("GET", "api/companies", true),
     ("POST", "api/companies", true),

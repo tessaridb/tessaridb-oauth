@@ -218,6 +218,124 @@ async fn a_registered_service_manages_accounts_by_its_assertions() {
 
 #[tokio::test]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn a_service_reads_the_subject_a_sector_knows_an_account_by() {
+    let (server, state) = registered().await;
+    let opened = send(
+        &state,
+        as_service(
+            "POST",
+            "/admin/acme/api/users",
+            &assertion("backend", "open-s1"),
+            Some((
+                "open-subject-0001",
+                r#"{"email":"subject@example.com","reason":"cloud sign-up"}"#,
+            )),
+        ),
+    )
+    .await;
+    assert_eq!(opened.status, StatusCode::CREATED, "{:?}", opened.body);
+    let user = opened.body["user"]
+        .as_str()
+        .expect("the account's id")
+        .to_owned();
+    let issued = server
+        .storage
+        .subjects
+        .pairwise(
+            &tenant("acme"),
+            &server.kek,
+            &SubjectSector::Named(Sector::parse("tessaridb-cloud").expect("a sector")),
+            &UserId::parse(user.clone()).expect("a user id"),
+            Timestamp::from_unix_secs(NOW),
+        )
+        .await
+        .expect("the subject a token of the sector carries");
+
+    let read = send(
+        &state,
+        as_service(
+            "GET",
+            &format!("/admin/acme/api/users/{user}/subject?sector=tessaridb-cloud"),
+            &assertion("backend", "subject-1"),
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(read.status, StatusCode::OK, "{:?}", read.body);
+    assert_eq!(read.body["user"], user.as_str());
+    assert_eq!(read.body["sector"], "tessaridb-cloud");
+    assert_eq!(read.body["subject"], issued.as_str());
+
+    // A sector no client of it has signed this account in to: the subject is answered and nothing is recorded, so
+    // the reverse lookup still names nobody.
+    let unseen = send(
+        &state,
+        as_service(
+            "GET",
+            &format!("/admin/acme/api/users/{user}/subject?sector=never-signed-in"),
+            &assertion("backend", "subject-2"),
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(unseen.status, StatusCode::OK, "{:?}", unseen.body);
+    let derived = unseen.body["subject"].as_str().expect("a subject");
+    assert_ne!(derived, issued.as_str(), "another sector, another subject");
+    let reverse = send(
+        &state,
+        as_service(
+            "GET",
+            &format!("/admin/acme/api/users/by-subject?sector=never-signed-in&sub={derived}"),
+            &assertion("backend", "subject-3"),
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(
+        reverse.status,
+        StatusCode::NOT_FOUND,
+        "a read records no subject: {:?}",
+        reverse.body
+    );
+
+    let nobody = send(
+        &state,
+        as_service(
+            "GET",
+            "/admin/acme/api/users/user-nobody/subject?sector=tessaridb-cloud",
+            &assertion("backend", "subject-4"),
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(nobody.status, StatusCode::NOT_FOUND, "{:?}", nobody.body);
+    assert_eq!(nobody.body["code"], "user_not_found");
+
+    for (number, query) in ["", "?sector=", "?sector=Not%20A%20Sector", "?sector=a&b=c"]
+        .into_iter()
+        .enumerate()
+    {
+        let refused = send(
+            &state,
+            as_service(
+                "GET",
+                &format!("/admin/acme/api/users/{user}/subject{query}"),
+                &assertion("backend", &format!("subject-bad-{number}")),
+                None,
+            ),
+        )
+        .await;
+        assert_eq!(
+            refused.status,
+            StatusCode::BAD_REQUEST,
+            "{query}: {:?}",
+            refused.body
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
 async fn an_assertion_that_is_not_exactly_right_is_refused() {
     let (_server, state) = registered().await;
     let seed = base64url::decode(SEED).expect("RFC seed");

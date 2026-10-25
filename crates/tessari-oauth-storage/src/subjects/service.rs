@@ -57,10 +57,27 @@ impl SubjectService {
         user: &UserId,
         now: Timestamp,
     ) -> Result<String> {
-        let salt = self.salt(tenant, kek, now).await?;
-        let subject = subject::pairwise(&salt, sector, user);
+        let subject = self.derive(tenant, kek, sector, user, now).await?;
         self.record(tenant, &subject, sector, user).await?;
         Ok(subject)
+    }
+
+    /// The subject `sector` knows `user` of `tenant` by, as [`Self::pairwise`] gives it, without recording it: an
+    /// administrator reading it writes nothing, and only a subject a client was given can be looked up in reverse.
+    ///
+    /// # Errors
+    ///
+    /// A custody failure when the salt does not open under `kek` for this tenant, and the store's failures.
+    pub async fn derive(
+        &self,
+        tenant: &TenantId,
+        kek: &Kek,
+        sector: &SubjectSector,
+        user: &UserId,
+        now: Timestamp,
+    ) -> Result<String> {
+        let salt = self.salt(tenant, kek, now).await?;
+        Ok(subject::pairwise(&salt, sector, user))
     }
 
     /// The user `subject` stands for in `sector` of `tenant`, when the subject was derived for that sector.
