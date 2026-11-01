@@ -147,6 +147,26 @@ fn redirected(page: &Page, error: &str, case: &str) {
 
 #[tokio::test]
 #[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn an_existing_sso_session_is_resumed_instead_of_repeated_sign_in() {
+    let server = server(2).await;
+    let uri = format!("/acme/oauth2/authorize?{}", encode(&valid()));
+    let answered = send(
+        state(&server, plenty()),
+        Request::get(uri)
+            .header("cookie", "__Host-tessari-session=existing")
+            .body(Body::empty())
+            .expect("a request"),
+    )
+    .await;
+    let location = header(&answered.answer, "location");
+    assert!(
+        location.contains("/oauth2/authorize/resume?interaction="),
+        "an existing SSO session continues at resume, not another login: {location}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
 async fn a_request_not_tied_to_a_registered_redirect_is_refused_at_the_server() {
     let server = server(2).await;
     rendered(

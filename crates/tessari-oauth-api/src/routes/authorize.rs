@@ -142,8 +142,9 @@ async fn respond(
             .await
             .map_err(Error::Store)?,
     };
-    // A request that asked for no page is answered from the session at resume, never shown the sign-in page.
-    let next = if request.silent {
+    // An existing SSO session continues at resume, so moving between relying parties does not ask for the same
+    // credentials again. A request that asked for no page is answered there too, never shown the sign-in page.
+    let next = if request.silent || cookie(headers, SESSION_COOKIE).is_some() {
         AUTHORIZE_RESUME_PATH
     } else {
         LOGIN_PATH
