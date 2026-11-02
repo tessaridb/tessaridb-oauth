@@ -10,7 +10,7 @@ An OAuth 2.1 authorization server and OpenID provider written in Rust. One binar
 endpoints, the users' account portal and an embedded admin panel on its own listener; tenants, users, clients,
 codes, grants, keys and the audit trail are records in a TessariDB cluster.
 
-[![release](https://img.shields.io/badge/release-0.3.1-6B5FD1?style=flat-square)](#status)
+[![release](https://img.shields.io/badge/release-0.3.2-6B5FD1?style=flat-square)](#status)
 [![licence](https://img.shields.io/badge/licence-BUSL--1.1-6B5FD1?style=flat-square)](LICENSE)
 [![rust](https://img.shields.io/badge/rust-1.98%2B-6B5FD1?style=flat-square)](#building-and-checking)
 
@@ -20,7 +20,7 @@ codes, grants, keys and the audit trail are records in a TessariDB cluster.
 </div>
 
 > [!NOTE]
-> **0.3.1.** Everything listed under [Status](#status) is served by the binary and covered by
+> **0.3.2.** Everything listed under [Status](#status) is served by the binary and covered by
 > tests. The configuration and the HTTP surface may still change in a minor release before 1.0.
 
 ## What it is for
