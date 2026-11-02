@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Explicit CORS preflight handling for token, revocation and pushed-authorization endpoints, allowing the Agent
+  Memory console to complete its browser OAuth flow while unrelated origins and methods stay refused.
+
 ## [0.3.0] - 2026-10-25
 
 ### Added
