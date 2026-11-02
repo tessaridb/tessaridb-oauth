@@ -4,7 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.1] - 2026-11-02
+
+### Added
+
+- Explicit CORS preflight handling for token, revocation and pushed-authorization endpoints, allowing the Agent
+  Memory console to complete its browser OAuth flow while unrelated origins and methods stay refused.
 
 ## [0.3.0] - 2026-10-25
 

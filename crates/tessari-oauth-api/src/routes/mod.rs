@@ -17,6 +17,7 @@ mod authorize;
 mod brand;
 mod breached;
 mod browser;
+mod cors;
 mod jwks;
 mod login;
 mod logout;
@@ -89,9 +90,22 @@ pub fn public_router(state: PublicState) -> Router {
             crate::throttle::authorizations,
         ));
     let tokens = Router::new()
-        .route("/{tenant}/oauth2/token", post(token::token))
-        .route("/{tenant}/oauth2/revoke", post(token::revoke))
-        .route("/{tenant}/oauth2/par", post(token::par))
+        .route(
+            "/{tenant}/oauth2/token",
+            post(token::token).options(cors::preflight),
+        )
+        .route(
+            "/{tenant}/oauth2/revoke",
+            post(token::revoke).options(cors::preflight),
+        )
+        .route(
+            "/{tenant}/oauth2/par",
+            post(token::par).options(cors::preflight),
+        )
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            cors::decorated,
+        ))
         .layer(DefaultBodyLimit::max(TOKEN_BODY_MAX_BYTES))
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),

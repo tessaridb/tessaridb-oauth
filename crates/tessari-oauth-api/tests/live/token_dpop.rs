@@ -4,16 +4,19 @@
 
 use std::collections::BTreeSet;
 
-use axum::http::StatusCode;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use tessari_oauth_api::public_router;
 use tessari_oauth_core::clients::{AuthMethod, GrantType};
 use tessari_oauth_infrastructure::custody::SigningKey;
 use tessari_oauth_storage::clients::NewClient;
 use tessari_oauth_types::{Algorithm, ClientId, RedirectUri, ScopeSet, Timestamp};
+use tower::ServiceExt;
 
-use crate::routes::Answer;
+use crate::routes::{Answer, answer, header};
 use crate::token_auth::{ASSERTION_TYPE, Holder, assertion, payload, post_with, target};
 use crate::token_fixture::{
-    NOW, REDIRECT, Server, issue, issuer, post, redemption, server, tenant, uncached,
+    NOW, REDIRECT, Server, issue, issuer, plenty, post, redemption, server, state, tenant, uncached,
 };
 
 fn issued(answer: &Answer, token_type: &str, case: &str) {
@@ -278,4 +281,43 @@ async fn a_confidential_clients_refresh_is_not_bound_to_the_proof_key() {
         "Bearer",
         "refreshed by client authentication alone",
     );
+}
+
+#[tokio::test]
+#[ignore = "needs a TessariDB node: set TESSARIDB_OAUTH_TEST_STORE, _USER and _PASSWORD"]
+async fn token_cors_is_limited_to_a_registered_public_clients_origin() {
+    let server = server(2).await;
+    for (origin, allowed) in [
+        ("https://app.example.com", true),
+        ("https://evil.example", false),
+    ] {
+        let response = public_router(state(&server, plenty()))
+            .oneshot(
+                Request::options("/acme/oauth2/token")
+                    .header("origin", origin)
+                    .header("access-control-request-method", "POST")
+                    .header(
+                        "access-control-request-headers",
+                        "authorization,dpop,content-type",
+                    )
+                    .body(Body::empty())
+                    .expect("a preflight request"),
+            )
+            .await
+            .expect("the router answers");
+        let answer = answer(response).await;
+        if allowed {
+            assert_eq!(answer.status, StatusCode::NO_CONTENT, "{}", answer.body);
+            assert_eq!(header(&answer, "access-control-allow-origin"), origin);
+            assert_eq!(header(&answer, "access-control-allow-methods"), "POST");
+            assert!(
+                !answer
+                    .headers
+                    .contains_key("access-control-allow-credentials")
+            );
+        } else {
+            assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
+            assert!(!answer.headers.contains_key("access-control-allow-origin"));
+        }
+    }
 }
