@@ -4,12 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.3] - 2026-11-10
+
+### Fixed
+
+- Existing SSO sessions now resume at authorization; absent or expired sessions and `prompt=login` still require authentication.
+- README, release notes and public release surfaces now describe the current server and image.
+
 ## [0.3.2] - 2026-11-02
 
 ### Added
 
 - Explicit CORS preflight handling for token, revocation and pushed-authorization endpoints, allowing the Agent
   Memory console to complete its browser OAuth flow while unrelated origins and methods stay refused.
+
+## [0.3.1] - 2026-11-02
+
+### Changed
+
+- The packaging attempt was abandoned before registry publication because per-crate versions disagreed. The git tag
+  remains immutable and was not moved; the corrected release is 0.3.2.
 
 ## [0.3.0] - 2026-10-25
 
